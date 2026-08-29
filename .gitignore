@@ -27,3 +27,34 @@ npm-debug.log*
 
 # Supabase CLI (estado local)
 supabase/.temp/
+
+# Environment & Secrets (AIOX)
+*.key
+*.pem
+
+# Dependencies (AIOX)
+node_modules
+
+# Build & Logs (AIOX)
+dist/
+logs/
+
+# IDE & OS (AIOX)
+Thumbs.db
+.idea/
+*.swp
+
+# AIOX Local (AIOX)
+.aiox-core/local/
+.claude/settings.local.json
+.aiox/install-log.txt
+
+# AIOX — framework vendorizado (51MB, reconstituível via `aiox install`), nunca versionar
+.aiox-core/
+
+# AIOX — config de IDEs que não usamos neste projeto (só Claude Code)
+.antigravity/
+.codex/
+.cursor/
+.gemini/
+.kimi/
