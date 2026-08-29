@@ -2,7 +2,8 @@
 
 :root {
   /* Paleta oficial da marca (Gaiamum marca/Gaiamum dashboard.png):
-     navy #011f51, azul #0141bc, azul vivo #0069fd, ciano #00cbee, creme #f5e9dc. */
+     navy #011f51, azul #0141bc, azul vivo #0069fd, ciano #00cbee, creme #f5e9dc.
+     Tema escuro é o padrão (sem atributo); tema claro entra via [data-theme="light"]. */
   --gaiamum-bg: #011f51;
   --gaiamum-surface: #0c2b63;
   --gaiamum-surface-raised: #163a76;
@@ -23,6 +24,17 @@
   --gaiamum-tag-purple: #a855f7;
   --gaiamum-tag-teal: #14b8a6;
   --gaiamum-tag-yellow: #eab308;
+}
+
+/* Tema claro — aplicação em fundo branco da marca (Logo Gaimum no branco.png):
+   mesmas cores de acento (azul/ciano), fundo e texto invertidos pro claro. */
+:root[data-theme="light"] {
+  --gaiamum-bg: #f5f6f8;
+  --gaiamum-surface: #ffffff;
+  --gaiamum-surface-raised: #eef0f4;
+  --gaiamum-border: #dde1e8;
+  --gaiamum-text: #002559;
+  --gaiamum-text-muted: #5b6b85;
 }
 
 @theme inline {
@@ -52,8 +64,13 @@ html {
   color-scheme: dark;
 }
 
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
 body {
   background: var(--gaiamum-bg);
   color: var(--gaiamum-text);
   font-family: var(--font-sans);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }

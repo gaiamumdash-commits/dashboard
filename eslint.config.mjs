@@ -12,6 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Framework instalado pelo AIOX — não é código do app, não seguimos as
+    // regras de lint dele (ESLint escaneia o disco, não respeita .gitignore).
+    ".claude/**",
+    ".github/**",
+    ".aiox-core/**",
+    ".antigravity/**",
+    ".codex/**",
+    ".cursor/**",
+    ".gemini/**",
+    ".kimi/**",
   ]),
 ]);
 
