@@ -72,7 +72,7 @@ export default function PaginaAuth() {
           <button
             type="submit"
             disabled={carregando}
-            className="mt-2 rounded-lg bg-gaiamum-primary px-4 py-2 font-medium text-black transition hover:bg-gaiamum-primary-dark disabled:opacity-60"
+            className="mt-2 rounded-lg bg-gaiamum-primary px-4 py-2 font-medium text-white transition hover:bg-gaiamum-primary-dark disabled:opacity-60"
           >
             {carregando ? "Aguarde..." : modo === "login" ? "Entrar" : "Criar conta"}
           </button>

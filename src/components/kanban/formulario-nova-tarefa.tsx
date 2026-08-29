@@ -62,7 +62,7 @@ export function FormularioNovaTarefa({ projetoId }: { projetoId: string }) {
 
       <button
         type="submit"
-        className="rounded-lg bg-gaiamum-primary px-5 py-2 font-medium text-black transition hover:bg-gaiamum-primary-dark"
+        className="rounded-lg bg-gaiamum-primary px-5 py-2 font-medium text-white transition hover:bg-gaiamum-primary-dark"
       >
         Adicionar tarefa
       </button>

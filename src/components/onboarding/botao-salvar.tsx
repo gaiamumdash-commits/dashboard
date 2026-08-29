@@ -9,7 +9,7 @@ export function BotaoSalvar() {
     <button
       type="submit"
       disabled={pending}
-      className="self-start rounded-lg bg-gaiamum-primary px-6 py-3 font-medium text-black transition hover:bg-gaiamum-primary-dark disabled:opacity-60"
+      className="self-start rounded-lg bg-gaiamum-primary px-6 py-3 font-medium text-white transition hover:bg-gaiamum-primary-dark disabled:opacity-60"
     >
       {pending ? "Salvando..." : "Salvar metas e continuar"}
     </button>

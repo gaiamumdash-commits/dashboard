@@ -1,25 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  /* Dark mode é o único modo do Gaiamum — alto contraste, fadiga visual baixa. */
-  --gaiamum-bg: #121212;
-  --gaiamum-surface: #27272a;
-  --gaiamum-surface-raised: #323235;
-  --gaiamum-border: #3a3a3d;
-  --gaiamum-text: #f4f4f5;
-  --gaiamum-text-muted: #a1a1aa;
+  /* Paleta oficial da marca (Gaiamum marca/Gaiamum dashboard.png):
+     navy #011f51, azul #0141bc, azul vivo #0069fd, ciano #00cbee, creme #f5e9dc. */
+  --gaiamum-bg: #011f51;
+  --gaiamum-surface: #0c2b63;
+  --gaiamum-surface-raised: #163a76;
+  --gaiamum-border: #24488c;
+  --gaiamum-text: #f5e9dc;
+  --gaiamum-text-muted: #9fb2d9;
 
-  --gaiamum-primary: #f97316;
-  --gaiamum-primary-dark: #c2570a;
+  --gaiamum-primary: #0069fd;
+  --gaiamum-primary-dark: #0141bc;
+  --gaiamum-accent: #00cbee;
 
   /* Semânticas */
   --gaiamum-success: #22c55e;
   --gaiamum-danger: #ef4444;
   --gaiamum-warning: #eab308;
 
-  /* Tags de categorização (Módulo 8) */
+  /* Tags de categorização */
   --gaiamum-tag-purple: #a855f7;
-  --gaiamum-tag-blue: #3b82f6;
+  --gaiamum-tag-teal: #14b8a6;
   --gaiamum-tag-yellow: #eab308;
 }
 
@@ -33,13 +35,14 @@
 
   --color-gaiamum-primary: var(--gaiamum-primary);
   --color-gaiamum-primary-dark: var(--gaiamum-primary-dark);
+  --color-gaiamum-accent: var(--gaiamum-accent);
 
   --color-gaiamum-success: var(--gaiamum-success);
   --color-gaiamum-danger: var(--gaiamum-danger);
   --color-gaiamum-warning: var(--gaiamum-warning);
 
   --color-gaiamum-tag-purple: var(--gaiamum-tag-purple);
-  --color-gaiamum-tag-blue: var(--gaiamum-tag-blue);
+  --color-gaiamum-tag-teal: var(--gaiamum-tag-teal);
   --color-gaiamum-tag-yellow: var(--gaiamum-tag-yellow);
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
