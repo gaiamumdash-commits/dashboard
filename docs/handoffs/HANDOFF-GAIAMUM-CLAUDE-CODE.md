@@ -8,16 +8,17 @@
 
 ---
 
-## Estado confirmado (2026-08-29, fim de tarde)
+## Estado confirmado (2026-08-29, noite)
 
 - **Fundação + Módulo 0-2** implementados: onboarding SMART, projetos (CRUD), kanban de tarefas (com tags pessoal/ifaz/faculdade/vendas). Detalhes de arquitetura na seção "Fundação técnica" abaixo.
 - **Infraestrutura 100% pronta e no ar**, independente do UltraQuadras:
   - **GitHub:** conta `gaiamumdash-commits`, repo `gaiamumdash-commits/dashboard`, branch `main`.
   - **Vercel:** time `gaiamum-dash`, projeto `gaiamum-dashboard`, conectado ao GitHub (deploy automático a cada push), env vars do Supabase em Production + Preview.
-  - **Supabase:** projeto `gaiamum-dashboard` (ref `zfjtcivusdmjvdbycpjs`, São Paulo), migration `0001_schema_inicial.sql` aplicada — tabelas `tenants`, `memberships`, `metas_smart`, `projetos`, `tarefas` confirmadas.
+  - **Supabase:** projeto `gaiamum-dashboard` (ref `zfjtcivusdmjvdbycpjs`, São Paulo), migration `0001_schema_inicial.sql` aplicada — tabelas `tenants`, `memberships`, `metas_smart`, `projetos`, `tarefas` confirmadas. `site_url` e `uri_allow_list` corrigidos (estavam em `localhost:3000`, agora apontam pra produção + localhost).
   - **`gh` e `vercel` CLI desta máquina** foram trocados da conta "ultraquadras" pra `gaiamumdash-commits`/`gaiamum-dash` — ficam assim permanentemente pra este projeto.
 - **AIOX instalado** localmente no projeto (framework de agentes/governança, auditado sem achados de segurança). Ver "Convenção de push" abaixo — muda como publicar no repo.
 - **Identidade visual completa:** tema escuro (padrão) + tema claro (alternável, botão fixo no canto), favicon, apple-touch-icon e imagem de Open Graph, todos com a paleta oficial da marca.
+- **Página de login com a arte oficial da marca:** layout dividido (arte à esquerda em telas largas, formulário à direita) com versão mobile dedicada (arte vertical sem os mockups, como fundo com o cartão flutuando embaixo). Login com Google implementado (`supabase.auth.signInWithOAuth`, provider habilitado no Supabase com Client ID/Secret do Google Cloud Console, projeto `Gaiamum Dashboard` na conta `gaiamumdash@gmail.com`) — **falta testar o clique real no navegador** (o teste automático via curl travou por rede neste ambiente, não é indicativo de problema). Fluxo de "esqueci minha senha" implementado (`resetPasswordForEmail` + página `/auth/redefinir-senha`).
 - **Módulos 3-7** (financeiro, CRM, vendas, relatórios/IA, painel owner, pagamentos) — nenhum iniciado.
 
 ### Convenção de push (importante, mudou nesta sessão)
@@ -32,7 +33,7 @@ Continua valendo sempre pedir confirmação ao Fabio antes de qualquer push — 
 
 ### Onde encontrar as coisas
 
-- **Marca/logo fonte:** `C:\Users\proff\Downloads\Gaiamum marca\` (`Gaiamum dashboard.png` = versão escura, `Logo Gaimum no branco.png` = versão clara).
+- **Marca/logo fonte:** `C:\Users\proff\Downloads\Gaiamum marca\` (`Gaiamum dashboard.png` = versão escura, `Logo Gaimum no branco.png` = versão clara, `Layout pag login Gaiamum.png` = hero desktop do login, `Layout Gaiamum Mobile.png` = hero mobile do login). Cópias em uso já estão em `public/brand/` no repo (`crab-mark.png`, `login-hero.png`, `login-hero-mobile.png`).
 - **Paleta:** navy `#011f51` (bg escuro), `#0069fd` (primário), `#0141bc` (hover), `#00cbee` (acento ciano), `#f5e9dc` (texto/creme no escuro), `#002559` (texto no tema claro).
 - **Export Obsidian:** `/ecc-system/metas/` dentro do repo — Markdown com frontmatter gerado a cada meta SMART salva. Não substitui o Supabase (fonte de verdade), é só destino de leitura no Obsidian.
 - **Memórias relevantes (fora do repo):** [[projeto_gaiamum_dashboard_novo_saas]] (visão geral), [[feedback_evitar_onedrive_novos_projetos]], [[projeto_gaiamum_referencia_dashboard_sow]] (padrões de UX pros módulos 3-6), [[feedback_gaiamum_aiox_push_devops]].
@@ -87,9 +88,17 @@ AIOX_ACTIVE_AGENT=devops git push   # publicar (ver "Convenção de push")
 
 ## Próximos passos
 
+### Imediato (retomar por aqui)
+
+1. **Testar o login com Google de verdade** no navegador em https://gaiamum-dashboard.vercel.app/auth (clicar "Entrar com Google", confirmar que completa o fluxo e cai em `/`). Se der erro de redirect_uri, conferir se a URI cadastrada no Google Cloud Console bate exatamente com `https://zfjtcivusdmjvdbycpjs.supabase.co/auth/v1/callback`.
+2. Testar o fluxo de "esqueci minha senha" de ponta a ponta (pedir o link, abrir o e-mail, definir nova senha).
+3. Testar o onboarding completo (signup → metas SMART → projeto → kanban) agora que a infra está toda real, e conferir se `/ecc-system/metas/` populou depois.
+
+### Depois
+
 - Módulos 3-7 (financeiro, CRM, value engine/vendas, relatórios/IA, painel owner + Resend, pagamentos, criptografia) — nenhum iniciado. Ver [[projeto_gaiamum_referencia_dashboard_sow]] pra padrões de UX reaproveitáveis.
 - Avaliar se vale evoluir o Módulo 1/2 pra amarrar tarefa↔produto vendido (padrão visto na referência SOW).
-- Registrar/confirmar o domínio `www.gaiamum.com.br` e conectar como domínio custom na Vercel quando pronto (hoje o app só responde em `gaiamum-dashboard.vercel.app` — `metadataBase` em `layout.tsx` vai precisar ser atualizado quando isso acontecer).
+- Registrar/confirmar o domínio `www.gaiamum.com.br` e conectar como domínio custom na Vercel quando pronto (hoje o app só responde em `gaiamum-dashboard.vercel.app` — `metadataBase` em `layout.tsx` e `site_url`/`uri_allow_list` no Supabase vão precisar ser atualizados quando isso acontecer).
 
 ---
 

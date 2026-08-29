@@ -87,8 +87,10 @@ export default function PaginaAuth() {
         />
       </div>
 
-      {/* Arte desktop: metade esquerda da tela, só em telas largas (lg+). */}
-      <div className="relative hidden lg:block lg:w-1/2">
+      {/* Arte desktop: metade esquerda da tela, só em telas largas (lg+).
+          lg:h-screen explícito porque <Image fill> precisa de um ancestral
+          com altura definida — não depender só do stretch do flex. */}
+      <div className="relative hidden lg:block lg:h-screen lg:w-1/2">
         <Image
           src="/brand/login-hero.png"
           alt="Gaiamum Dashboard: organize, decida, cresça"
@@ -99,7 +101,7 @@ export default function PaginaAuth() {
         />
       </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col justify-end px-4 pb-10 pt-4 lg:w-1/2 lg:flex-row lg:items-center lg:justify-center lg:py-12">
+      <div className="relative z-10 flex min-h-screen flex-col justify-end px-4 pb-10 pt-4 lg:h-screen lg:w-1/2 lg:flex-row lg:items-center lg:justify-center lg:py-12">
         <div className="w-full max-w-sm rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-8">
         <Image src="/brand/crab-mark.png" alt="" width={56} height={56} className="mb-3" priority />
         <h1 className="mb-1 text-2xl font-semibold text-gaiamum-text">Gaiamum</h1>
