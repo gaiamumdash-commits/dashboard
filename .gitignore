@@ -24,3 +24,6 @@ npm-debug.log*
 .env.local
 .env.*.local
 !.env.local.example
+
+# Supabase CLI (estado local)
+supabase/.temp/
