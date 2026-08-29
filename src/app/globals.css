@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  /* Dark mode é o único modo do Gaiamum — alto contraste, fadiga visual baixa. */
+  --gaiamum-bg: #121212;
+  --gaiamum-surface: #27272a;
+  --gaiamum-surface-raised: #323235;
+  --gaiamum-border: #3a3a3d;
+  --gaiamum-text: #f4f4f5;
+  --gaiamum-text-muted: #a1a1aa;
+
+  --gaiamum-primary: #f97316;
+  --gaiamum-primary-dark: #c2570a;
+
+  /* Semânticas */
+  --gaiamum-success: #22c55e;
+  --gaiamum-danger: #ef4444;
+  --gaiamum-warning: #eab308;
+
+  /* Tags de categorização (Módulo 8) */
+  --gaiamum-tag-purple: #a855f7;
+  --gaiamum-tag-blue: #3b82f6;
+  --gaiamum-tag-yellow: #eab308;
+}
+
+@theme inline {
+  --color-gaiamum-bg: var(--gaiamum-bg);
+  --color-gaiamum-surface: var(--gaiamum-surface);
+  --color-gaiamum-surface-raised: var(--gaiamum-surface-raised);
+  --color-gaiamum-border: var(--gaiamum-border);
+  --color-gaiamum-text: var(--gaiamum-text);
+  --color-gaiamum-text-muted: var(--gaiamum-text-muted);
+
+  --color-gaiamum-primary: var(--gaiamum-primary);
+  --color-gaiamum-primary-dark: var(--gaiamum-primary-dark);
+
+  --color-gaiamum-success: var(--gaiamum-success);
+  --color-gaiamum-danger: var(--gaiamum-danger);
+  --color-gaiamum-warning: var(--gaiamum-warning);
+
+  --color-gaiamum-tag-purple: var(--gaiamum-tag-purple);
+  --color-gaiamum-tag-blue: var(--gaiamum-tag-blue);
+  --color-gaiamum-tag-yellow: var(--gaiamum-tag-yellow);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--gaiamum-bg);
+  color: var(--gaiamum-text);
+  font-family: var(--font-sans);
+}
