@@ -149,6 +149,20 @@ Sessão que já vinha de um relatório overnight (ver checkpoint da madrugada) c
 
 **Retomar assim:** quando o Fabio quiser avançar nisso, começar decidindo UM pedaço concreto pra prototipar primeiro (provavelmente o gerador de propostas/landing page com IA do plano Manguezal, que já reaproveita o que o relatório overnight mapeou pro Value Engine, sem depender de nenhuma integração externa nova) — não tentar as 7 peças de uma vez.
 
+#### Perfil da empresa (cadastro completo, reutilizável em tudo) — ideia adicional do Fabio, 2026-08-30
+
+Inspirado na Fase 1 (`Diagnóstico da Agência`) da skill `av-value-engine`: um cadastro de empresa completo — nome, site, redes sociais, logo, nicho, tempo de operação, tamanho de time, faturamento (faixa), principal desafio — preenchido uma vez e reaproveitado em tudo que o sistema gerar depois (propostas, landing pages, criativos, contratos), pra o usuário não ficar subindo as mesmas informações toda hora.
+
+**Detalhe importante relido com atenção no `detailed-flow.md` (a skill original faz mais que só coletar dados):** ela pesquisa sozinha via busca na web e acessa o site/redes informados pra completar o que faltou, e devolve um **diagnóstico automático em 3 blocos (Forças, Gaps, Melhorias prioritárias numeradas)** antes de qualquer outra coisa. Vale reaproveitar esse padrão no Gaiamum: pedir só nome + 1 link pra começar, o sistema busca o resto sozinho, e devolve um mini-diagnóstico como primeira "vitória rápida" do onboarding — mais forte que um formulário estático.
+
+**Melhorias sobre o original, específicas do Gaiamum:**
+- Dividir em 2 blocos, como o formulário SMART já faz: **essencial** (nome, nicho, logo, 1 rede social — libera o resto do sistema) e **aprofundado** (pode pular, mesmo padrão "Pular, preencho depois" já existente).
+- Dois campos que a skill original não tem, mas valem muito aqui (o perfil alimenta geração de criativo, não só relatório): **cores da marca** (extraídas do logo automaticamente, como já foi feito com a arte oficial do Gaiamum via `sharp`) e **tom de voz** (formal/descontraído/técnico).
+- Reaproveitar a mesma `BarraProgresso` com a animação do caranguejo indo pra toca (já existe e é genérica).
+- Precisa de uma tela de "Perfil da Empresa" nas configurações pra editar depois — não é só onboarding, senão vira dado congelado no dia 1.
+
+**Diferenciação de plano (mencionada pelo Fabio):** o plano Manguezal permite cadastrar até 2 empresas simultâneas (ex.: alguém tocando duas marcas). Isso muda uma decisão de schema, não só um número de plano: o perfil de empresa vive num nível abaixo do `tenant`, cada empresa com seu próprio perfil completo, e o usuário troca de "empresa ativa" — mesmo padrão de um seletor de workspace. Guardar essa decisão de schema pra quando o Perfil da Empresa for arquitetado de verdade.
+
 ---
 
 ## Checkpoints
