@@ -90,13 +90,13 @@ export default function PaginaAuth() {
       {/* Arte desktop: metade esquerda da tela, só em telas largas (lg+).
           lg:h-screen explícito porque <Image fill> precisa de um ancestral
           com altura definida — não depender só do stretch do flex. */}
-      <div className="relative hidden lg:block lg:h-screen lg:w-1/2">
+      <div className="relative hidden bg-gaiamum-bg lg:block lg:h-screen lg:w-1/2">
         <Image
           src="/brand/login-hero.png"
           alt="Gaiamum Dashboard: organize, decida, cresça"
           fill
           sizes="50vw"
-          className="object-cover object-left"
+          className="object-contain object-left"
           priority
         />
       </div>
