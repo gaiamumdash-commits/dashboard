@@ -77,9 +77,56 @@ export async function enviarAnexoContaAPagar(contaId: string, formData: FormData
   revalidatePath("/financeiro");
 }
 
-export async function removerAnexo(anexoId: string) {
+export async function enviarAnexoTarefa(tarefaId: string, projetoId: string, formData: FormData) {
   const tenantId = await garantirWorkspace();
-  await exigirOwner(tenantId);
+  const supabase = await createClient();
+
+  const arquivo = formData.get("arquivo");
+  if (!(arquivo instanceof File) || arquivo.size === 0) {
+    throw new Error("Selecione um arquivo.");
+  }
+  if (arquivo.size > TAMANHO_MAXIMO_BYTES) {
+    throw new Error("Arquivo maior que 15MB — linke com o Google Drive em vez de anexar aqui.");
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Usuário não autenticado.");
+  }
+
+  const nomeSanitizado = arquivo.name.replace(/[^\w.\-]/g, "_");
+  const storagePath = `${tenantId}/tarefa/${tarefaId}/${Date.now()}-${nomeSanitizado}`;
+
+  const { error: erroUpload } = await supabase.storage.from("anexos").upload(storagePath, arquivo, {
+    contentType: arquivo.type || "application/octet-stream",
+  });
+
+  if (erroUpload) {
+    throw new Error(`Falha ao enviar arquivo: ${erroUpload.message}`);
+  }
+
+  const { error: erroMetadados } = await supabase.from("anexos").insert({
+    tenant_id: tenantId,
+    entidade_tipo: "tarefa",
+    entidade_id: tarefaId,
+    storage_path: storagePath,
+    nome_arquivo: arquivo.name,
+    tamanho_bytes: arquivo.size,
+    tipo_mime: arquivo.type || "application/octet-stream",
+    enviado_por: user.id,
+  });
+
+  if (erroMetadados) {
+    await supabase.storage.from("anexos").remove([storagePath]);
+    throw new Error(`Falha ao registrar anexo: ${erroMetadados.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+export async function removerAnexo(anexoId: string, caminhoRevalidar: string) {
   const supabase = await createClient();
 
   const { data: anexo, error: erroBusca } = await supabase
@@ -100,7 +147,7 @@ export async function removerAnexo(anexoId: string) {
     throw new Error(`Falha ao remover anexo: ${error.message}`);
   }
 
-  revalidatePath("/financeiro");
+  revalidatePath(caminhoRevalidar);
 }
 
 export async function urlAssinadaDoAnexo(storagePath: string): Promise<string> {

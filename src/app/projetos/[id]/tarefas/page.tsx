@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { listarMembros, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
-import type { ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
+import type { Anexo, ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
@@ -68,6 +68,19 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
   ]);
 
   const podeExcluirTarefa = papelAtual === "owner" || Boolean(gestorDoProjeto);
+  const listaTarefas = (tarefas as Tarefa[]) ?? [];
+
+  const { data: anexosDasTarefas } =
+    listaTarefas.length > 0
+      ? await supabase
+          .from("anexos")
+          .select("*")
+          .eq("entidade_tipo", "tarefa")
+          .in(
+            "entidade_id",
+            listaTarefas.map((t) => t.id),
+          )
+      : { data: [] as Anexo[] };
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">
@@ -90,12 +103,13 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
           <QuadroKanban
             projetoId={projetoId}
             colunasIniciais={(colunas as ColunaKanban[]) ?? []}
-            tarefasIniciais={(tarefas as Tarefa[]) ?? []}
+            tarefasIniciais={listaTarefas}
             membrosDoTenant={membros}
             tarefaMembrosIniciais={(tarefaMembros as TarefaMembro[]) ?? []}
             checklistItensIniciais={(checklistItens as ChecklistItem[]) ?? []}
             etiquetasDoTenant={etiquetas}
             tarefaEtiquetasIniciais={(tarefaEtiquetas as TarefaEtiqueta[]) ?? []}
+            anexosIniciais={(anexosDasTarefas as Anexo[] | null) ?? []}
             usuarioAtualId={user?.id ?? null}
             podeExcluirTarefa={podeExcluirTarefa}
           />

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Anexo } from "@/lib/ecc/tipos";
-import { enviarAnexoContaAPagar, removerAnexo, urlAssinadaDoAnexo } from "@/lib/ecc/anexos";
+import { removerAnexo, urlAssinadaDoAnexo } from "@/lib/ecc/anexos";
 
 function formatarTamanho(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -11,7 +11,20 @@ function formatarTamanho(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function AnexoComprovante({ contaId, anexos }: { contaId: string; anexos: Anexo[] }) {
+/** Peça genérica de anexo — mesmo bucket privado do Supabase Storage,
+ * reaproveitada tanto pra comprovante de conta a pagar quanto pra arquivo
+ * no cartão de tarefa. `enviar` já vem com a entidade fixada pelo chamador. */
+export function AnexoArquivo({
+  anexos,
+  enviar,
+  caminhoRevalidar,
+  rotuloAnexar = "Anexar arquivo",
+}: {
+  anexos: Anexo[];
+  enviar: (formData: FormData) => Promise<void>;
+  caminhoRevalidar: string;
+  rotuloAnexar?: string;
+}) {
   const [, iniciarTransicao] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const router = useRouter();
@@ -26,7 +39,7 @@ export function AnexoComprovante({ contaId, anexos }: { contaId: string; anexos:
   }
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 pl-7">
+    <div className="flex w-full flex-wrap items-center gap-2">
       {anexos.map((anexo) => (
         <span
           key={anexo.id}
@@ -43,7 +56,7 @@ export function AnexoComprovante({ contaId, anexos }: { contaId: string; anexos:
             type="button"
             onClick={() =>
               iniciarTransicao(async () => {
-                await removerAnexo(anexo.id);
+                await removerAnexo(anexo.id, caminhoRevalidar);
                 router.refresh();
               })
             }
@@ -58,10 +71,10 @@ export function AnexoComprovante({ contaId, anexos }: { contaId: string; anexos:
         action={async (formData) => {
           setErro(null);
           try {
-            await enviarAnexoContaAPagar(contaId, formData);
+            await enviar(formData);
             router.refresh();
           } catch (e) {
-            setErro(e instanceof Error ? e.message : "Falha ao enviar comprovante.");
+            setErro(e instanceof Error ? e.message : "Falha ao enviar arquivo.");
           }
         }}
         className="flex items-center gap-1"
@@ -73,7 +86,7 @@ export function AnexoComprovante({ contaId, anexos }: { contaId: string; anexos:
           className="text-xs text-gaiamum-text-muted file:mr-2 file:rounded file:border-0 file:bg-gaiamum-surface-raised file:px-2 file:py-1 file:text-xs file:text-gaiamum-text"
         />
         <button type="submit" className="text-xs text-gaiamum-primary hover:underline">
-          Anexar comprovante
+          {rotuloAnexar}
         </button>
       </form>
       {erro && <span className="text-xs text-gaiamum-danger">{erro}</span>}

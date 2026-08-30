@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Prioridade, Tarefa } from "@/lib/ecc/tipos";
+import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Prioridade, Tarefa } from "@/lib/ecc/tipos";
 import { CLASSE_COR_ETIQUETA } from "@/lib/ecc/kanban";
 import {
   adicionarChecklistItem,
@@ -15,6 +15,8 @@ import {
   removerChecklistItem,
 } from "@/lib/ecc/actions";
 import { adicionarEtiquetaNaTarefa, removerEtiquetaDaTarefa } from "@/lib/ecc/etiquetas";
+import { enviarAnexoTarefa } from "@/lib/ecc/anexos";
+import { AnexoArquivo } from "@/components/anexo-arquivo";
 
 const PRIORIDADES: Prioridade[] = ["P1", "P2", "P3", "P4"];
 
@@ -27,6 +29,7 @@ export function DetalheTarefa({
   checklist,
   etiquetasDoTenant,
   etiquetasDaTarefa,
+  anexos,
   aoFechar,
 }: {
   tarefa: Tarefa;
@@ -37,6 +40,7 @@ export function DetalheTarefa({
   checklist: ChecklistItem[];
   etiquetasDoTenant: Etiqueta[];
   etiquetasDaTarefa: string[];
+  anexos: Anexo[];
   aoFechar: () => void;
 }) {
   const [descricao, setDescricao] = useState(tarefa.descricao ?? "");
@@ -346,6 +350,17 @@ export function DetalheTarefa({
               Adicionar
             </button>
           </form>
+        </div>
+
+        <div className="mt-5">
+          <span className="text-xs font-medium text-gaiamum-text-muted">Anexos</span>
+          <div className="mt-1.5">
+            <AnexoArquivo
+              anexos={anexos}
+              enviar={(formData) => enviarAnexoTarefa(tarefa.id, projetoId, formData)}
+              caminhoRevalidar={`/projetos/${projetoId}/tarefas`}
+            />
+          </div>
         </div>
       </div>
     </div>

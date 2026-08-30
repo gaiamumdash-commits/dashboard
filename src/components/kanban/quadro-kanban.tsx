@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import type { ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
+import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { CLASSE_COR_ETIQUETA, urgenciaDoPrazo } from "@/lib/ecc/kanban";
 import {
   criarColuna,
@@ -31,6 +31,7 @@ export function QuadroKanban({
   checklistItensIniciais,
   etiquetasDoTenant,
   tarefaEtiquetasIniciais,
+  anexosIniciais,
   usuarioAtualId,
   podeExcluirTarefa,
 }: {
@@ -42,6 +43,7 @@ export function QuadroKanban({
   checklistItensIniciais: ChecklistItem[];
   etiquetasDoTenant: Etiqueta[];
   tarefaEtiquetasIniciais: TarefaEtiqueta[];
+  anexosIniciais: Anexo[];
   usuarioAtualId: string | null;
   podeExcluirTarefa: boolean;
 }) {
@@ -138,6 +140,7 @@ export function QuadroKanban({
         {tarefasDaColuna.map((tarefa) => {
           const urgencia = urgenciaDoPrazo(tarefa, coluna.concluido);
           const checklistDaTarefa = checklistItensIniciais.filter((c) => c.tarefa_id === tarefa.id);
+          const anexosDaTarefa = anexosIniciais.filter((a) => a.entidade_id === tarefa.id);
           const concluidos = checklistDaTarefa.filter((c) => c.concluido).length;
           const membrosDaTarefa = tarefaMembrosIniciais.filter((m) => m.tarefa_id === tarefa.id);
           const souResponsavel = Boolean(
@@ -210,6 +213,11 @@ export function QuadroKanban({
                 {checklistDaTarefa.length > 0 && (
                   <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
                     ☑ {concluidos}/{checklistDaTarefa.length}
+                  </span>
+                )}
+                {anexosDaTarefa.length > 0 && (
+                  <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
+                    📎 {anexosDaTarefa.length}
                   </span>
                 )}
               </div>
@@ -309,6 +317,7 @@ export function QuadroKanban({
           etiquetasDaTarefa={tarefaEtiquetasIniciais
             .filter((te) => te.tarefa_id === tarefaAberta.id)
             .map((te) => te.etiqueta_id)}
+          anexos={anexosIniciais.filter((a) => a.entidade_id === tarefaAberta.id)}
           aoFechar={fecharModal}
         />
       )}

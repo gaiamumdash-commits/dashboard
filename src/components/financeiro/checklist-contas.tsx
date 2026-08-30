@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Anexo, ContaAPagar } from "@/lib/ecc/tipos";
 import { atualizarValorEVencimento, desmarcarComoPaga, marcarComoPaga } from "@/lib/ecc/financeiro";
-import { AnexoComprovante } from "@/components/financeiro/anexo-comprovante";
+import { enviarAnexoContaAPagar } from "@/lib/ecc/anexos";
+import { AnexoArquivo } from "@/components/anexo-arquivo";
 
 const ROTULO_CATEGORIA: Record<ContaAPagar["categoria"], string> = {
   consumo: "Consumo",
@@ -140,7 +141,12 @@ function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
       </div>
 
       <div className="mt-3">
-        <AnexoComprovante contaId={conta.id} anexos={anexos} />
+        <AnexoArquivo
+          anexos={anexos}
+          enviar={(formData) => enviarAnexoContaAPagar(conta.id, formData)}
+          caminhoRevalidar="/financeiro"
+          rotuloAnexar="Anexar comprovante"
+        />
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-gaiamum-border pt-3">
