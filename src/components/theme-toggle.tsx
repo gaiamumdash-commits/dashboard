@@ -1,26 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const CHAVE_STORAGE = "gaiamum-theme";
+const ouvintes = new Set<() => void>();
+
+function inscrever(callback: () => void) {
+  ouvintes.add(callback);
+  return () => ouvintes.delete(callback);
+}
+
+function obterTema(): "light" | "dark" {
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
+// O servidor não tem acesso a `document`/localStorage, então sempre "vê"
+// dark. O script inline em layout.tsx já aplica o tema real no <html> antes
+// do paint; useSyncExternalStore reconcilia esse valor com segurança depois
+// da hidratação, sem o mismatch que antes descartava a árvore inteira.
+function obterTemaServidor(): "light" | "dark" {
+  return "dark";
+}
 
 function aplicarTema(tema: "light" | "dark") {
   document.documentElement.dataset.theme = tema === "light" ? "light" : "";
   localStorage.setItem(CHAVE_STORAGE, tema);
-}
-
-function temaInicial(): "light" | "dark" {
-  if (typeof document === "undefined") return "dark";
-  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  ouvintes.forEach((callback) => callback());
 }
 
 export function ThemeToggle() {
-  const [tema, setTema] = useState<"light" | "dark">(temaInicial);
+  const tema = useSyncExternalStore(inscrever, obterTema, obterTemaServidor);
 
   function alternar() {
-    const proximo = tema === "light" ? "dark" : "light";
-    setTema(proximo);
-    aplicarTema(proximo);
+    aplicarTema(tema === "light" ? "dark" : "light");
   }
 
   return (
