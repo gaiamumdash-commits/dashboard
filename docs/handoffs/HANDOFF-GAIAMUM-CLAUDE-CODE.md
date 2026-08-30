@@ -149,6 +149,25 @@ Sessão que já vinha de um relatório overnight (ver checkpoint da madrugada) c
 
 **Retomar assim:** quando o Fabio quiser avançar nisso, começar decidindo UM pedaço concreto pra prototipar primeiro (provavelmente o gerador de propostas/landing page com IA do plano Manguezal, que já reaproveita o que o relatório overnight mapeou pro Value Engine, sem depender de nenhuma integração externa nova) — não tentar as 7 peças de uma vez.
 
+**Ordem de construção por ondas (dependências, não cronograma fixo — decisão final desta sessão):**
+
+| Onda | O que entra | Por que nessa ordem |
+|---|---|---|
+| 0 — Fundação silenciosa | Tabela `planos` (Toca/Colônia/Manguezal + limites), confirmar multi-empresa = multi-tenant | Base pra tudo que vier depois (módulos, limites, Perfil da Empresa) |
+| 1 — Colaboração em equipe | Convite de membro, `responsavel_id` em tarefas, permissão owner/member real | Já prioridade do Fabio; "Colônia" só faz sentido como nome com isso funcionando |
+| 2 — Perfil da Empresa | Cadastro essencial+aprofundado, busca automática, diagnóstico, Avatar do Cliente Ideal, Perfil Consolidado | Tudo que gera conteúdo depois lê daqui |
+| 3 — Financeiro básico | Lançamentos com tag âmbito (pessoal/profissional) + estratégia (receita/custo) desde o schema inicial | Value Engine e Relatórios/IA não têm matéria-prima sem isso |
+| 4 — Projetos ↔ produto vendido | Checklist herdado do produto | Evolução pequena do que já existe |
+| — **MVP vendável termina aqui (ondas 0-4)** — recomendação: validar com cliente pagante antes de seguir | | |
+| 5 — CRM/Pipeline | Reaproveita o kanban + prospecção assistida (Fase 5 da skill) | Fecha o ciclo lead → venda → dinheiro |
+| 6 — Value Engine/vendas | Motor de conta de valor + gerador de propostas/landing pages (reaproveitando o design system do `deliverables.md`) | Consome Perfil da Empresa + Financeiro + CRM |
+| 7 — Relatórios/IA | Sugestões ancoradas nas metas SMART | Herda a lógica de cenário conservador/realista já validada no Value Engine |
+| 8 — Growth OS externo | MCP Windsor/Metricool/Trello/Google Calendar, dashboard de tráfego, assistente de conteúdo (roteamento por framework de copy), bot conversacional | Só depois de tudo interno provado — é onde entra credencial de terceiro e contexto suficiente pro bot não ser genérico |
+| 9 — Painel do dono + onboarding modular real | Usuários, Auditoria, escolha de módulos dentro do teto do plano | Precisa da tabela `planos` da Onda 0 já madura |
+| 10 — Pagamentos | Cobrança de verdade, criptografia | Por último — compliance pesa mais aqui que em qualquer outra onda |
+
+Ajuda contextual em tela (o que é, por que fazer, o que aumenta receita/corta custo, dica de produtividade) não é uma onda separada — é requisito de qualidade de toda tela construída a partir da Onda 0.
+
 #### Perfil da empresa (cadastro completo, reutilizável em tudo) — ideia adicional do Fabio, 2026-08-30
 
 Inspirado na Fase 1 (`Diagnóstico da Agência`) da skill `av-value-engine`: um cadastro de empresa completo — nome, site, redes sociais, logo, nicho, tempo de operação, tamanho de time, faturamento (faixa), principal desafio — preenchido uma vez e reaproveitado em tudo que o sistema gerar depois (propostas, landing pages, criativos, contratos), pra o usuário não ficar subindo as mesmas informações toda hora.
@@ -162,6 +181,28 @@ Inspirado na Fase 1 (`Diagnóstico da Agência`) da skill `av-value-engine`: um 
 - Precisa de uma tela de "Perfil da Empresa" nas configurações pra editar depois — não é só onboarding, senão vira dado congelado no dia 1.
 
 **Diferenciação de plano (mencionada pelo Fabio):** o plano Manguezal permite cadastrar até 2 empresas simultâneas (ex.: alguém tocando duas marcas). Isso muda uma decisão de schema, não só um número de plano: o perfil de empresa vive num nível abaixo do `tenant`, cada empresa com seu próprio perfil completo, e o usuário troca de "empresa ativa" — mesmo padrão de um seletor de workspace. Guardar essa decisão de schema pra quando o Perfil da Empresa for arquitetado de verdade.
+
+#### Fechamento de escopo — análise completa dos 3 documentos de referência, 2026-08-30
+
+O Fabio pediu uma análise minuciosa de tudo que foi anexado nesta sessão (landing page "Copy Master", PDF de screenshots do dashboard "Vibe Coding"/SOW, e a skill `av-value-engine` completa) pra fechar o escopo de uma vez, antes de qualquer implementação nova. Resultado:
+
+**Decisões de arquitetura fechadas (resolvem contradições encontradas na revisão):**
+1. **"Onboarding modular" (item 6 do Growth OS) não é escolha de billing.** O plano (Toca/Colônia/Manguezal) define o teto de módulos disponíveis; dentro desse teto, o usuário só escolhe o que fica visível no menu lateral. Resolve a contradição entre "planos com módulos fixos" e "usuário escolhe módulos livremente".
+2. **Multi-empresa (até 2 no Manguezal) = múltiplos `tenants` por usuário**, não uma hierarquia nova dentro do tenant. Reaproveita 100% do multi-tenant já existente.
+3. **Precisa existir uma tabela `planos` (Toca/Colônia/Manguezal + limites) antes do onboarding modular ser construído** — senão o onboarding modular nasce sem teto pra respeitar e precisa ser refeito quando o billing chegar.
+
+**Três peças novas que a análise da skill `av-value-engine` trouxe (não estavam registradas antes):**
+- **Avatar do Cliente Ideal** (Fases 3-4 da skill: 5 dores, 5 desejos, dor unificada, gatilho de compra) — vive no Perfil da Empresa ou no CRM, calibra Value Engine e Assistente de Conteúdo pro nicho real do usuário em vez de gerar coisa genérica.
+- **Prospecção assistida** (Fase 5: 3 referências de mercado + 5 clientes-alvo, cada um com site/Instagram/estado atual/ângulo de abordagem, tudo pesquisado via busca) — função nova dentro do módulo CRM/Pipeline: o sistema ajuda a *encontrar* leads, não só a organizar os que o usuário já digitou.
+- **"Perfil Consolidado"** (inspirado no `Engine.md` da skill — o "cérebro portátil" que ela gera no final): em vez de cada módulo de IA (relatórios, propostas, conteúdo, o futuro bot) buscar dado espalhado em várias tabelas, todos leem de uma fonte única consolidada (perfil da empresa + metas SMART + avatar do cliente + conta de valor). Vira a espinha dorsal técnica de todo o Growth OS.
+
+**Outras duas peças menores registradas, sem prioridade imediata:**
+- Nicho escolhido em **cascata estruturada** (universo → vertical → nicho, como a Fase 2 da skill), não texto livre — deveria substituir qualquer campo de texto livre pra nicho no Perfil da Empresa.
+- Padrão de UI "revisor lado a lado" (original | revisado pela IA), do dashboard de referência — reaproveitável em qualquer texto que o Value Engine gerar.
+
+**Ajuda dentro do sistema (pedido do Fabio: "sistema muito grande e complexo, precisa de ajuda contextual"):** decidido começar por **texto de ajuda fixo em cada tela** (o que é, por que fazer, o que aumenta receita/corta custo com aquela ação, dica de produtividade) — custa zero em IA, não tem risco de alucinar conselho errado, cobre a maior parte da necessidade real. Um **bot conversacional só entra depois que o Perfil Consolidado existir** (Onda 8, Growth OS) — sem esse contexto, o bot dá resposta genérica e frustra mais do que ajuda. A ajuda contextual em tela não é um módulo à parte: é requisito de qualidade de toda tela construída daqui pra frente, desde a Onda 0.
+
+**Veredito de valor do produto (pedido pelo Fabio):** sim, tem valor real — o Plano de Ação (metas SMART → IA) e o Value Engine (conta de valor com cenário conservador/realista) são diferenciação de verdade, não feature genérica; nenhuma ferramenta de gestão pra pequeno negócio hoje junta isso. **Ressalva honesta:** o escopo fechado (10 módulos + 4 integrações externas + IA em três frentes + billing + multi-empresa) é trabalho de um time por um bom tempo, não de uma pessoa só. **O maior risco do Gaiamum não é a ideia, é tentar terminar tudo perfeito antes do primeiro cliente pagante.** Recomendação: tratar as Ondas 0-4 (fundação + colaboração + perfil + financeiro + projetos) como o corte de "MVP vendável" pro plano Toca, e só avançar pro resto com validação real de mercado — não abandonar a visão, só sequenciar com disciplina.
 
 ---
 
