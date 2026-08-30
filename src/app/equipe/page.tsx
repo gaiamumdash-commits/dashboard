@@ -1,0 +1,54 @@
+import { headers } from "next/headers";
+import { garantirWorkspace } from "@/lib/ecc/workspace";
+import { createClient } from "@/lib/supabase/server";
+import { listarMembros, listarConvitesPendentes, obterPapelAtual } from "@/lib/ecc/equipe";
+import { MenuLateral } from "@/components/layout/menu-lateral";
+import { FormularioConvite } from "@/components/equipe/formulario-convite";
+import { ListaConvites } from "@/components/equipe/lista-convites";
+import { ListaMembros } from "@/components/equipe/lista-membros";
+
+export default async function PaginaEquipe() {
+  const tenantId = await garantirWorkspace();
+  const supabase = await createClient();
+
+  const [membros, convites, papelAtual, { count: totalMetasSmart }, cabecalhos] = await Promise.all([
+    listarMembros(tenantId),
+    listarConvitesPendentes(tenantId),
+    obterPapelAtual(tenantId),
+    supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    headers(),
+  ]);
+
+  const host = cabecalhos.get("host") ?? "gaiamum-dashboard.vercel.app";
+  const origem = host.includes("localhost") ? `http://${host}` : `https://${host}`;
+  const souOwner = papelAtual === "owner";
+
+  return (
+    <div className="flex min-h-screen bg-gaiamum-bg">
+      <MenuLateral temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)} />
+      <main className="mx-auto max-w-3xl flex-1 px-4 py-12">
+        <h1 className="text-3xl font-semibold text-gaiamum-text">Equipe</h1>
+        <p className="mt-1 text-gaiamum-text-muted">
+          Quem tem acesso a este workspace. Convide alguém e envie o link gerado por WhatsApp ou e-mail —
+          ainda não enviamos automaticamente.
+        </p>
+
+        <div className="mt-8">
+          <ListaMembros membros={membros} souOwner={souOwner} />
+        </div>
+
+        {souOwner && (
+          <div className="mt-8">
+            <FormularioConvite />
+          </div>
+        )}
+
+        {souOwner && convites.length > 0 && (
+          <div className="mt-8">
+            <ListaConvites convites={convites} origem={origem} />
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

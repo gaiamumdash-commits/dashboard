@@ -10,7 +10,7 @@ export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
 const DIAS_PARA_ALERTA_AMARELO = 2;
 
-/** Amarelo quando o prazo está a até 2 dias, vermelho quando já passou. */
+/** Amarelo faltando até 48h (2 dias), vermelho no dia do prazo ou depois. */
 export function urgenciaDoPrazo(tarefa: Pick<Tarefa, "data_limite" | "status">): UrgenciaPrazo {
   if (tarefa.status === "concluido" || !tarefa.data_limite) {
     return tarefa.data_limite ? "ok" : "sem_prazo";
@@ -21,7 +21,7 @@ export function urgenciaDoPrazo(tarefa: Pick<Tarefa, "data_limite" | "status">):
   const limite = new Date(`${tarefa.data_limite}T00:00:00`);
   const diasRestantes = Math.round((limite.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diasRestantes < 0) return "atrasado";
+  if (diasRestantes <= 0) return "atrasado";
   if (diasRestantes <= DIAS_PARA_ALERTA_AMARELO) return "proximo";
   return "ok";
 }

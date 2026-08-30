@@ -1,12 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
 export default function PaginaAuth() {
+  return (
+    <Suspense>
+      <FormularioAuth />
+    </Suspense>
+  );
+}
+
+function FormularioAuth() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
   const supabase = createClient();
 
   const [modo, setModo] = useState<"login" | "cadastro" | "recuperacao">("login");
@@ -51,7 +61,7 @@ export default function PaginaAuth() {
       return;
     }
 
-    router.push("/");
+    router.push(redirect);
     router.refresh();
   }
 

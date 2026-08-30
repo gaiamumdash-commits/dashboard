@@ -37,8 +37,71 @@ export type Tarefa = {
   status: StatusTarefa;
   prioridade: Prioridade;
   tag: string | null;
+  data_inicio: string | null;
   data_limite: string | null;
   tempo_estimado_min: number | null;
   tempo_realizado_min: number | null;
+  criado_em: string;
+};
+
+export type Papel = "owner" | "member";
+export type EscopoMembership = "completo" | "projeto";
+
+export type Membership = {
+  id: string;
+  user_id: string;
+  tenant_id: string;
+  papel: Papel;
+  escopo: EscopoMembership;
+  criado_em: string;
+};
+
+export type MembroTenant = {
+  user_id: string;
+  email: string;
+  papel: Papel;
+};
+
+export type StatusConvite = "pendente" | "aceito" | "cancelado";
+
+export type Convite = {
+  id: string;
+  tenant_id: string;
+  email: string;
+  papel: Papel;
+  token: string;
+  status: StatusConvite;
+  convidado_por: string;
+  criado_em: string;
+  expira_em: string;
+  projeto_id: string | null;
+};
+
+export type PapelProjeto = "gestor" | "usuario";
+
+export type ProjetoMembro = {
+  id: string;
+  tenant_id: string;
+  projeto_id: string;
+  user_id: string;
+  papel: PapelProjeto;
+  criado_em: string;
+};
+
+export type TarefaMembro = {
+  id: string;
+  tenant_id: string;
+  tarefa_id: string;
+  user_id: string;
+  criado_em: string;
+};
+
+export type ChecklistItem = {
+  id: string;
+  tenant_id: string;
+  tarefa_id: string;
+  texto: string;
+  concluido: boolean;
+  ordem: number;
   criado_em: string;
 };

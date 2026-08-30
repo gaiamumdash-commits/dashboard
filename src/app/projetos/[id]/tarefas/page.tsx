@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
-import type { Projeto, Tarefa } from "@/lib/ecc/tipos";
+import { listarMembros } from "@/lib/ecc/equipe";
+import type { ChecklistItem, Projeto, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
 import { FormularioNovaTarefa } from "@/components/kanban/formulario-nova-tarefa";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
@@ -23,9 +24,22 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     notFound();
   }
 
-  const [{ data: tarefas }, { count: totalMetasSmart }] = await Promise.all([
+  const [
+    { data: tarefas },
+    { count: totalMetasSmart },
+    { data: tarefaMembros },
+    { data: checklistItens },
+    membros,
+    {
+      data: { user },
+    },
+  ] = await Promise.all([
     supabase.from("tarefas").select("*").eq("projeto_id", projetoId).order("criado_em", { ascending: true }),
     supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    supabase.from("tarefa_membros").select("*").eq("tenant_id", tenantId),
+    supabase.from("tarefa_checklist_itens").select("*").eq("tenant_id", tenantId).order("ordem"),
+    listarMembros(tenantId),
+    supabase.auth.getUser(),
   ]);
 
   return (
@@ -46,7 +60,14 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
         </div>
 
         <div className="mt-8">
-          <QuadroKanban projetoId={projetoId} tarefasIniciais={(tarefas as Tarefa[]) ?? []} />
+          <QuadroKanban
+            projetoId={projetoId}
+            tarefasIniciais={(tarefas as Tarefa[]) ?? []}
+            membrosDoTenant={membros}
+            tarefaMembrosIniciais={(tarefaMembros as TarefaMembro[]) ?? []}
+            checklistItensIniciais={(checklistItens as ChecklistItem[]) ?? []}
+            usuarioAtualId={user?.id ?? null}
+          />
         </div>
       </main>
     </div>

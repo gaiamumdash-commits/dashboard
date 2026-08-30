@@ -28,6 +28,10 @@ npm-debug.log*
 # Supabase CLI (estado local)
 supabase/.temp/
 
+# Export local de dados gerados em runtime (metas SMART em Markdown) — não é
+# código-fonte, é saída dinâmica do app, cada ambiente gera o seu.
+ecc-system/
+
 # Environment & Secrets (AIOX)
 *.key
 *.pem

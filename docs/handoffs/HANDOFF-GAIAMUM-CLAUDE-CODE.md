@@ -204,6 +204,21 @@ O Fabio pediu uma análise minuciosa de tudo que foi anexado nesta sessão (land
 
 **Veredito de valor do produto (pedido pelo Fabio):** sim, tem valor real — o Plano de Ação (metas SMART → IA) e o Value Engine (conta de valor com cenário conservador/realista) são diferenciação de verdade, não feature genérica; nenhuma ferramenta de gestão pra pequeno negócio hoje junta isso. **Ressalva honesta:** o escopo fechado (10 módulos + 4 integrações externas + IA em três frentes + billing + multi-empresa) é trabalho de um time por um bom tempo, não de uma pessoa só. **O maior risco do Gaiamum não é a ideia, é tentar terminar tudo perfeito antes do primeiro cliente pagante.** Recomendação: tratar as Ondas 0-4 (fundação + colaboração + perfil + financeiro + projetos) como o corte de "MVP vendável" pro plano Toca, e só avançar pro resto com validação real de mercado — não abandonar a visão, só sequenciar com disciplina.
 
+#### Contexto pessoal/profissional do Fabio e uso real definido pro Gaiamum, 2026-08-30
+
+Registrado porque muda como priorizar qualquer decisão daqui pra frente, não só no Gaiamum: o Fabio é Diretor Geral da Faculdade FAMA (expediente 16h-22h seg-sex), no meio do processo de **reconhecimento do curso de Psicologia junto ao MEC** e do **recredenciamento da faculdade**, apoiando a Pesquisadora Institucional (PI) que lidera os dois processos. Mantém em paralelo 3 projetos de software (CV Hunter, UltraQuadras, Gaiamum), tem um plano Claude 5x que não pretende renovar (~3 semanas restantes no momento deste registro) e quer aproveitar essa janela com o máximo de funcionalidade útil possível. A partir de 2026-08-31 (segunda-feira) inicia uma mentoria com a equipe de Leandro Ladeira pra vender seus produtos digitais, com plano de fundar uma "empresa guarda-chuva" reunindo eles.
+
+**Uso real definido pro Gaiamum (não é mais hipótese, é decisão):**
+- **Kanban/Projetos (o que já existe hoje):** uso interno com a equipe da FAMA (coordenar o reconhecimento/recredenciamento) + organização profissional geral do próprio Fabio (CV Hunter, UltraQuadras, Gaiamum, FAMA).
+- **Value Engine e o resto do Growth OS (visão futura):** apoiar a estruturação e venda dos próprios produtos do Fabio (CV Hunter, UltraQuadras, Gaiamum) dentro da mentoria com Leandro Ladeira, e a criação da empresa guarda-chuva. **Não vai estar pronto pra segunda-feira** (a ordem de construção coloca Value Engine na Onda 6, depois de Financeiro e CRM) — combinado que serve pra mais adiante no processo da mentoria, não pro primeiro encontro.
+- **CV Hunter é o candidato mais forte a "carro-chefe"** da nova empresa (já pronto e testado); UltraQuadras tem risco próprio (cliente piloto, ainda precisa alinhar com sócios); a decisão de qual produto lidera será discutida na mentoria.
+
+**Decisão de segurança tomada pelo próprio Fabio (validada, não uma sugestão minha):** ele já tem um sistema próprio rodando numa VPS Linux (Hostinger) com agentes autônomos (webhook + API) ligados ao sistema acadêmico, com um dashboard de financeiro, marketing (orgânico/tráfego pago), evasão, formandos e inadimplência por curso da FAMA — construído pra apoiar o mesmo processo de reconhecimento/recredenciamento, mas que não escalou pra equipe (faltou processo de uso com todos, e ele preferiu não escalar de propósito por serem dados sensíveis de uma operação onde só ele mexe). **Decisão: todos os dados sensíveis da FAMA continuam só nessa VPS, sem nenhuma integração com o Gaiamum.** O Gaiamum entra só como camada de coordenação de tarefas (sem nenhum dado de aluno/financeiro/inadimplência passando por ali) — isso reduz o risco de um piloto com a equipe da FAMA a praticamente zero, já que não há dado sensível envolvido.
+
+**Estratégia de piloto acordada:** começar só com a PI usando o Gaiamum pra coordenar as tarefas do reconhecimento/recredenciamento por 1-2 semanas antes de abrir pro diretor acadêmico, coordenadores e professores (grupo final de até ~15 pessoas).
+
+**Ajuste na ordem de construção:** a Onda 0 (tabela de `planos`/billing) não é urgente pro uso imediato (nem FAMA nem organização pessoal do Fabio dependem de cobrança funcionando) — pode ser adiada. **Colaboração em Equipe (antiga Onda 1) passa a ser o próximo passo de implementação real**, por destravar o piloto com a PI.
+
 ---
 
 ## Checkpoints

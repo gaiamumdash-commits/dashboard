@@ -1,5 +1,6 @@
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
+import { temAcessoCompleto } from "@/lib/ecc/equipe";
 import type { Projeto } from "@/lib/ecc/tipos";
 import { FormularioNovoProjeto } from "@/components/projetos/formulario-novo-projeto";
 import { CartaoProjeto } from "@/components/projetos/cartao-projeto";
@@ -9,14 +10,18 @@ export default async function PaginaProjetos() {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
-  const [{ data: projetos }, { count: totalMetasSmart }] = await Promise.all([
+  const [{ data: projetos }, { count: totalMetasSmart }, acessoCompleto] = await Promise.all([
     supabase.from("projetos").select("*").eq("tenant_id", tenantId).order("criado_em", { ascending: false }),
     supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    temAcessoCompleto(tenantId),
   ]);
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">
-      <MenuLateral temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)} />
+      <MenuLateral
+        temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)}
+        acessoCompleto={acessoCompleto}
+      />
       <main className="mx-auto max-w-5xl flex-1 px-4 py-12">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-gaiamum-text">Projetos</h1>

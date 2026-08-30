@@ -13,10 +13,12 @@ export function FormularioNovaTarefa({ projetoId }: { projetoId: string }) {
     >
       <label className="flex flex-1 min-w-[200px] flex-col gap-1 text-sm text-gaiamum-text-muted">
         Título da tarefa
-        <input
+        <textarea
           name="titulo"
           required
-          className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none focus:border-gaiamum-primary"
+          rows={1}
+          placeholder="Uma por linha vira um cartão pra cada"
+          className="resize-none rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none focus:border-gaiamum-primary focus:resize-y"
         />
       </label>
 
