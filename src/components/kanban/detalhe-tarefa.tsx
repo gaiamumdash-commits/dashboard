@@ -2,18 +2,24 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { ChecklistItem, MembroTenant, Tarefa } from "@/lib/ecc/tipos";
+import type { ChecklistItem, ColunaKanban, MembroTenant, Prioridade, Tarefa } from "@/lib/ecc/tipos";
 import {
   adicionarChecklistItem,
   alternarChecklistItem,
   alternarMembroTarefa,
+  atualizarDatasTarefa,
   atualizarDescricaoTarefa,
+  atualizarPrioridadeTarefa,
+  moverTarefa,
   removerChecklistItem,
 } from "@/lib/ecc/actions";
+
+const PRIORIDADES: Prioridade[] = ["P1", "P2", "P3", "P4"];
 
 export function DetalheTarefa({
   tarefa,
   projetoId,
+  colunasDoProjeto,
   membrosDoTenant,
   membrosDaTarefa,
   checklist,
@@ -21,6 +27,7 @@ export function DetalheTarefa({
 }: {
   tarefa: Tarefa;
   projetoId: string;
+  colunasDoProjeto: ColunaKanban[];
   membrosDoTenant: MembroTenant[];
   membrosDaTarefa: string[];
   checklist: ChecklistItem[];
@@ -37,6 +44,30 @@ export function DetalheTarefa({
       const formData = new FormData();
       formData.set("descricao", descricao);
       await atualizarDescricaoTarefa(tarefa.id, projetoId, formData);
+      router.refresh();
+    });
+  }
+
+  function salvarDatas(campo: "data_inicio" | "data_limite", valor: string) {
+    iniciarTransicao(async () => {
+      const formData = new FormData();
+      formData.set("data_inicio", campo === "data_inicio" ? valor : (tarefa.data_inicio ?? ""));
+      formData.set("data_limite", campo === "data_limite" ? valor : (tarefa.data_limite ?? ""));
+      await atualizarDatasTarefa(tarefa.id, projetoId, formData);
+      router.refresh();
+    });
+  }
+
+  function mudarPrioridade(prioridade: Prioridade) {
+    iniciarTransicao(async () => {
+      await atualizarPrioridadeTarefa(tarefa.id, projetoId, prioridade);
+      router.refresh();
+    });
+  }
+
+  function moverPara(novaColunaId: string) {
+    iniciarTransicao(async () => {
+      await moverTarefa(tarefa.id, projetoId, novaColunaId);
       router.refresh();
     });
   }
@@ -87,6 +118,58 @@ export function DetalheTarefa({
           >
             ✕
           </button>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+            Coluna
+            <select
+              value={tarefa.coluna_id}
+              onChange={(e) => moverPara(e.target.value)}
+              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
+            >
+              {colunasDoProjeto.map((coluna) => (
+                <option key={coluna.id} value={coluna.id}>
+                  {coluna.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+            Prioridade
+            <select
+              value={tarefa.prioridade}
+              onChange={(e) => mudarPrioridade(e.target.value as Prioridade)}
+              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
+            >
+              {PRIORIDADES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+            Data de início
+            <input
+              type="date"
+              defaultValue={tarefa.data_inicio ?? ""}
+              onBlur={(e) => salvarDatas("data_inicio", e.target.value)}
+              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+            Data de entrega
+            <input
+              type="date"
+              defaultValue={tarefa.data_limite ?? ""}
+              onBlur={(e) => salvarDatas("data_limite", e.target.value)}
+              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
+            />
+          </label>
         </div>
 
         <div className="mt-4 flex flex-col gap-1.5">

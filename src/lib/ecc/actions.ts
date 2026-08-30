@@ -216,6 +216,37 @@ export async function atualizarDescricaoTarefa(tarefaId: string, projetoId: stri
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
+export async function atualizarDatasTarefa(tarefaId: string, projetoId: string, formData: FormData) {
+  await garantirWorkspace();
+  const supabase = await createClient();
+  const dataInicio = (formData.get("data_inicio") as string | null) || null;
+  const dataLimite = (formData.get("data_limite") as string | null) || null;
+
+  const { error } = await supabase
+    .from("tarefas")
+    .update({ data_inicio: dataInicio, data_limite: dataLimite })
+    .eq("id", tarefaId);
+
+  if (error) {
+    throw new Error(`Falha ao salvar datas: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+export async function atualizarPrioridadeTarefa(tarefaId: string, projetoId: string, prioridade: Prioridade) {
+  await garantirWorkspace();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("tarefas").update({ prioridade }).eq("id", tarefaId);
+
+  if (error) {
+    throw new Error(`Falha ao salvar prioridade: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
 export async function alternarMembroTarefa(tarefaId: string, userId: string, projetoId: string) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();

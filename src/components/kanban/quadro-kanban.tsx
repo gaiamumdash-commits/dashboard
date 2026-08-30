@@ -265,6 +265,7 @@ export function QuadroKanban({
         <DetalheTarefa
           tarefa={tarefaAberta}
           projetoId={projetoId}
+          colunasDoProjeto={colunasIniciais}
           membrosDoTenant={membrosDoTenant}
           membrosDaTarefa={tarefaMembrosIniciais
             .filter((m) => m.tarefa_id === tarefaAberta.id)
