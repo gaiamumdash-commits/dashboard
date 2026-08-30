@@ -8,9 +8,9 @@
 
 ---
 
-## Estado confirmado (2026-08-29, noite — última atualização)
+## Estado confirmado (2026-08-30, madrugada — última atualização)
 
-- **Domínio próprio comprado:** `gaiamum.com.br` (registro.br), `www.gaiamum.com.br` é o principal. Já adicionado ao projeto Vercel (`gaiamum.com.br` e `www.gaiamum.com.br`), redirect 301 apex→www configurado em `next.config.ts`, `metadataBase` e `site_url`/`uri_allow_list` do Supabase já apontam pro domínio novo (com fallback pro `.vercel.app` e `localhost` durante a transição). **Falta o Fabio configurar os registros DNS no painel do registro.br:** `A @ 76.76.21.21` e `A www 76.76.21.21`. Sem isso o domínio não resolve — checar com `vercel domains inspect gaiamum.com.br --scope gaiamum-dash` (ou `www.gaiamum.com.br`) se já propagou.
+- **Domínio próprio comprado:** `gaiamum.com.br` (registro.br), `www.gaiamum.com.br` é o principal. Já adicionado ao projeto Vercel (`gaiamum.com.br` e `www.gaiamum.com.br`), redirect 301 apex→www configurado em `next.config.ts`, `metadataBase` e `site_url`/`uri_allow_list` do Supabase já apontam pro domínio novo (com fallback pro `.vercel.app` e `localhost` durante a transição). **Falta o Fabio configurar os registros DNS no painel do registro.br:** `A @ 76.76.21.21` e `A www 76.76.21.21`. Confirmado via `vercel domains inspect` nesta sessão que ainda não foi feito (nameservers continuam `a/b.auto.dns.br`, os padrão do registro.br) — o Fabio disse que o registro.br libera a configuração ~1h05 depois da compra do domínio.
 
 - **Fundação + Módulo 0-2** implementados: onboarding SMART, projetos (CRUD), kanban de tarefas (com tags pessoal/ifaz/faculdade/vendas). Detalhes de arquitetura na seção "Fundação técnica" abaixo.
 - **Infraestrutura 100% pronta e no ar**, independente do UltraQuadras:
@@ -20,7 +20,9 @@
   - **`gh` e `vercel` CLI desta máquina** foram trocados da conta "ultraquadras" pra `gaiamumdash-commits`/`gaiamum-dash` — ficam assim permanentemente pra este projeto.
 - **AIOX instalado** localmente no projeto (framework de agentes/governança, auditado sem achados de segurança). Ver "Convenção de push" abaixo — muda como publicar no repo.
 - **Identidade visual completa:** tema escuro (padrão) + tema claro (alternável, botão fixo no canto), favicon, apple-touch-icon e imagem de Open Graph, todos com a paleta oficial da marca.
-- **Página de login com a arte oficial da marca:** layout dividido (arte à esquerda em telas largas, formulário à direita) com versão mobile dedicada (arte vertical sem os mockups, como fundo com o cartão flutuando embaixo). Login com Google implementado (`supabase.auth.signInWithOAuth`, provider habilitado no Supabase com Client ID/Secret do Google Cloud Console, projeto `Gaiamum Dashboard` na conta `gaiamumdash@gmail.com`) — **falta testar o clique real no navegador** (o teste automático via curl travou por rede neste ambiente, não é indicativo de problema). Fluxo de "esqueci minha senha" implementado (`resetPasswordForEmail` + página `/auth/redefinir-senha`).
+- **Página de login com a arte oficial da marca:** layout dividido (arte à esquerda em telas largas, formulário à direita) com versão mobile dedicada (arte vertical sem os mockups, como fundo com o cartão flutuando embaixo). **Login com Google testado nesta sessão** (clique real no navegador via Playwright): redireciona certo pro Google com o `redirect_uri` batendo no callback do Supabase — fluxo tecnicamente correto (não completei o login de verdade, é conta pessoal). **Fluxo de "esqueci minha senha" testado tecnicamente**: o envio retorna sucesso e a página `/auth/redefinir-senha` carrega certo; disparei um teste real pra `gaiamumdash@gmail.com` — falta o Fabio confirmar se o e-mail chegou e seguir o link até o fim.
+- **Responsividade da tela de login corrigida nesta sessão** (o Fabio notou a arte cortada em tela não-maximizada, e pediu pra também cobrir tablet): eram dois bugs de `object-fit`/layout, não de asset. Desktop: `object-cover` cortava o mockup "Fornecedores" em containers mais estreitos que a proporção 16:9 da arte — trocado pra `object-contain` e recortada a faixa vazia da direita da própria imagem (`login-hero.png`, 1672×941 → 1010×941) pra não sobrar espaço vazio. Mobile/tablet: em tablet retrato (proporção mais "quadrada" que a de celular) o `object-cover` esticava a arte e cortava o texto "Cresça." no meio; e mesmo em celular normal o cartão de login (relativamente alto) sobrepunha esse mesmo texto. Corrigido com `object-contain` a partir de `md:` + um spacer de `min-h-[48vh]` empurrando o cartão pra baixo do bloco de texto antes de deixá-lo flutuar. Testado em iPhone 14 (390×844), tablet retrato (768×1024, 834×1194), tablet paisagem (1024×768) e desktop (1280×720, 1920×1080) — sem regressão. 2 commits locais, sem push ainda: `a659265` (fix desktop) e `1f33afd` (fix tablet/celular).
+  - **Pegadinha nova:** o cache de otimização de imagens do Next (`.next/cache/images`) guarda entradas por formato (PNG/WebP) e sobrevive a `rm -rf .next/cache/images` se o processo antigo do `next dev` ainda estiver rodando (ele seguia vivo mesmo depois de `TaskStop`, precisou `taskkill` no PID da porta). Se trocar um asset de imagem e o resultado no navegador não mudar, apagar a pasta `.next` inteira com o processo já morto, não só `.next/cache/images`.
 - **Módulos 3-7** (financeiro, CRM, vendas, relatórios/IA, painel owner, pagamentos) — nenhum iniciado.
 
 ### Convenção de push (importante, mudou nesta sessão)
@@ -92,10 +94,10 @@ AIOX_ACTIVE_AGENT=devops git push   # publicar (ver "Convenção de push")
 
 ### Imediato (retomar por aqui)
 
-1. **Confirmar se o DNS do domínio já propagou:** `cd Gaiamum && npx vercel domains inspect gaiamum.com.br --scope gaiamum-dash` (e o mesmo pra `www.gaiamum.com.br`). Se o Fabio ainda não configurou os registros A no registro.br, lembrar ele (ver "Estado confirmado").
-2. **Testar o login com Google de verdade** no navegador em `/auth` (usar o domínio que estiver ativo — `www.gaiamum.com.br` se o DNS já propagou, senão `gaiamum-dashboard.vercel.app`). Se der erro de redirect_uri, conferir se a URI cadastrada no Google Cloud Console bate exatamente com `https://zfjtcivusdmjvdbycpjs.supabase.co/auth/v1/callback`.
-3. Testar o fluxo de "esqueci minha senha" de ponta a ponta (pedir o link, abrir o e-mail, definir nova senha).
-4. Testar o onboarding completo (signup → metas SMART → projeto → kanban) agora que a infra está toda real, e conferir se `/ecc-system/metas/` populou depois.
+1. **DNS ainda não propagou** — repetir `npx vercel domains inspect gaiamum.com.br --scope gaiamum-dash` (e `www.gaiamum.com.br`) depois que o Fabio configurar os registros A no registro.br (ele disse que libera ~1h05 depois da compra, feita 2026-08-29 ~21h).
+2. ~~Testar login com Google~~ — feito nesta sessão (ver "Estado confirmado").
+3. ~~Testar "esqueci minha senha"~~ — testado tecnicamente nesta sessão; falta só o Fabio confirmar o recebimento do e-mail em `gaiamumdash@gmail.com` e seguir o link até definir a nova senha.
+4. **Testar o onboarding completo** (signup → metas SMART → projeto → kanban) — ainda pendente. Nesta sessão confirmei que o Supabase exige confirmação de e-mail antes do signup liberar (testei com um e-mail descartável e o app fica preso em `/auth` sem sinalizar isso ao usuário — vale um ajuste de UX futuro: hoje o app não avisa "confirme seu e-mail", falha silenciosamente). **Recomendação:** usar `gaiamumdash@gmail.com` pra criar o workspace de teste — é uma conta que o Fabio já controla e vai checar de qualquer forma (por causa do teste de recuperação de senha acima), e não há risco técnico em reaproveitá-la (a tabela `auth.users` do produto é independente de qualquer credencial de infra). Depois de validar o fluxo, apagar esse usuário/tenant de teste do Supabase pra não sujar produção. Alternativa mais lenta: e-mail descartável à parte, mas aí ninguém consegue confirmar o cadastro.
 
 ### Depois
 
@@ -145,3 +147,19 @@ Também expliquei ao Fabio que eu não "uso" o Obsidian (app de desktop, não te
 **Pendente, só o Fabio pode fazer:** configurar os registros DNS `A @ 76.76.21.21` e `A www 76.76.21.21` no painel do registro.br. Até isso propagar, o domínio próprio não resolve — usar `gaiamum-dashboard.vercel.app` normalmente.
 
 **Pausa:** Fabio vai transportar o computador. Todo o trabalho está commitado e publicado (push até o commit `67f4983`), nada em risco de se perder.
+
+### 2026-08-30 (madrugada) — testes de auth + correção de responsividade do login
+
+Retomada seguindo as prioridades do handoff. DNS: confirmado via `vercel domains inspect` que ainda não propagou (nameservers seguem no padrão do registro.br) — Fabio disse que libera ~1h05 depois da compra.
+
+Login com Google testado de verdade no navegador (Playwright): clique redireciona certo pro Google com `redirect_uri` batendo no callback do Supabase. Não completei o login (conta pessoal), mas o fluxo está tecnicamente correto de ponta a ponta.
+
+Fabio notou que a arte do login ficava cortada quando a janela do navegador não estava maximizada, e pediu pra também cobrir tablet. Eram dois bugs de CSS/layout, não do asset em si:
+- **Desktop:** `object-cover` numa arte 16:9 dentro de um container de metade da tela (bem mais estreito) cortava as laterais, incluindo o mockup "Fornecedores". Corrigido com `object-contain` + recorte da faixa vazia à direita da própria imagem-fonte (1672×941 → 1010×941), eliminando também a sobra de espaço vazio.
+- **Tablet/celular:** a arte mobile foi desenhada pra proporção de celular; em tablet retrato (mais "quadrado") o `object-cover` esticava demais e cortava o texto "Cresça." no meio — e mesmo em celular normal, o cartão de login (relativamente alto) já sobrepunha esse mesmo texto por falta de margem de segurança. Medi programaticamente (via `sharp`, analisando brilho por linha) onde o bloco de texto termina na imagem (~46% da altura) e corrigi com `object-contain` a partir de `md:` + um spacer `min-h-[48vh]` empurrando o cartão pra baixo do texto antes de deixá-lo flutuar. Testado em iPhone 14, tablet retrato (768×1024, 834×1194), tablet paisagem e desktop (1280×720, 1920×1080) — sem regressão em nenhum. 2 commits locais (`a659265`, `1f33afd`), sem push ainda — pendente aprovação do Fabio pra publicar.
+
+**Achado à parte, sem relação com o pedido:** o cache de otimização de imagens do Next.js Server (`.next/cache/images`) sobreviveu a duas rodadas de `rm -rf` porque o processo antigo do `next dev` continuava rodando em background (`TaskStop` não mata o processo filho do Turbopack no Windows) — só resolveu depois de matar o processo pela porta (`taskkill`) e apagar a pasta `.next` inteira. Registrado em "Pegadinhas".
+
+"Esqueci minha senha" testado tecnicamente: fluxo completo até o envio retorna sucesso, e `/auth/redefinir-senha` carrega certo. Disparei um teste real pra `gaiamumdash@gmail.com` — falta o Fabio confirmar o recebimento e seguir o link.
+
+Onboarding completo ainda não testado: confirmei que o Supabase exige confirmação de e-mail antes do signup liberar (o app falha silenciosamente nesse caso, sem avisar o usuário — possível ajuste de UX futuro). Recomendei ao Fabio usar `gaiamumdash@gmail.com` pra criar o workspace de teste, decisão ainda em aberto no momento da pausa desta sessão.
