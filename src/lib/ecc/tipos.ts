@@ -105,3 +105,25 @@ export type ChecklistItem = {
   ordem: number;
   criado_em: string;
 };
+
+export type TipoAtividade =
+  | "criada"
+  | "movida"
+  | "descricao_editada"
+  | "checklist_item_adicionado"
+  | "checklist_item_concluido"
+  | "checklist_item_reaberto"
+  | "checklist_item_removido"
+  | "membro_adicionado"
+  | "membro_removido";
+
+export type AtividadeTarefa = {
+  id: string;
+  tenant_id: string;
+  projeto_id: string;
+  tarefa_id: string;
+  user_id: string;
+  tipo: TipoAtividade;
+  detalhe: Record<string, string>;
+  criado_em: string;
+};

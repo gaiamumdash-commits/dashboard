@@ -50,14 +50,14 @@ export function DetalheTarefa({
 
   function alternarItem(itemId: string, concluido: boolean) {
     iniciarTransicao(async () => {
-      await alternarChecklistItem(itemId, concluido, projetoId);
+      await alternarChecklistItem(itemId, tarefa.id, concluido, projetoId);
       router.refresh();
     });
   }
 
   function removerItem(itemId: string) {
     iniciarTransicao(async () => {
-      await removerChecklistItem(itemId, projetoId);
+      await removerChecklistItem(itemId, tarefa.id, projetoId);
       router.refresh();
     });
   }

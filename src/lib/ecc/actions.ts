@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
+import { registrarAtividade } from "@/lib/ecc/atividade";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
 import type { Convite, Horizonte, MetaSmart, Papel, Prioridade, StatusProjeto, StatusTarefa } from "@/lib/ecc/tipos";
 
@@ -167,6 +168,7 @@ export async function criarTarefa(projetoId: string, formData: FormData) {
 }
 
 export async function atualizarDescricaoTarefa(tarefaId: string, projetoId: string, formData: FormData) {
+  const tenantId = await garantirWorkspace();
   const supabase = await createClient();
   const descricao = (formData.get("descricao") as string | null)?.trim() || null;
 
@@ -175,6 +177,8 @@ export async function atualizarDescricaoTarefa(tarefaId: string, projetoId: stri
   if (error) {
     throw new Error(`Falha ao salvar descrição: ${error.message}`);
   }
+
+  await registrarAtividade({ tenantId, projetoId, tarefaId, tipo: "descricao_editada" });
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
@@ -193,11 +197,19 @@ export async function alternarMembroTarefa(tarefaId: string, userId: string, pro
   if (existente) {
     const { error } = await supabase.from("tarefa_membros").delete().eq("id", existente.id);
     if (error) throw new Error(`Falha ao remover membro da tarefa: ${error.message}`);
+    await registrarAtividade({
+      tenantId,
+      projetoId,
+      tarefaId,
+      tipo: "membro_removido",
+      notificarTambem: [userId],
+    });
   } else {
     const { error } = await supabase
       .from("tarefa_membros")
       .insert({ tenant_id: tenantId, tarefa_id: tarefaId, user_id: userId });
     if (error) throw new Error(`Falha ao adicionar membro à tarefa: ${error.message}`);
+    await registrarAtividade({ tenantId, projetoId, tarefaId, tipo: "membro_adicionado" });
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
@@ -224,38 +236,91 @@ export async function adicionarChecklistItem(tarefaId: string, projetoId: string
     throw new Error(`Falha ao adicionar item do checklist: ${error.message}`);
   }
 
+  await registrarAtividade({
+    tenantId,
+    projetoId,
+    tarefaId,
+    tipo: "checklist_item_adicionado",
+    detalhe: { texto },
+  });
+
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
-export async function alternarChecklistItem(itemId: string, concluido: boolean, projetoId: string) {
+export async function alternarChecklistItem(
+  itemId: string,
+  tarefaId: string,
+  concluido: boolean,
+  projetoId: string,
+) {
+  const tenantId = await garantirWorkspace();
   const supabase = await createClient();
-  const { error } = await supabase.from("tarefa_checklist_itens").update({ concluido }).eq("id", itemId);
+  const { data: item, error } = await supabase
+    .from("tarefa_checklist_itens")
+    .update({ concluido })
+    .eq("id", itemId)
+    .select("texto")
+    .single();
 
   if (error) {
     throw new Error(`Falha ao atualizar item do checklist: ${error.message}`);
   }
 
+  await registrarAtividade({
+    tenantId,
+    projetoId,
+    tarefaId,
+    tipo: concluido ? "checklist_item_concluido" : "checklist_item_reaberto",
+    detalhe: { texto: item.texto },
+  });
+
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
-export async function removerChecklistItem(itemId: string, projetoId: string) {
+export async function removerChecklistItem(itemId: string, tarefaId: string, projetoId: string) {
+  const tenantId = await garantirWorkspace();
   const supabase = await createClient();
-  const { error } = await supabase.from("tarefa_checklist_itens").delete().eq("id", itemId);
+  const { data: item, error } = await supabase
+    .from("tarefa_checklist_itens")
+    .delete()
+    .eq("id", itemId)
+    .select("texto")
+    .single();
 
   if (error) {
     throw new Error(`Falha ao remover item do checklist: ${error.message}`);
   }
 
+  await registrarAtividade({
+    tenantId,
+    projetoId,
+    tarefaId,
+    tipo: "checklist_item_removido",
+    detalhe: { texto: item.texto },
+  });
+
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
 export async function moverTarefa(tarefaId: string, projetoId: string, novoStatus: StatusTarefa) {
+  const tenantId = await garantirWorkspace();
   const supabase = await createClient();
+
+  const { data: tarefaAtual } = await supabase.from("tarefas").select("status").eq("id", tarefaId).maybeSingle();
+
   const { error } = await supabase.from("tarefas").update({ status: novoStatus }).eq("id", tarefaId);
 
   if (error) {
     throw new Error(`Falha ao mover tarefa: ${error.message}`);
   }
+
+  await registrarAtividade({
+    tenantId,
+    projetoId,
+    tarefaId,
+    tipo: "movida",
+    detalhe: { de: tarefaAtual?.status ?? "?", para: novoStatus },
+  });
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
