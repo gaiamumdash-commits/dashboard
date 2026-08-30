@@ -6,12 +6,16 @@ export function FormularioSmart() {
   return (
     <form action={criarMetasSmart} className="mt-8 flex flex-col gap-10">
       {HORIZONTES.map((horizonte) => (
-        <fieldset
+        <div
           key={horizonte.valor}
+          role="group"
+          aria-labelledby={`titulo-${horizonte.valor}`}
           className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6"
         >
-          <legend className="px-1 text-lg font-semibold text-gaiamum-primary">{horizonte.titulo}</legend>
-          <p className="mb-4 text-sm text-gaiamum-text-muted">{horizonte.ajuda}</p>
+          <h2 id={`titulo-${horizonte.valor}`} className="text-lg font-semibold text-gaiamum-primary">
+            {horizonte.titulo}
+          </h2>
+          <p className="mb-4 mt-1 text-sm text-gaiamum-text-muted">{horizonte.ajuda}</p>
 
           <label className="mb-4 flex flex-col gap-2 text-sm">
             <span className="font-semibold text-gaiamum-text">Visão macro</span>
@@ -44,7 +48,7 @@ export function FormularioSmart() {
               </label>
             ))}
           </div>
-        </fieldset>
+        </div>
       ))}
 
       <div className="flex items-center gap-4">
