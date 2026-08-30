@@ -122,6 +122,33 @@ Fabio perguntou se o Gaiamum pode suportar times trabalhando juntos (tipo Trello
 
 **Roadmap futuro relacionado (mencionado pelo Fabio, ainda não arquitetado):** integração com a API oficial da Meta (WhatsApp Business) pra lembretes de tarefa chegarem via WhatsApp — torna o produto mais aderente ao jeito que times realmente trabalham (ver o padrão "Alertas Comerciais" com WhatsApp na referência SOW, [[projeto_gaiamum_referencia_dashboard_sow]]). Não é escopo imediato, mas deve pesar na decisão de quando construir o módulo de colaboração (o campo "responsável" da tarefa é o gancho técnico que a notificação de WhatsApp vai precisar).
 
+### Visão North Star — Growth OS, registrada 2026-08-30 (madrugada) — NÃO começar a implementar sem retomar com calma
+
+Sessão que já vinha de um relatório overnight (ver checkpoint da madrugada) cruzando a skill `av-value-engine` + o dashboard de referência SOW com o roadmap do Gaiamum. O Fabio aprovou o relatório inteiro e, em cima disso, ampliou a visão do módulo Value Engine/vendas pra algo bem maior — registrado aqui **só como visão de longo prazo**, explicitamente **não pra implementar agora** (decisão do próprio Fabio: "registre a ideia e realizamos de forma modular, com calma").
+
+**O que o Value Engine vira, na visão ampliada:**
+1. **Assistente de conteúdo com IA** — copy, criativos, carrosséis e stories pra vender os produtos do usuário.
+2. **Integrações externas via MCP** com Windsor.ai, Metricool e Trello — puxar dados de tráfego pago/Instagram e organizar execução no momento certo.
+3. **Dashboard de relatórios diários** exclusivo — contas de Instagram + tráfego pago.
+4. **Gerador de propostas comerciais e landing pages com IA**, reaproveitando a mesma "expertise" da skill `av-value-engine` (a lógica de conta/valor em dois cenários, já mapeada como base do Value Engine no relatório overnight).
+5. **Integração com Google Calendar** + follow-up automatizado — o diferencial sobre a skill original, que não tem isso.
+6. **Onboarding modular:** o usuário escolhe quais módulos quer no sistema dele (muda a estrutura do onboarding construído nesta sessão).
+7. **3 planos de preço**, do operacional ao "empresa com IA aplicada à estratégia de negócios".
+
+**Por que não começar agora (consenso desta sessão):** Windsor.ai, Metricool, Trello e Google Calendar exigem OAuth/credenciais reais — não é algo pra configurar de madrugada sem sessão de cabeça fresca revisando cada permissão concedida. Preço de plano trava o modelo de receita — merece conversa com calma, não decisão de virada de noite. E onboarding modular mexe direto na estrutura que acabou de ser construída e validada nesta mesma sessão (formulário SMART, menu lateral) — value do risco de quebrar o que já está testado é maior que o ganho de decidir isso agora.
+
+**Nomes dos 3 planos, decisão do Fabio (substituem os nomes genéricos da primeira proposta):** usar a metáfora do próprio mangue/caranguejo que já é a identidade visual do Gaiamum (a "toca" que a barra de progresso do onboarding já anima) — um caranguejo sozinho → uma colônia → o manguezal inteiro. Reforça a marca em vez de nome genérico de SaaS, e a progressão de complexidade dos planos bate exatamente com a progressão natural da metáfora.
+
+| Plano | Tagline | Módulos | Preço/mês (hipótese, números não pesquisados) |
+|---|---|---|---|
+| **Toca** | Sua base, organizada. | Metas SMART, Projetos, Kanban, Financeiro básico | R$97–147 |
+| **Colônia** | Cresça com o time. | + CRM/Pipeline, Value Engine, Dashboard Instagram/tráfego (Windsor/Metricool) | R$247–397 |
+| **Manguezal** | Todo o ecossistema do seu negócio, rodando junto. | + Relatórios/IA, propostas comerciais e landing pages geradas, follow-up, Trello + Google Calendar | R$597–997 |
+
+"Colônia" reforça de propósito o módulo de colaboração em equipe (convite de membro, atribuição de tarefa) — o nome já comunica por que faz sentido pagar mais pra ter time. Nota pro futuro (não decidir agora): um eventual plano pra agências/parceiros gerenciando vários workspaces poderia seguir a mesma lógica com "Recife" — só guardando a ideia.
+
+**Retomar assim:** quando o Fabio quiser avançar nisso, começar decidindo UM pedaço concreto pra prototipar primeiro (provavelmente o gerador de propostas/landing page com IA do plano Manguezal, que já reaproveita o que o relatório overnight mapeou pro Value Engine, sem depender de nenhuma integração externa nova) — não tentar as 7 peças de uma vez.
+
 ---
 
 ## Checkpoints
