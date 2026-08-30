@@ -9,7 +9,7 @@ import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { eSouGestorDoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
-import type { Convite, Horizonte, MetaSmart, Papel, Prioridade, StatusProjeto } from "@/lib/ecc/tipos";
+import type { AtividadeTarefa, Convite, Horizonte, MetaSmart, Papel, Prioridade, StatusProjeto } from "@/lib/ecc/tipos";
 
 function campoObrigatorio(formData: FormData, nome: string): string {
   const valor = formData.get(nome);
@@ -492,6 +492,26 @@ export async function deletarTarefa(tarefaId: string, projetoId: string) {
   if (error) {
     throw new Error(`Falha ao excluir tarefa: ${error.message}`);
   }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+export async function listarAtividadesDaTarefa(tarefaId: string): Promise<AtividadeTarefa[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("tarefa_atividades")
+    .select("*")
+    .eq("tarefa_id", tarefaId)
+    .order("criado_em", { ascending: false });
+
+  return (data as AtividadeTarefa[] | null) ?? [];
+}
+
+export async function comentarNaTarefa(tarefaId: string, projetoId: string, formData: FormData) {
+  const tenantId = await garantirWorkspace();
+  const texto = campoObrigatorio(formData, "texto");
+
+  await registrarAtividade({ tenantId, projetoId, tarefaId, tipo: "comentario", detalhe: { texto } });
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }

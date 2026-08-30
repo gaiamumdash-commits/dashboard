@@ -1,9 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Prioridade, Tarefa } from "@/lib/ecc/tipos";
+import type {
+  Anexo,
+  AtividadeTarefa,
+  ChecklistItem,
+  ColunaKanban,
+  Etiqueta,
+  MembroTenant,
+  Prioridade,
+  Tarefa,
+} from "@/lib/ecc/tipos";
 import { CLASSE_COR_ETIQUETA } from "@/lib/ecc/kanban";
+import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
 import {
   adicionarChecklistItem,
   alternarChecklistItem,
@@ -11,6 +21,8 @@ import {
   atualizarDatasTarefa,
   atualizarDescricaoTarefa,
   atualizarPrioridadeTarefa,
+  comentarNaTarefa,
+  listarAtividadesDaTarefa,
   moverTarefa,
   removerChecklistItem,
 } from "@/lib/ecc/actions";
@@ -45,8 +57,32 @@ export function DetalheTarefa({
 }) {
   const [descricao, setDescricao] = useState(tarefa.descricao ?? "");
   const [buscaEtiqueta, setBuscaEtiqueta] = useState("");
+  const [atividades, setAtividades] = useState<AtividadeTarefa[] | null>(null);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
+
+  useEffect(() => {
+    let cancelado = false;
+    listarAtividadesDaTarefa(tarefa.id).then((dados) => {
+      if (!cancelado) setAtividades(dados);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [tarefa.id]);
+
+  function nomeDoAutor(userId: string): string {
+    const membro = membrosDoTenant.find((m) => m.user_id === userId);
+    return membro?.email ?? "alguém";
+  }
+
+  function comentar(formData: FormData) {
+    iniciarTransicao(async () => {
+      await comentarNaTarefa(tarefa.id, projetoId, formData);
+      const dados = await listarAtividadesDaTarefa(tarefa.id);
+      setAtividades(dados);
+    });
+  }
 
   const etiquetasAnexadas = etiquetasDoTenant.filter((e) => etiquetasDaTarefa.includes(e.id));
   const sugestoesEtiqueta =
@@ -360,6 +396,41 @@ export function DetalheTarefa({
               enviar={(formData) => enviarAnexoTarefa(tarefa.id, projetoId, formData)}
               caminhoRevalidar={`/projetos/${projetoId}/tarefas`}
             />
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <span className="text-xs font-medium text-gaiamum-text-muted">Atividade</span>
+
+          <form action={comentar} className="mt-1.5 flex gap-2">
+            <input
+              name="texto"
+              required
+              placeholder="Comentar..."
+              className="flex-1 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+            />
+            <button
+              type="submit"
+              className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+            >
+              Enviar
+            </button>
+          </form>
+
+          <div className="mt-3 flex flex-col gap-2">
+            {atividades === null && <p className="text-xs text-gaiamum-text-muted">Carregando...</p>}
+            {atividades !== null && atividades.length === 0 && (
+              <p className="text-xs text-gaiamum-text-muted">Nenhuma atividade ainda.</p>
+            )}
+            {atividades?.map((atividade) => (
+              <div key={atividade.id} className="text-xs text-gaiamum-text-muted">
+                <span className="font-medium text-gaiamum-text">{nomeDoAutor(atividade.user_id)}</span>{" "}
+                {MENSAGEM_POR_TIPO[atividade.tipo](atividade.detalhe)}
+                <span className="ml-1 text-gaiamum-text-muted">
+                  · {new Date(atividade.criado_em).toLocaleString("pt-BR")}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

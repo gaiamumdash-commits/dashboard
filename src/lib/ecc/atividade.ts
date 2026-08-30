@@ -2,20 +2,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { listarMembros } from "@/lib/ecc/equipe";
 import { enviarEmailAtividade } from "@/lib/ecc/notificacoes";
+import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
 import type { TipoAtividade } from "@/lib/ecc/tipos";
-
-const MENSAGEM_POR_TIPO: Record<TipoAtividade, (detalhe: Record<string, string>) => string> = {
-  criada: () => "criou este cartão",
-  movida: (d) => `moveu este cartão de "${d.de}" para "${d.para}"`,
-  descricao_editada: () => "editou a descrição deste cartão",
-  checklist_item_adicionado: (d) => `adicionou "${d.texto}" ao checklist`,
-  checklist_item_concluido: (d) => `marcou "${d.texto}" como concluído no checklist`,
-  checklist_item_reaberto: (d) => `reabriu "${d.texto}" no checklist`,
-  checklist_item_removido: (d) => `removeu "${d.texto}" do checklist`,
-  membro_adicionado: () => "te adicionou como responsável por este cartão",
-  membro_removido: () => "te removeu como responsável deste cartão",
-  excluida: () => "apagou este cartão",
-};
 
 /**
  * Grava no histórico da tarefa e avisa por e-mail quem está marcado como

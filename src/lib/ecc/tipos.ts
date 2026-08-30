@@ -194,7 +194,8 @@ export type TipoAtividade =
   | "checklist_item_removido"
   | "membro_adicionado"
   | "membro_removido"
-  | "excluida";
+  | "excluida"
+  | "comentario";
 
 export type AtividadeTarefa = {
   id: string;
