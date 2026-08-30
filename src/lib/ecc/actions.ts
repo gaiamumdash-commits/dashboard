@@ -54,6 +54,10 @@ export async function criarMetasSmart(formData: FormData) {
   redirect("/projetos");
 }
 
+export async function pularOnboarding() {
+  redirect("/projetos");
+}
+
 // ---------------------------------------------------------------------------
 // Módulo 1 — Projetos
 // ---------------------------------------------------------------------------
