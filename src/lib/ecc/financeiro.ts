@@ -109,6 +109,32 @@ export async function criarDespesaAvulsa(formData: FormData) {
   revalidatePath("/financeiro");
 }
 
+/** Ajusta valor e/ou vencimento da cobrança do mês — útil pra contas fixas
+ * cujo valor real (ex: conta de luz) só se sabe quando o boleto chega,
+ * sem precisar recadastrar o modelo. Não mexe em `mes_referencia`: o
+ * vencimento pode escorregar pro mês seguinte, mas a cobrança continua
+ * pertencendo ao ciclo em que foi gerada (evita duplicar no próximo cron). */
+export async function atualizarValorEVencimento(contaId: string, valor: number, dataVencimento: string) {
+  const tenantId = await garantirWorkspace();
+  await exigirOwner(tenantId);
+  const supabase = await createClient();
+
+  if (!Number.isFinite(valor) || valor <= 0) {
+    throw new Error("Valor inválido.");
+  }
+
+  const { error } = await supabase
+    .from("contas_a_pagar")
+    .update({ valor, data_vencimento: dataVencimento })
+    .eq("id", contaId);
+
+  if (error) {
+    throw new Error(`Falha ao atualizar conta: ${error.message}`);
+  }
+
+  revalidatePath("/financeiro");
+}
+
 export async function marcarComoPaga(contaId: string, dataPagamento: string) {
   const tenantId = await garantirWorkspace();
   await exigirOwner(tenantId);

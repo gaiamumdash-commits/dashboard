@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Anexo, ContaAPagar } from "@/lib/ecc/tipos";
-import { desmarcarComoPaga, marcarComoPaga } from "@/lib/ecc/financeiro";
+import { atualizarValorEVencimento, desmarcarComoPaga, marcarComoPaga } from "@/lib/ecc/financeiro";
 import { AnexoComprovante } from "@/components/financeiro/anexo-comprovante";
 
 const ROTULO_CATEGORIA: Record<ContaAPagar["categoria"], string> = {
@@ -22,6 +22,7 @@ function formatarData(dataISO: string): string {
 
 function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
   const [editandoData, setEditandoData] = useState(false);
+  const [editandoValor, setEditandoValor] = useState(false);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
 
@@ -51,10 +52,53 @@ function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
       <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-xs text-gaiamum-text-muted">
         {ROTULO_CATEGORIA[conta.categoria]}
       </span>
-      <span className="text-sm text-gaiamum-text-muted">
-        {conta.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-      </span>
-      <span className="text-xs text-gaiamum-text-muted">Vence {formatarData(conta.data_vencimento)}</span>
+      {!editandoValor && (
+        <button
+          type="button"
+          onClick={() => setEditandoValor(true)}
+          className="text-sm text-gaiamum-text-muted hover:text-gaiamum-primary hover:underline"
+          title="Clique pra corrigir valor e vencimento (boleto chegou com valor diferente do esperado)"
+        >
+          {conta.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · Vence{" "}
+          {formatarData(conta.data_vencimento)}
+        </button>
+      )}
+
+      {editandoValor && (
+        <form
+          className="flex items-center gap-1"
+          action={(formData) => {
+            const novoValor = Number(formData.get("valor"));
+            const novoVencimento = String(formData.get("data_vencimento"));
+            setEditandoValor(false);
+            iniciarTransicao(async () => {
+              await atualizarValorEVencimento(conta.id, novoValor, novoVencimento);
+              router.refresh();
+            });
+          }}
+        >
+          <input
+            type="number"
+            name="valor"
+            step="0.01"
+            min="0.01"
+            required
+            autoFocus
+            defaultValue={conta.valor}
+            className="w-24 rounded border border-gaiamum-primary bg-gaiamum-surface px-2 py-0.5 text-xs text-gaiamum-text outline-none"
+          />
+          <input
+            type="date"
+            name="data_vencimento"
+            required
+            defaultValue={conta.data_vencimento}
+            className="rounded border border-gaiamum-primary bg-gaiamum-surface px-2 py-0.5 text-xs text-gaiamum-text outline-none"
+          />
+          <button type="submit" className="text-xs text-gaiamum-primary hover:underline">
+            Salvar
+          </button>
+        </form>
+      )}
 
       {conta.pago && conta.data_pagamento && !editandoData && (
         <button
