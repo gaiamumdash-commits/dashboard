@@ -4,7 +4,6 @@ import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { listarMembros, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import type { ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
-import { FormularioNovaTarefa } from "@/components/kanban/formulario-nova-tarefa";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
@@ -81,10 +80,6 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
         {(projeto as Projeto).descricao && (
           <p className="mt-1 text-gaiamum-text-muted">{(projeto as Projeto).descricao}</p>
         )}
-
-        <div className="mt-8">
-          <FormularioNovaTarefa projetoId={projetoId} />
-        </div>
 
         <div className="mt-8">
           <QuadroKanban

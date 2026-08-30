@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import type { ChecklistItem, ColunaKanban, MembroTenant, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
 import { urgenciaDoPrazo } from "@/lib/ecc/kanban";
-import { criarColuna, deletarTarefa, excluirColuna, moverTarefa, renomearColuna } from "@/lib/ecc/actions";
+import {
+  criarColuna,
+  criarTarefa,
+  deletarTarefa,
+  excluirColuna,
+  moverTarefa,
+  renomearColuna,
+} from "@/lib/ecc/actions";
 import { DetalheTarefa } from "@/components/kanban/detalhe-tarefa";
 
 const CLASSE_PRAZO: Record<ReturnType<typeof urgenciaDoPrazo>, string> = {
@@ -228,6 +235,20 @@ export function QuadroKanban({
             </div>
           );
         })}
+
+        <form
+          action={async (formData) => {
+            await criarTarefa(projetoId, coluna.id, formData);
+            router.refresh();
+          }}
+        >
+          <input
+            name="titulo"
+            required
+            placeholder="+ Adicionar cartão"
+            className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-gaiamum-text-muted outline-none transition hover:border-gaiamum-border focus:border-gaiamum-primary focus:bg-gaiamum-surface-raised focus:text-gaiamum-text"
+          />
+        </form>
       </div>
     );
   }

@@ -145,7 +145,7 @@ export async function deletarProjeto(projetoId: string) {
 // Módulo 2 — Tarefas (Kanban)
 // ---------------------------------------------------------------------------
 
-export async function criarTarefa(projetoId: string, formData: FormData) {
+export async function criarTarefa(projetoId: string, colunaId: string, formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
@@ -160,35 +160,14 @@ export async function criarTarefa(projetoId: string, formData: FormData) {
     throw new Error("Informe ao menos um título de tarefa.");
   }
 
-  const prioridade = (formData.get("prioridade") as Prioridade | null) ?? "P3";
-  const tag = (formData.get("tag") as string | null)?.trim() || null;
-  const dataInicio = (formData.get("data_inicio") as string | null) || null;
-  const dataLimite = (formData.get("data_limite") as string | null) || null;
-
-  // Cartão novo sempre nasce na primeira coluna aberta (menor `ordem`,
-  // excluindo a fixa "Concluído") do projeto.
-  const { data: primeiraColuna, error: erroColuna } = await supabase
-    .from("colunas_kanban")
-    .select("id")
-    .eq("projeto_id", projetoId)
-    .eq("concluido", false)
-    .order("ordem", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (erroColuna || !primeiraColuna) {
-    throw new Error("Falha ao localizar a coluna inicial do quadro.");
-  }
-
+  // Criação rápida: só o título agora, o resto (prioridade, tag, datas) o
+  // usuário preenche depois abrindo o cartão.
   const linhas = titulos.map((titulo) => ({
     tenant_id: tenantId,
     projeto_id: projetoId,
-    coluna_id: primeiraColuna.id,
+    coluna_id: colunaId,
     titulo,
-    prioridade,
-    tag,
-    data_inicio: dataInicio,
-    data_limite: dataLimite,
+    prioridade: "P3" as Prioridade,
   }));
 
   const { error } = await supabase.from("tarefas").insert(linhas);
