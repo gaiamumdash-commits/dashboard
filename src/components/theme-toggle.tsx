@@ -5,25 +5,34 @@ import { useSyncExternalStore } from "react";
 const CHAVE_STORAGE = "gaiamum-theme";
 const ouvintes = new Set<() => void>();
 
+type Tema = "light" | "navy" | "black";
+
+const OPCOES: { valor: Tema; rotulo: string; cor: string }[] = [
+  { valor: "light", rotulo: "Tema claro", cor: "#f5f6f8" },
+  { valor: "navy", rotulo: "Tema azul", cor: "#011f51" },
+  { valor: "black", rotulo: "Tema preto", cor: "#08090d" },
+];
+
 function inscrever(callback: () => void) {
   ouvintes.add(callback);
   return () => ouvintes.delete(callback);
 }
 
-function obterTema(): "light" | "dark" {
-  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+function obterTema(): Tema {
+  const atual = document.documentElement.dataset.theme;
+  return atual === "light" || atual === "black" ? atual : "navy";
 }
 
 // O servidor não tem acesso a `document`/localStorage, então sempre "vê"
-// dark. O script inline em layout.tsx já aplica o tema real no <html> antes
+// navy. O script inline em layout.tsx já aplica o tema real no <html> antes
 // do paint; useSyncExternalStore reconcilia esse valor com segurança depois
-// da hidratação, sem o mismatch que antes descartava a árvore inteira.
-function obterTemaServidor(): "light" | "dark" {
-  return "dark";
+// da hidratação, sem o mismatch que descartaria a árvore inteira.
+function obterTemaServidor(): Tema {
+  return "navy";
 }
 
-function aplicarTema(tema: "light" | "dark") {
-  document.documentElement.dataset.theme = tema === "light" ? "light" : "";
+function aplicarTema(tema: Tema) {
+  document.documentElement.dataset.theme = tema === "navy" ? "" : tema;
   localStorage.setItem(CHAVE_STORAGE, tema);
   ouvintes.forEach((callback) => callback());
 }
@@ -31,27 +40,24 @@ function aplicarTema(tema: "light" | "dark") {
 export function ThemeToggle() {
   const tema = useSyncExternalStore(inscrever, obterTema, obterTemaServidor);
 
-  function alternar() {
-    aplicarTema(tema === "light" ? "dark" : "light");
-  }
-
   return (
-    <button
-      type="button"
-      onClick={alternar}
-      aria-label={tema === "light" ? "Mudar para tema escuro" : "Mudar para tema claro"}
-      className="fixed right-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-gaiamum-border bg-gaiamum-surface text-gaiamum-text-muted transition hover:text-gaiamum-text"
-    >
-      {tema === "light" ? (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
-      ) : (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-        </svg>
-      )}
-    </button>
+    <div className="fixed right-4 top-4 z-50 flex items-center gap-1.5 rounded-full border border-gaiamum-border bg-gaiamum-surface p-1.5">
+      {OPCOES.map((opcao) => (
+        <button
+          key={opcao.valor}
+          type="button"
+          onClick={() => aplicarTema(opcao.valor)}
+          aria-label={opcao.rotulo}
+          aria-pressed={tema === opcao.valor}
+          title={opcao.rotulo}
+          className={`h-6 w-6 rounded-full border-2 transition ${
+            tema === opcao.valor
+              ? "border-gaiamum-primary scale-110"
+              : "border-transparent hover:border-gaiamum-border"
+          }`}
+          style={{ backgroundColor: opcao.cor }}
+        />
+      ))}
+    </div>
   );
 }

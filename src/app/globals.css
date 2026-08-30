@@ -37,6 +37,23 @@
   --gaiamum-text-muted: #5b6b85;
 }
 
+/* Tema preto — mais escuro que o navy padrão, pra quem usa à noite e quer
+   menos luz de tela. Acento troca de azul/ciano pra laranja/âmbar (pedido
+   explícito, referência de um dashboard preto e laranja) — só neste tema,
+   os outros dois continuam com a paleta oficial azul/ciano da marca. */
+:root[data-theme="black"] {
+  --gaiamum-bg: #08090d;
+  --gaiamum-surface: #121420;
+  --gaiamum-surface-raised: #1b1e2c;
+  --gaiamum-border: #2a2d3d;
+  --gaiamum-text: #e8e9ee;
+  --gaiamum-text-muted: #8a8fa0;
+
+  --gaiamum-primary: #ff7a1a;
+  --gaiamum-primary-dark: #d9600a;
+  --gaiamum-accent: #ffb020;
+}
+
 @theme inline {
   --color-gaiamum-bg: var(--gaiamum-bg);
   --color-gaiamum-surface: var(--gaiamum-surface);
@@ -66,6 +83,10 @@ html {
 
 html[data-theme="light"] {
   color-scheme: light;
+}
+
+html[data-theme="black"] {
+  color-scheme: dark;
 }
 
 body {

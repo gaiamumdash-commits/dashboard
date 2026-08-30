@@ -1,10 +1,27 @@
+"use client";
+
+import { useState } from "react";
 import { criarMetasSmart, pularOnboarding } from "@/lib/ecc/actions";
 import { CAMPOS_SMART, HORIZONTES } from "@/lib/ecc/smart";
 import { BotaoSalvar } from "@/components/onboarding/botao-salvar";
+import { BarraProgresso } from "@/components/ui/barra-progresso";
+
+const TOTAL_CAMPOS = HORIZONTES.length * (1 + CAMPOS_SMART.length);
 
 export function FormularioSmart() {
+  const [valores, setValores] = useState<Record<string, string>>({});
+
+  const preenchidos = Object.values(valores).filter((valor) => valor.trim() !== "").length;
+  const percentual = Math.round((preenchidos / TOTAL_CAMPOS) * 100);
+
+  function handleChange(nome: string, valor: string) {
+    setValores((anterior) => ({ ...anterior, [nome]: valor }));
+  }
+
   return (
     <form action={criarMetasSmart} className="mt-8 flex flex-col gap-10">
+      <BarraProgresso percentual={percentual} rotulo="Metas SMART preenchidas" />
+
       {HORIZONTES.map((horizonte) => (
         <div
           key={horizonte.valor}
@@ -24,6 +41,7 @@ export function FormularioSmart() {
               required
               rows={2}
               placeholder={horizonte.placeholder}
+              onChange={(e) => handleChange(`${horizonte.valor}_visao_macro`, e.target.value)}
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none placeholder:text-gaiamum-text-muted/60 focus:border-gaiamum-primary"
             />
           </label>
@@ -43,6 +61,7 @@ export function FormularioSmart() {
                   required
                   rows={2}
                   placeholder={campo.placeholder}
+                  onChange={(e) => handleChange(`${horizonte.valor}_${campo.campo}`, e.target.value)}
                   className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none placeholder:text-gaiamum-text-muted/60 focus:border-gaiamum-primary"
                 />
               </label>

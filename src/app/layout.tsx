@@ -8,7 +8,7 @@ import "./globals.css";
 const SCRIPT_TEMA = `
 try {
   var tema = localStorage.getItem("gaiamum-theme");
-  if (tema === "light") document.documentElement.dataset.theme = "light";
+  if (tema === "light" || tema === "black") document.documentElement.dataset.theme = tema;
 } catch (e) {}
 `;
 
