@@ -21,6 +21,7 @@ export function QuadroKanban({
   tarefaMembrosIniciais,
   checklistItensIniciais,
   usuarioAtualId,
+  podeExcluirTarefa,
 }: {
   projetoId: string;
   tarefasIniciais: Tarefa[];
@@ -28,6 +29,7 @@ export function QuadroKanban({
   tarefaMembrosIniciais: TarefaMembro[];
   checklistItensIniciais: ChecklistItem[];
   usuarioAtualId: string | null;
+  podeExcluirTarefa: boolean;
 }) {
   const [tarefas, setTarefas] = useState(tarefasIniciais);
   const [tarefaAbertaId, setTarefaAbertaId] = useState<string | null>(null);
@@ -99,13 +101,15 @@ export function QuadroKanban({
                       >
                         {tarefa.titulo}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => excluir(tarefa.id)}
-                        className="shrink-0 text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-                      >
-                        ✕
-                      </button>
+                      {podeExcluirTarefa && (
+                        <button
+                          type="button"
+                          onClick={() => excluir(tarefa.id)}
+                          className="shrink-0 text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
 
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">

@@ -11,7 +11,7 @@ const ROTULO_STATUS: Record<StatusProjeto, string> = {
   concluido: "Concluído",
 };
 
-export function CartaoProjeto({ projeto }: { projeto: Projeto }) {
+export function CartaoProjeto({ projeto, podeExcluir }: { projeto: Projeto; podeExcluir: boolean }) {
   const [pendente, iniciarTransicao] = useTransition();
 
   function mudarStatus(status: StatusProjeto) {
@@ -49,14 +49,16 @@ export function CartaoProjeto({ projeto }: { projeto: Projeto }) {
         <Link href={`/projetos/${projeto.id}/tarefas`} className="text-sm text-gaiamum-primary hover:underline">
           Ver kanban →
         </Link>
-        <button
-          type="button"
-          onClick={excluir}
-          disabled={pendente}
-          className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-        >
-          Excluir
-        </button>
+        {podeExcluir && (
+          <button
+            type="button"
+            onClick={excluir}
+            disabled={pendente}
+            className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
+          >
+            Excluir
+          </button>
+        )}
       </div>
     </div>
   );

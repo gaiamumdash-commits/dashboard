@@ -11,13 +11,15 @@ export default async function PaginaEquipe() {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
-  const [membros, convites, papelAtual, { count: totalMetasSmart }, cabecalhos] = await Promise.all([
-    listarMembros(tenantId),
-    listarConvitesPendentes(tenantId),
-    obterPapelAtual(tenantId),
-    supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
-    headers(),
-  ]);
+  const [membros, convites, papelAtual, { count: totalMetasSmart }, { data: projetos }, cabecalhos] =
+    await Promise.all([
+      listarMembros(tenantId),
+      listarConvitesPendentes(tenantId),
+      obterPapelAtual(tenantId),
+      supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+      supabase.from("projetos").select("id, nome").eq("tenant_id", tenantId).order("nome"),
+      headers(),
+    ]);
 
   const host = cabecalhos.get("host") ?? "gaiamum-dashboard.vercel.app";
   const origem = host.includes("localhost") ? `http://${host}` : `https://${host}`;
@@ -39,13 +41,13 @@ export default async function PaginaEquipe() {
 
         {souOwner && (
           <div className="mt-8">
-            <FormularioConvite />
+            <FormularioConvite projetos={projetos ?? []} />
           </div>
         )}
 
         {souOwner && convites.length > 0 && (
           <div className="mt-8">
-            <ListaConvites convites={convites} origem={origem} />
+            <ListaConvites convites={convites} origem={origem} projetos={projetos ?? []} />
           </div>
         )}
       </main>

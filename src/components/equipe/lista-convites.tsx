@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { Convite } from "@/lib/ecc/tipos";
+import type { Convite, Projeto } from "@/lib/ecc/tipos";
 import { cancelarConvite } from "@/lib/ecc/actions";
 
-export function ListaConvites({ convites, origem }: { convites: Convite[]; origem: string }) {
+export function ListaConvites({
+  convites,
+  origem,
+  projetos,
+}: {
+  convites: Convite[];
+  origem: string;
+  projetos: Pick<Projeto, "id" | "nome">[];
+}) {
   const [, iniciarTransicao] = useTransition();
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
 
@@ -20,6 +28,7 @@ export function ListaConvites({ convites, origem }: { convites: Convite[]; orige
       <div className="mt-3 flex flex-col gap-2">
         {convites.map((convite) => {
           const link = `${origem}/convite/${convite.token}`;
+          const projeto = convite.projeto_id ? projetos.find((p) => p.id === convite.projeto_id) : null;
           return (
             <div
               key={convite.id}
@@ -28,8 +37,9 @@ export function ListaConvites({ convites, origem }: { convites: Convite[]; orige
               <div>
                 <p className="text-sm text-gaiamum-text">{convite.email}</p>
                 <p className="text-xs text-gaiamum-text-muted">
-                  {convite.papel === "owner" ? "Dono" : "Membro"} · expira em{" "}
-                  {new Date(convite.expira_em).toLocaleDateString("pt-BR")}
+                  {convite.papel === "owner" ? "Dono" : "Membro"} ·{" "}
+                  {convite.projeto_id ? `quadro: ${projeto?.nome ?? "projeto removido"}` : "workspace inteiro"} ·
+                  expira em {new Date(convite.expira_em).toLocaleDateString("pt-BR")}
                 </p>
               </div>
               <div className="flex gap-2">

@@ -1,6 +1,6 @@
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
-import { temAcessoCompleto } from "@/lib/ecc/equipe";
+import { temAcessoCompleto, obterPapelAtual } from "@/lib/ecc/equipe";
 import type { Projeto } from "@/lib/ecc/tipos";
 import { FormularioNovoProjeto } from "@/components/projetos/formulario-novo-projeto";
 import { CartaoProjeto } from "@/components/projetos/cartao-projeto";
@@ -10,11 +10,23 @@ export default async function PaginaProjetos() {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
-  const [{ data: projetos }, { count: totalMetasSmart }, acessoCompleto] = await Promise.all([
-    supabase.from("projetos").select("*").eq("tenant_id", tenantId).order("criado_em", { ascending: false }),
-    supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
-    temAcessoCompleto(tenantId),
-  ]);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: projetos }, { count: totalMetasSmart }, acessoCompleto, papelAtual, { data: projetosGeridos }] =
+    await Promise.all([
+      supabase.from("projetos").select("*").eq("tenant_id", tenantId).order("criado_em", { ascending: false }),
+      supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+      temAcessoCompleto(tenantId),
+      obterPapelAtual(tenantId),
+      user
+        ? supabase.from("projeto_membros").select("projeto_id").eq("user_id", user.id).eq("papel", "gestor")
+        : Promise.resolve({ data: [] as { projeto_id: string }[] }),
+    ]);
+
+  const souOwner = papelAtual === "owner";
+  const idsProjetosGeridos = new Set((projetosGeridos ?? []).map((p) => p.projeto_id as string));
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">
@@ -32,7 +44,11 @@ export default async function PaginaProjetos() {
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(projetos as Projeto[] | null)?.map((projeto) => (
-            <CartaoProjeto key={projeto.id} projeto={projeto} />
+            <CartaoProjeto
+              key={projeto.id}
+              projeto={projeto}
+              podeExcluir={souOwner || idsProjetosGeridos.has(projeto.id)}
+            />
           ))}
           {(!projetos || projetos.length === 0) && (
             <p className="col-span-full text-gaiamum-text-muted">

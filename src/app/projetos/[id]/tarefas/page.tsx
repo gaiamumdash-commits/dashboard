@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
-import { listarMembros } from "@/lib/ecc/equipe";
+import { listarMembros, obterPapelAtual } from "@/lib/ecc/equipe";
 import type { ChecklistItem, Projeto, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
 import { FormularioNovaTarefa } from "@/components/kanban/formulario-nova-tarefa";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
@@ -24,23 +24,37 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     notFound();
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const [
     { data: tarefas },
     { count: totalMetasSmart },
     { data: tarefaMembros },
     { data: checklistItens },
     membros,
-    {
-      data: { user },
-    },
+    papelAtual,
+    { data: gestorDoProjeto },
   ] = await Promise.all([
     supabase.from("tarefas").select("*").eq("projeto_id", projetoId).order("criado_em", { ascending: true }),
     supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     supabase.from("tarefa_membros").select("*").eq("tenant_id", tenantId),
     supabase.from("tarefa_checklist_itens").select("*").eq("tenant_id", tenantId).order("ordem"),
     listarMembros(tenantId),
-    supabase.auth.getUser(),
+    obterPapelAtual(tenantId),
+    user
+      ? supabase
+          .from("projeto_membros")
+          .select("id")
+          .eq("projeto_id", projetoId)
+          .eq("user_id", user.id)
+          .eq("papel", "gestor")
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
+
+  const podeExcluirTarefa = papelAtual === "owner" || Boolean(gestorDoProjeto);
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">
@@ -67,6 +81,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
             tarefaMembrosIniciais={(tarefaMembros as TarefaMembro[]) ?? []}
             checklistItensIniciais={(checklistItens as ChecklistItem[]) ?? []}
             usuarioAtualId={user?.id ?? null}
+            podeExcluirTarefa={podeExcluirTarefa}
           />
         </div>
       </main>
