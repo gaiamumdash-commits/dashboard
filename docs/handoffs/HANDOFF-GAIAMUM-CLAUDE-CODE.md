@@ -155,6 +155,18 @@ Sessão que já vinha de um relatório overnight (ver checkpoint da madrugada) c
 
 **Retomar assim:** quando o Fabio quiser avançar nisso, começar decidindo UM pedaço concreto pra prototipar primeiro (provavelmente o gerador de propostas/landing page com IA do plano Manguezal, que já reaproveita o que o relatório overnight mapeou pro Value Engine, sem depender de nenhuma integração externa nova) — não tentar as 7 peças de uma vez.
 
+#### Página de faturamento — ideia registrada, 2026-08-30 (não implementar ainda)
+
+Pedido do Fabio: uma tela onde o usuário vê o plano contratado e as informações de pagamento/fatura, baseada em apps de referência. Pertence à **Onda 10 (Pagamentos)**, propositalmente a última — depende de uma decisão ainda não tomada (qual gateway; Stripe é o padrão de mercado pra SaaS no Brasil, com Billing Portal pronto que cobre boa parte disso sem construir do zero) e da tabela `planos` da Onda 0 já existir.
+
+**Campos que apps de referência (Stripe Billing Portal, Vercel, Notion) normalmente têm, pra usar de base quando for construir:**
+- Plano atual (nome + preço) e data da próxima cobrança.
+- Método de pagamento: cartão mascarado (final 4 dígitos, bandeira, validade) + botão trocar.
+- Histórico de faturas: lista com data, valor, status (pago/pendente/falhou), link pra PDF de cada uma.
+- Botão de upgrade/downgrade entre os 3 planos (Toca/Colônia/Manguezal), com o valor pro-rata da mudança.
+- Cancelamento com confirmação (e, se fizer sentido, oferta de retenção antes de confirmar).
+- Uso do plano quando houver limite (ex.: "3 de 15 membros", "1 de 2 empresas no Manguezal") — dá pro usuário ver quando está perto do teto antes de precisar fazer upgrade.
+
 **Ordem de construção por ondas (dependências, não cronograma fixo — decisão final desta sessão):**
 
 | Onda | O que entra | Por que nessa ordem |
