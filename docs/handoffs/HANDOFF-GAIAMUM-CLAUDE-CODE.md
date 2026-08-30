@@ -101,6 +101,20 @@ AIOX_ACTIVE_AGENT=devops git push   # publicar (ver "Convenção de push")
 
 - Módulos 3-7 (financeiro, CRM, value engine/vendas, relatórios/IA, painel owner + Resend, pagamentos, criptografia) — nenhum iniciado. Ver [[projeto_gaiamum_referencia_dashboard_sow]] pra padrões de UX reaproveitáveis.
 - Avaliar se vale evoluir o Módulo 1/2 pra amarrar tarefa↔produto vendido (padrão visto na referência SOW).
+- **Colaboração em equipe (estilo Trello)** — ver seção dedicada abaixo. Prioridade estratégica do Fabio, considerar antes de aprofundar demais nos módulos 3-7.
+
+### Colaboração em equipe (estilo Trello) — decisão estratégica, 2026-08-29
+
+Fabio perguntou se o Gaiamum pode suportar times trabalhando juntos (tipo Trello) e se isso precisa ser desde o início ou pode ser evolução. **Veredito: pode ser evolução, sem dívida técnica.** O schema já foi desenhado multi-tenant desde a Fase 0 de propósito (`tenants` + `memberships` com papel `owner`/`member` + RLS por `tenant_id`) — o mesmo padrão do UltraQuadras — exatamente pra não bloquear "vários usuários por workspace" depois. Isso já está pronto e funcionando.
+
+**O que falta construir (não existe hoje):**
+1. Convite de membro pro workspace (fluxo de convite por e-mail, aceitar convite, hoje só quem cria o workspace existe nele).
+2. Atribuição de tarefa a uma pessoa (`tarefas` não tem coluna de responsável ainda).
+3. Diferenciação real de permissão entre `owner` e `member` (hoje são só rótulos).
+
+**Why isso importa (registrado a pedido do Fabio):** ele considera isso importante pra evolução do produto e pra aumentar a chance de comercializar o Gaiamum — colaboração em equipe é o que diferencia uma ferramenta pessoal de um produto vendável pra empresas. Prioridade estratégica, não só técnica.
+
+**Roadmap futuro relacionado (mencionado pelo Fabio, ainda não arquitetado):** integração com a API oficial da Meta (WhatsApp Business) pra lembretes de tarefa chegarem via WhatsApp — torna o produto mais aderente ao jeito que times realmente trabalham (ver o padrão "Alertas Comerciais" com WhatsApp na referência SOW, [[projeto_gaiamum_referencia_dashboard_sow]]). Não é escopo imediato, mas deve pesar na decisão de quando construir o módulo de colaboração (o campo "responsável" da tarefa é o gancho técnico que a notificação de WhatsApp vai precisar).
 
 ---
 
