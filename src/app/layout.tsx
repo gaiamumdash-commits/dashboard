@@ -15,7 +15,7 @@ try {
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://gaiamum-dashboard.vercel.app"),
+  metadataBase: new URL("https://www.gaiamum.com.br"),
   title: "Gaiamum Dashboard",
   description: "Command Center do empreendedor: metas, projetos e tarefas em um lugar só.",
   manifest: "/manifest.json",
