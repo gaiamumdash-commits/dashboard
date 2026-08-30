@@ -4,11 +4,13 @@
 
 **Criado:** 2026-08-29 · **Branch:** main · **Remoto:** https://github.com/gaiamumdash-commits/dashboard
 **Local do projeto:** `c:\Users\proff\Documents\Gaiamum\` (**fora do OneDrive de propósito** — não mover de volta)
-**Produção:** https://gaiamum-dashboard.vercel.app
+**Produção:** https://www.gaiamum.com.br (domínio próprio, comprado 2026-08-29 — **DNS ainda não configurado**, ver "Estado confirmado"). Enquanto o DNS não propaga, o app continua respondendo em https://gaiamum-dashboard.vercel.app.
 
 ---
 
-## Estado confirmado (2026-08-29, noite)
+## Estado confirmado (2026-08-29, noite — última atualização)
+
+- **Domínio próprio comprado:** `gaiamum.com.br` (registro.br), `www.gaiamum.com.br` é o principal. Já adicionado ao projeto Vercel (`gaiamum.com.br` e `www.gaiamum.com.br`), redirect 301 apex→www configurado em `next.config.ts`, `metadataBase` e `site_url`/`uri_allow_list` do Supabase já apontam pro domínio novo (com fallback pro `.vercel.app` e `localhost` durante a transição). **Falta o Fabio configurar os registros DNS no painel do registro.br:** `A @ 76.76.21.21` e `A www 76.76.21.21`. Sem isso o domínio não resolve — checar com `vercel domains inspect gaiamum.com.br --scope gaiamum-dash` (ou `www.gaiamum.com.br`) se já propagou.
 
 - **Fundação + Módulo 0-2** implementados: onboarding SMART, projetos (CRUD), kanban de tarefas (com tags pessoal/ifaz/faculdade/vendas). Detalhes de arquitetura na seção "Fundação técnica" abaixo.
 - **Infraestrutura 100% pronta e no ar**, independente do UltraQuadras:
@@ -35,7 +37,7 @@ Continua valendo sempre pedir confirmação ao Fabio antes de qualquer push — 
 
 - **Marca/logo fonte:** `C:\Users\proff\Downloads\Gaiamum marca\` (`Gaiamum dashboard.png` = versão escura, `Logo Gaimum no branco.png` = versão clara, `Layout pag login Gaiamum.png` = hero desktop do login, `Layout Gaiamum Mobile.png` = hero mobile do login). Cópias em uso já estão em `public/brand/` no repo (`crab-mark.png`, `login-hero.png`, `login-hero-mobile.png`).
 - **Paleta:** navy `#011f51` (bg escuro), `#0069fd` (primário), `#0141bc` (hover), `#00cbee` (acento ciano), `#f5e9dc` (texto/creme no escuro), `#002559` (texto no tema claro).
-- **Export Obsidian:** `/ecc-system/metas/` dentro do repo — Markdown com frontmatter gerado a cada meta SMART salva. Não substitui o Supabase (fonte de verdade), é só destino de leitura no Obsidian.
+- **Export Obsidian:** `/ecc-system/metas/` dentro do repo — Markdown com frontmatter gerado a cada meta SMART salva. Não substitui o Supabase (fonte de verdade), é só destino de leitura no Obsidian. **Claude não abre/usa o Obsidian** (é um app de desktop com interface gráfica) — só gera Markdown compatível. Se o Fabio quiser navegar as notas, é ele quem abre o Obsidian e aponta pra `c:\Users\proff\Documents\Gaiamum\` (o repo inteiro, não só `/ecc-system/` — assim `docs/handoffs/` também fica navegável). Hoje `/ecc-system/metas/` está vazio (nenhum onboarding real rodou ainda).
 - **Memórias relevantes (fora do repo):** [[projeto_gaiamum_dashboard_novo_saas]] (visão geral), [[feedback_evitar_onedrive_novos_projetos]], [[projeto_gaiamum_referencia_dashboard_sow]] (padrões de UX pros módulos 3-6), [[feedback_gaiamum_aiox_push_devops]].
 
 ---
@@ -90,15 +92,15 @@ AIOX_ACTIVE_AGENT=devops git push   # publicar (ver "Convenção de push")
 
 ### Imediato (retomar por aqui)
 
-1. **Testar o login com Google de verdade** no navegador em https://gaiamum-dashboard.vercel.app/auth (clicar "Entrar com Google", confirmar que completa o fluxo e cai em `/`). Se der erro de redirect_uri, conferir se a URI cadastrada no Google Cloud Console bate exatamente com `https://zfjtcivusdmjvdbycpjs.supabase.co/auth/v1/callback`.
-2. Testar o fluxo de "esqueci minha senha" de ponta a ponta (pedir o link, abrir o e-mail, definir nova senha).
-3. Testar o onboarding completo (signup → metas SMART → projeto → kanban) agora que a infra está toda real, e conferir se `/ecc-system/metas/` populou depois.
+1. **Confirmar se o DNS do domínio já propagou:** `cd Gaiamum && npx vercel domains inspect gaiamum.com.br --scope gaiamum-dash` (e o mesmo pra `www.gaiamum.com.br`). Se o Fabio ainda não configurou os registros A no registro.br, lembrar ele (ver "Estado confirmado").
+2. **Testar o login com Google de verdade** no navegador em `/auth` (usar o domínio que estiver ativo — `www.gaiamum.com.br` se o DNS já propagou, senão `gaiamum-dashboard.vercel.app`). Se der erro de redirect_uri, conferir se a URI cadastrada no Google Cloud Console bate exatamente com `https://zfjtcivusdmjvdbycpjs.supabase.co/auth/v1/callback`.
+3. Testar o fluxo de "esqueci minha senha" de ponta a ponta (pedir o link, abrir o e-mail, definir nova senha).
+4. Testar o onboarding completo (signup → metas SMART → projeto → kanban) agora que a infra está toda real, e conferir se `/ecc-system/metas/` populou depois.
 
 ### Depois
 
 - Módulos 3-7 (financeiro, CRM, value engine/vendas, relatórios/IA, painel owner + Resend, pagamentos, criptografia) — nenhum iniciado. Ver [[projeto_gaiamum_referencia_dashboard_sow]] pra padrões de UX reaproveitáveis.
 - Avaliar se vale evoluir o Módulo 1/2 pra amarrar tarefa↔produto vendido (padrão visto na referência SOW).
-- Registrar/confirmar o domínio `www.gaiamum.com.br` e conectar como domínio custom na Vercel quando pronto (hoje o app só responde em `gaiamum-dashboard.vercel.app` — `metadataBase` em `layout.tsx` e `site_url`/`uri_allow_list` no Supabase vão precisar ser atualizados quando isso acontecer).
 
 ---
 
@@ -120,4 +122,12 @@ Implementado: `/auth` agora é um layout dividido (arte à esquerda em telas ≥
 
 **Não testado com clique real em navegador ainda:** login com Google (o teste automático via curl travou por rede neste ambiente sandboxed, não é sinal de problema de config) e o fluxo de recuperação de senha. Primeira coisa a fazer na próxima sessão.
 
-**Pausa:** Fabio vai transportar o computador. Todo o trabalho está commitado e publicado (push até o commit `28ca58b`), nada em risco de se perder.
+### 2026-08-29 (noite, mais tarde) — domínio próprio conectado
+
+Fabio comprou `gaiamum.com.br` no registro.br e definiu `www.gaiamum.com.br` como domínio principal. Adicionei os dois domínios ao projeto Vercel (`vercel domains add`), configurei redirect 301 de `gaiamum.com.br` pro `www` via `next.config.ts` (matcher por `host`, não precisa de configuração no painel da Vercel), e atualizei `metadataBase` (layout.tsx) e `site_url`/`uri_allow_list` (Supabase, via API de gerenciamento) pro domínio novo — mantendo o `.vercel.app` e `localhost` na allow-list como fallback enquanto o DNS não propaga.
+
+Também expliquei ao Fabio que eu não "uso" o Obsidian (app de desktop, não tenho como abrir/navegar nele) — só gero Markdown compatível em `/ecc-system/`. Recomendei ele apontar o Obsidian (se for instalar) pra pasta do repo inteiro, não só `/ecc-system/`, pra já enxergar o handoff hoje.
+
+**Pendente, só o Fabio pode fazer:** configurar os registros DNS `A @ 76.76.21.21` e `A www 76.76.21.21` no painel do registro.br. Até isso propagar, o domínio próprio não resolve — usar `gaiamum-dashboard.vercel.app` normalmente.
+
+**Pausa:** Fabio vai transportar o computador. Todo o trabalho está commitado e publicado (push até o commit `67f4983`), nada em risco de se perder.
