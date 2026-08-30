@@ -105,6 +105,7 @@ AIOX_ACTIVE_AGENT=devops git push   # publicar (ver "Convenção de push")
 ### Depois
 
 - Módulos 3-7 (financeiro, CRM, value engine/vendas, relatórios/IA, painel owner + Resend, pagamentos, criptografia) — nenhum iniciado. Ver [[projeto_gaiamum_referencia_dashboard_sow]] pra padrões de UX reaproveitáveis.
+  - **Decisão de visão registrada nesta sessão (2026-08-30):** as metas SMART do onboarding (Módulo 0) não são sobre colaboração — são a base do "Plano de Ação". O Fabio quer que o futuro Módulo 5 (relatórios/IA) use essas metas de médio/longo prazo como contexto pra IA sugerir ações nos relatórios, alinhadas aos objetivos que o dono do negócio definiu. Guardar isso pra quando o Módulo 5 for arquitetado — hoje as metas só existem em `metas_smart` e no export Markdown, sem nenhum consumo por IA ainda.
 - Avaliar se vale evoluir o Módulo 1/2 pra amarrar tarefa↔produto vendido (padrão visto na referência SOW).
 - **Colaboração em equipe (estilo Trello)** — ver seção dedicada abaixo. Prioridade estratégica do Fabio, considerar antes de aprofundar demais nos módulos 3-7.
 
