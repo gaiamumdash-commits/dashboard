@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
-import { listarMembros, listarConvitesPendentes, obterPapelAtual } from "@/lib/ecc/equipe";
+import { listarMembros, listarConvitesPendentes, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { FormularioConvite } from "@/components/equipe/formulario-convite";
 import { ListaConvites } from "@/components/equipe/lista-convites";
@@ -9,6 +10,13 @@ import { ListaMembros } from "@/components/equipe/lista-membros";
 
 export default async function PaginaEquipe() {
   const tenantId = await garantirWorkspace();
+
+  // Quem entrou convidado só pra um quadro não vê a Equipe do workspace
+  // inteiro, só o(s) quadro(s) em que foi colocado.
+  if (!(await temAcessoCompleto(tenantId))) {
+    redirect("/projetos");
+  }
+
   const supabase = await createClient();
 
   const [membros, convites, papelAtual, { count: totalMetasSmart }, { data: projetos }, cabecalhos] =

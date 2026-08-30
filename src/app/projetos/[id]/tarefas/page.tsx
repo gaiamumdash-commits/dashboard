@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
-import { listarMembros, obterPapelAtual } from "@/lib/ecc/equipe";
+import { listarMembros, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import type { ChecklistItem, Projeto, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
 import { FormularioNovaTarefa } from "@/components/kanban/formulario-nova-tarefa";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
@@ -35,6 +35,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     { data: checklistItens },
     membros,
     papelAtual,
+    acessoCompleto,
     { data: gestorDoProjeto },
   ] = await Promise.all([
     supabase.from("tarefas").select("*").eq("projeto_id", projetoId).order("criado_em", { ascending: true }),
@@ -43,6 +44,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     supabase.from("tarefa_checklist_itens").select("*").eq("tenant_id", tenantId).order("ordem"),
     listarMembros(tenantId),
     obterPapelAtual(tenantId),
+    temAcessoCompleto(tenantId),
     user
       ? supabase
           .from("projeto_membros")
@@ -58,7 +60,10 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">
-      <MenuLateral temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)} />
+      <MenuLateral
+        temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)}
+        acessoCompleto={acessoCompleto}
+      />
       <main className="mx-auto max-w-6xl flex-1 px-4 py-12">
         <Link href="/projetos" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">
           ← Projetos

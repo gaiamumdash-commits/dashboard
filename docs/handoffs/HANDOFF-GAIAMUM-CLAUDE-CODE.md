@@ -2,6 +2,8 @@
 
 **Documento canônico de continuidade.** Ao retomar uma sessão nova sobre o Gaiamum, ler só "Estado confirmado" abaixo + a última entrada de "Checkpoints" no rodapé — não o arquivo inteiro. Ao fim de qualquer sessão relevante, atualizar "Estado confirmado" (se mudou) e acrescentar uma entrada nova em "Checkpoints". Nunca criar um arquivo de handoff novo — este é o único.
 
+**Regra permanente (pedido do Fabio, 2026-08-30):** sempre que uma ferramenta travar, uma automação ficar esperando algo que não vai resolver sozinha (ex.: confirmação de e-mail, permissão de navegador, aprovação externa), ou o trabalho ficar bloqueado por qualquer motivo, avisar o Fabio imediatamente — dizer o que travou e o que ele pode fazer pra destravar. Nunca deixar isso implícito ou esperar ele perguntar "travou?".
+
 **Criado:** 2026-08-29 · **Branch:** main · **Remoto:** https://github.com/gaiamumdash-commits/dashboard
 **Local do projeto:** `c:\Users\proff\Documents\Gaiamum\` (**fora do OneDrive de propósito** — não mover de volta)
 **Produção:** https://www.gaiamum.com.br (domínio próprio, DNS já propagado — **falta só o certificado SSL ativar**, ver "Estado confirmado"). Enquanto isso, o app responde normalmente em https://gaiamum-dashboard.vercel.app.

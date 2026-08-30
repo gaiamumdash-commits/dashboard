@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
+import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
-import type { Horizonte, MetaSmart, Papel, Prioridade, StatusProjeto, StatusTarefa } from "@/lib/ecc/tipos";
+import type { Convite, Horizonte, MetaSmart, Papel, Prioridade, StatusProjeto, StatusTarefa } from "@/lib/ecc/tipos";
 
 function campoObrigatorio(formData: FormData, nome: string): string {
   const valor = formData.get(nome);
@@ -368,34 +369,7 @@ export async function aceitarConvite(token: string) {
     throw new Error("Este convite foi feito para outro e-mail.");
   }
 
-  // Convite de projeto sempre entra como "member" do tenant, com escopo
-  // "projeto" — não enxerga Metas SMART nem Equipe do workspace inteiro,
-  // só o(s) quadro(s) em que foi colocado via projeto_membros.
-  const papelTenant = convite.projeto_id ? "member" : convite.papel;
-  const escopo = convite.projeto_id ? "projeto" : "completo";
-
-  const { error: erroMembership } = await service
-    .from("memberships")
-    .insert({ user_id: user.id, tenant_id: convite.tenant_id, papel: papelTenant, escopo });
-
-  if (erroMembership && erroMembership.code !== "23505") {
-    throw new Error(`Falha ao entrar no workspace: ${erroMembership.message}`);
-  }
-
-  if (convite.projeto_id) {
-    const { error: erroProjetoMembro } = await service.from("projeto_membros").insert({
-      tenant_id: convite.tenant_id,
-      projeto_id: convite.projeto_id,
-      user_id: user.id,
-      papel: "usuario",
-    });
-
-    if (erroProjetoMembro && erroProjetoMembro.code !== "23505") {
-      throw new Error(`Falha ao entrar no quadro: ${erroProjetoMembro.message}`);
-    }
-  }
-
-  await service.from("convites").update({ status: "aceito" }).eq("id", convite.id);
+  await vincularUsuarioAoConvite(convite as Convite, user.id);
 
   redirect("/projetos");
 }

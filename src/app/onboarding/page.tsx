@@ -1,11 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
+import { temAcessoCompleto } from "@/lib/ecc/equipe";
 import { createClient } from "@/lib/supabase/server";
 import { FormularioSmart } from "@/components/onboarding/formulario-smart";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
 export default async function PaginaOnboarding() {
   const tenantId = await garantirWorkspace();
+
+  // Quem entrou convidado só pra um quadro não vê Metas SMART.
+  if (!(await temAcessoCompleto(tenantId))) {
+    redirect("/projetos");
+  }
+
   const supabase = await createClient();
 
   const { count } = await supabase

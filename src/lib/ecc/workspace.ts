@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { buscarConvitePendentePorEmail, vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 
 /**
  * Garante que o usuário autenticado tem um workspace (tenant) e retorna o
@@ -25,11 +26,25 @@ export async function garantirWorkspace(): Promise<string> {
     .from("memberships")
     .select("tenant_id")
     .eq("user_id", user.id)
+    .order("criado_em", { ascending: true })
     .limit(1)
     .maybeSingle();
 
   if (membershipExistente) {
     return membershipExistente.tenant_id as string;
+  }
+
+  // Antes de criar um workspace pessoal, honra um convite pendente pro
+  // e-mail do usuário — sem isso, quem visita qualquer página que chama
+  // garantirWorkspace() antes de clicar no link do convite (ex.: o
+  // redirect automático de "/" pra "/onboarding") ganha um workspace
+  // pessoal vazio à toa, e fica com duas memberships sem critério
+  // determinístico de qual é a "certa".
+  if (user.email) {
+    const convitePendente = await buscarConvitePendentePorEmail(user.email);
+    if (convitePendente) {
+      return vincularUsuarioAoConvite(convitePendente, user.id);
+    }
   }
 
   const service = createServiceClient();

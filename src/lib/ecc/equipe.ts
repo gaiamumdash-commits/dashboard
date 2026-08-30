@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { Convite, EscopoMembership, MembroTenant, Papel } from "@/lib/ecc/tipos";
 
 export async function listarMembros(tenantId: string): Promise<MembroTenant[]> {
@@ -49,4 +50,65 @@ export async function obterPapelAtual(tenantId: string): Promise<Papel | null> {
 export async function temAcessoCompleto(tenantId: string): Promise<boolean> {
   const membership = await obterMembershipAtual(tenantId);
   return membership?.escopo !== "projeto";
+}
+
+/** Busca um convite pendente e não expirado pro e-mail do usuário, em
+ * qualquer tenant (usa service client — RLS de `convites` só libera pra
+ * quem já é membro do tenant, e quem ainda não aceitou não é). */
+export async function buscarConvitePendentePorEmail(email: string): Promise<Convite | null> {
+  const service = createServiceClient();
+  const { data } = await service
+    .from("convites")
+    .select("*")
+    .eq("email", email.toLowerCase())
+    .eq("status", "pendente")
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data || new Date(data.expira_em) < new Date()) {
+    return null;
+  }
+
+  return data as Convite;
+}
+
+/** Vincula o usuário ao tenant do convite (membership + projeto_membros se
+ * for convite de quadro específico) e marca o convite como aceito.
+ * Compartilhado entre a aceitação explícita em `/convite/[token]` e o
+ * bootstrap automático de workspace, pra quem já tem convite pendente
+ * nunca ganhar um workspace pessoal à toa. */
+export async function vincularUsuarioAoConvite(convite: Convite, userId: string): Promise<string> {
+  const service = createServiceClient();
+
+  // Convite de projeto sempre entra como "member" do tenant, com escopo
+  // "projeto" — não enxerga Metas SMART nem Equipe do workspace inteiro,
+  // só o(s) quadro(s) em que foi colocado via projeto_membros.
+  const papelTenant = convite.projeto_id ? "member" : convite.papel;
+  const escopo = convite.projeto_id ? "projeto" : "completo";
+
+  const { error: erroMembership } = await service
+    .from("memberships")
+    .insert({ user_id: userId, tenant_id: convite.tenant_id, papel: papelTenant, escopo });
+
+  if (erroMembership && erroMembership.code !== "23505") {
+    throw new Error(`Falha ao entrar no workspace: ${erroMembership.message}`);
+  }
+
+  if (convite.projeto_id) {
+    const { error: erroProjetoMembro } = await service.from("projeto_membros").insert({
+      tenant_id: convite.tenant_id,
+      projeto_id: convite.projeto_id,
+      user_id: userId,
+      papel: "usuario",
+    });
+
+    if (erroProjetoMembro && erroProjetoMembro.code !== "23505") {
+      throw new Error(`Falha ao entrar no quadro: ${erroProjetoMembro.message}`);
+    }
+  }
+
+  await service.from("convites").update({ status: "aceito" }).eq("id", convite.id);
+
+  return convite.tenant_id;
 }
