@@ -70,6 +70,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
       <MenuLateral
         temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)}
         acessoCompleto={acessoCompleto}
+        souOwner={papelAtual === "owner"}
       />
       <main className="mx-auto max-w-6xl flex-1 px-4 py-12">
         <Link href="/projetos" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">

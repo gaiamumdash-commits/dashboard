@@ -33,6 +33,7 @@ export default async function PaginaProjetos() {
       <MenuLateral
         temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)}
         acessoCompleto={acessoCompleto}
+        souOwner={souOwner}
       />
       <main className="mx-auto max-w-5xl flex-1 px-4 py-12">
         <div className="mb-8">

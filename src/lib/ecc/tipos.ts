@@ -55,6 +55,56 @@ export type ColunaKanban = {
   criado_em: string;
 };
 
+export type CategoriaFinanceira = "consumo" | "investimento" | "despesa";
+
+export type ContaFixaModelo = {
+  id: string;
+  tenant_id: string;
+  nome: string;
+  valor_esperado: number;
+  dia_vencimento: number;
+  categoria: CategoriaFinanceira;
+  ativo: boolean;
+  criado_em: string;
+};
+
+export type ContaAPagar = {
+  id: string;
+  tenant_id: string;
+  conta_fixa_id: string | null;
+  nome: string;
+  valor: number;
+  categoria: CategoriaFinanceira;
+  mes_referencia: string;
+  data_vencimento: string;
+  data_pagamento: string | null;
+  pago: boolean;
+  criado_em: string;
+};
+
+export type EntidadeAnexo = "conta_a_pagar" | "tarefa";
+
+export type Anexo = {
+  id: string;
+  tenant_id: string;
+  entidade_tipo: EntidadeAnexo;
+  entidade_id: string;
+  storage_path: string;
+  nome_arquivo: string;
+  tamanho_bytes: number;
+  tipo_mime: string;
+  enviado_por: string;
+  criado_em: string;
+};
+
+export type RegraCategoria = {
+  id: string;
+  tenant_id: string;
+  palavra_chave: string;
+  categoria: CategoriaFinanceira;
+  criado_em: string;
+};
+
 export type Papel = "owner" | "member";
 export type EscopoMembership = "completo" | "projeto";
 

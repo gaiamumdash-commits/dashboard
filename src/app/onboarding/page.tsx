@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
-import { temAcessoCompleto } from "@/lib/ecc/equipe";
+import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import { createClient } from "@/lib/supabase/server";
 import { FormularioSmart } from "@/components/onboarding/formulario-smart";
 import { MenuLateral } from "@/components/layout/menu-lateral";
@@ -22,10 +22,11 @@ export default async function PaginaOnboarding() {
     .eq("tenant_id", tenantId);
 
   const temMetasSmart = Boolean(count && count > 0);
+  const souOwner = (await obterPapelAtual(tenantId)) === "owner";
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">
-      <MenuLateral temMetasSmart={temMetasSmart} />
+      <MenuLateral temMetasSmart={temMetasSmart} souOwner={souOwner} />
       <main className="mx-auto max-w-3xl flex-1 px-4 py-12">
         {temMetasSmart ? (
           <>

@@ -4,9 +4,11 @@ import Image from "next/image";
 export function MenuLateral({
   temMetasSmart,
   acessoCompleto = true,
+  souOwner = false,
 }: {
   temMetasSmart: boolean;
   acessoCompleto?: boolean;
+  souOwner?: boolean;
 }) {
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-gaiamum-border bg-gaiamum-surface px-4 py-6 sm:flex">
@@ -42,6 +44,14 @@ export function MenuLateral({
               Equipe
             </Link>
           </>
+        )}
+        {souOwner && (
+          <Link
+            href="/financeiro"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
+          >
+            Financeiro
+          </Link>
         )}
       </nav>
     </aside>
