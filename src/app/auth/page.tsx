@@ -75,14 +75,17 @@ export default function PaginaAuth() {
     <main className="relative min-h-screen bg-gaiamum-bg lg:flex">
       {/* Arte mobile: fundo cheio, versão vertical sem os mockups (densos
           demais numa tela estreita), com espaço vazio na parte de baixo pro
-          cartão flutuar sem brigar com o texto. */}
-      <div className="absolute inset-0 lg:hidden">
+          cartão flutuar sem brigar com o texto. object-cover cabe bem em
+          proporções de celular (mais estreitas que a arte); em tablet
+          retrato (mais "quadrado") ele esticava demais e cortava o texto
+          do meio, então a partir de md usamos contain. */}
+      <div className="absolute inset-0 bg-gaiamum-bg lg:hidden">
         <Image
           src="/brand/login-hero-mobile.png"
           alt="Gaiamum Dashboard: organize, decida, cresça"
           fill
           sizes="100vw"
-          className="object-cover object-top"
+          className="object-cover object-top md:object-contain md:object-center"
           priority
         />
       </div>
@@ -101,7 +104,13 @@ export default function PaginaAuth() {
         />
       </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col justify-end px-4 pb-10 pt-4 lg:h-screen lg:w-1/2 lg:flex-row lg:items-center lg:justify-center lg:py-12">
+      <div className="relative z-10 flex min-h-screen flex-col px-4 pb-10 pt-4 lg:h-screen lg:w-1/2 lg:flex-row lg:items-center lg:justify-center lg:py-12">
+        {/* Empurra o cartão pra baixo do texto da arte (que termina em ~46%
+            da altura da imagem) antes de deixá-lo flutuar na reserva vazia
+            do fundo. Sem isso, em celulares mais baixos o cartão cobria
+            "Cresça." — min-height garante a folga mínima, flex-1 deixa ele
+            crescer e empurrar o cartão pro fim quando sobra espaço. */}
+        <div className="min-h-[48vh] flex-1 lg:hidden" aria-hidden />
         <div className="w-full max-w-sm rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-8">
         <Image src="/brand/crab-mark.png" alt="" width={56} height={56} className="mb-3" priority />
         <h1 className="mb-1 text-2xl font-semibold text-gaiamum-text">Gaiamum</h1>
