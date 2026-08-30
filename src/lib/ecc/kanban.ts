@@ -1,18 +1,17 @@
-import type { StatusTarefa, Tarefa } from "@/lib/ecc/tipos";
-
-export const COLUNAS: { status: StatusTarefa; titulo: string }[] = [
-  { status: "backlog", titulo: "A Fazer / Backlog" },
-  { status: "em_execucao", titulo: "Em Execução" },
-  { status: "concluido", titulo: "Concluído" },
-];
+import type { Tarefa } from "@/lib/ecc/tipos";
 
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
 const DIAS_PARA_ALERTA_AMARELO = 2;
 
-/** Amarelo faltando até 48h (2 dias), vermelho no dia do prazo ou depois. */
-export function urgenciaDoPrazo(tarefa: Pick<Tarefa, "data_limite" | "status">): UrgenciaPrazo {
-  if (tarefa.status === "concluido" || !tarefa.data_limite) {
+/** Amarelo faltando até 48h (2 dias), vermelho no dia do prazo ou depois.
+ * `colunaConcluida` vem da coluna atual da tarefa (`ColunaKanban.concluido`),
+ * não de um status fixo — uma vez que colunas são configuráveis por projeto. */
+export function urgenciaDoPrazo(
+  tarefa: Pick<Tarefa, "data_limite">,
+  colunaConcluida: boolean,
+): UrgenciaPrazo {
+  if (colunaConcluida || !tarefa.data_limite) {
     return tarefa.data_limite ? "ok" : "sem_prazo";
   }
 

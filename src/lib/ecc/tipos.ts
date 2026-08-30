@@ -25,7 +25,6 @@ export type Projeto = {
   criado_em: string;
 };
 
-export type StatusTarefa = "backlog" | "em_execucao" | "concluido";
 export type Prioridade = "P1" | "P2" | "P3" | "P4";
 
 export type Tarefa = {
@@ -34,13 +33,25 @@ export type Tarefa = {
   projeto_id: string;
   titulo: string;
   descricao: string | null;
-  status: StatusTarefa;
+  coluna_id: string;
   prioridade: Prioridade;
   tag: string | null;
   data_inicio: string | null;
   data_limite: string | null;
   tempo_estimado_min: number | null;
   tempo_realizado_min: number | null;
+  criado_em: string;
+};
+
+/** Coluna do kanban — livre por projeto, exceto a de `concluido: true`,
+ * que é fixa (não pode ser renomeada nem apagada). */
+export type ColunaKanban = {
+  id: string;
+  tenant_id: string;
+  projeto_id: string;
+  nome: string;
+  ordem: number;
+  concluido: boolean;
   criado_em: string;
 };
 
@@ -115,13 +126,16 @@ export type TipoAtividade =
   | "checklist_item_reaberto"
   | "checklist_item_removido"
   | "membro_adicionado"
-  | "membro_removido";
+  | "membro_removido"
+  | "excluida";
 
 export type AtividadeTarefa = {
   id: string;
   tenant_id: string;
   projeto_id: string;
-  tarefa_id: string;
+  /** Fica `null` se o cartão foi apagado depois — o registro de atividade
+   * sobrevive à exclusão do cartão. */
+  tarefa_id: string | null;
   user_id: string;
   tipo: TipoAtividade;
   detalhe: Record<string, string>;

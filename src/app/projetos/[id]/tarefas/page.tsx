@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { listarMembros, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
-import type { ChecklistItem, Projeto, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
+import type { ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
 import { FormularioNovaTarefa } from "@/components/kanban/formulario-nova-tarefa";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
@@ -29,6 +29,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
   } = await supabase.auth.getUser();
 
   const [
+    { data: colunas },
     { data: tarefas },
     { count: totalMetasSmart },
     { data: tarefaMembros },
@@ -38,6 +39,12 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     acessoCompleto,
     { data: gestorDoProjeto },
   ] = await Promise.all([
+    supabase
+      .from("colunas_kanban")
+      .select("*")
+      .eq("projeto_id", projetoId)
+      .order("concluido", { ascending: true })
+      .order("ordem", { ascending: true }),
     supabase.from("tarefas").select("*").eq("projeto_id", projetoId).order("criado_em", { ascending: true }),
     supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     supabase.from("tarefa_membros").select("*").eq("tenant_id", tenantId),
@@ -81,6 +88,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
         <div className="mt-8">
           <QuadroKanban
             projetoId={projetoId}
+            colunasIniciais={(colunas as ColunaKanban[]) ?? []}
             tarefasIniciais={(tarefas as Tarefa[]) ?? []}
             membrosDoTenant={membros}
             tarefaMembrosIniciais={(tarefaMembros as TarefaMembro[]) ?? []}

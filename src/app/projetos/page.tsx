@@ -40,7 +40,7 @@ export default async function PaginaProjetos() {
           <p className="mt-1 text-gaiamum-text-muted">Cada projeto isola suas próprias tarefas.</p>
         </div>
 
-        <FormularioNovoProjeto />
+        {souOwner && <FormularioNovoProjeto />}
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(projetos as Projeto[] | null)?.map((projeto) => (

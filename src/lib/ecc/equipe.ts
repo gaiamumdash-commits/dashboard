@@ -45,6 +45,19 @@ export async function obterPapelAtual(tenantId: string): Promise<Papel | null> {
   return membership?.papel ?? null;
 }
 
+export async function eSouGestorDoProjeto(projetoId: string, userId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("projeto_membros")
+    .select("id")
+    .eq("projeto_id", projetoId)
+    .eq("user_id", userId)
+    .eq("papel", "gestor")
+    .maybeSingle();
+
+  return Boolean(data);
+}
+
 /** false pra quem entrou convidado só pra um projeto — não vê Metas SMART
  * nem a página de Equipe do workspace inteiro, só o(s) quadro(s) dele. */
 export async function temAcessoCompleto(tenantId: string): Promise<boolean> {

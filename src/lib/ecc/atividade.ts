@@ -14,6 +14,7 @@ const MENSAGEM_POR_TIPO: Record<TipoAtividade, (detalhe: Record<string, string>)
   checklist_item_removido: (d) => `removeu "${d.texto}" do checklist`,
   membro_adicionado: () => "te adicionou como responsável por este cartão",
   membro_removido: () => "te removeu como responsável deste cartão",
+  excluida: () => "apagou este cartão",
 };
 
 /**

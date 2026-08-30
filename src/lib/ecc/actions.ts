@@ -7,8 +7,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
+import { eSouGestorDoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
-import type { Convite, Horizonte, MetaSmart, Papel, Prioridade, StatusProjeto, StatusTarefa } from "@/lib/ecc/tipos";
+import type { Convite, Horizonte, MetaSmart, Papel, Prioridade, StatusProjeto } from "@/lib/ecc/tipos";
 
 function campoObrigatorio(formData: FormData, nome: string): string {
   const valor = formData.get(nome);
@@ -76,6 +77,10 @@ export async function criarProjeto(formData: FormData) {
     throw new Error("Usuário não autenticado.");
   }
 
+  if ((await obterPapelAtual(tenantId)) !== "owner") {
+    throw new Error("Só o dono do workspace pode criar projetos novos.");
+  }
+
   const nome = campoObrigatorio(formData, "nome");
   const descricao = (formData.get("descricao") as string | null)?.trim() || null;
 
@@ -97,6 +102,18 @@ export async function criarProjeto(formData: FormData) {
 
   if (erroMembro) {
     throw new Error(`Projeto criado, mas falha ao definir gestor: ${erroMembro.message}`);
+  }
+
+  // Todo projeto novo nasce com as 3 colunas padrão — "Concluído" fixa,
+  // as outras duas o usuário pode renomear ou apagar depois.
+  const { error: erroColunas } = await supabase.from("colunas_kanban").insert([
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Aberto", ordem: 0, concluido: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Desenvolvimento", ordem: 1, concluido: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Concluído", ordem: 0, concluido: true },
+  ]);
+
+  if (erroColunas) {
+    throw new Error(`Projeto criado, mas falha ao criar colunas padrão: ${erroColunas.message}`);
   }
 
   revalidatePath("/projetos");
@@ -148,9 +165,25 @@ export async function criarTarefa(projetoId: string, formData: FormData) {
   const dataInicio = (formData.get("data_inicio") as string | null) || null;
   const dataLimite = (formData.get("data_limite") as string | null) || null;
 
+  // Cartão novo sempre nasce na primeira coluna aberta (menor `ordem`,
+  // excluindo a fixa "Concluído") do projeto.
+  const { data: primeiraColuna, error: erroColuna } = await supabase
+    .from("colunas_kanban")
+    .select("id")
+    .eq("projeto_id", projetoId)
+    .eq("concluido", false)
+    .order("ordem", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (erroColuna || !primeiraColuna) {
+    throw new Error("Falha ao localizar a coluna inicial do quadro.");
+  }
+
   const linhas = titulos.map((titulo) => ({
     tenant_id: tenantId,
     projeto_id: projetoId,
+    coluna_id: primeiraColuna.id,
     titulo,
     prioridade,
     tag,
@@ -302,13 +335,22 @@ export async function removerChecklistItem(itemId: string, tarefaId: string, pro
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
-export async function moverTarefa(tarefaId: string, projetoId: string, novoStatus: StatusTarefa) {
+export async function moverTarefa(tarefaId: string, projetoId: string, novaColunaId: string) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
-  const { data: tarefaAtual } = await supabase.from("tarefas").select("status").eq("id", tarefaId).maybeSingle();
+  const { data: tarefaAtual } = await supabase
+    .from("tarefas")
+    .select("coluna_id")
+    .eq("id", tarefaId)
+    .maybeSingle();
 
-  const { error } = await supabase.from("tarefas").update({ status: novoStatus }).eq("id", tarefaId);
+  const idsColunas = [tarefaAtual?.coluna_id, novaColunaId].filter((id): id is string => Boolean(id));
+  const { data: colunas } = await supabase.from("colunas_kanban").select("id, nome").in("id", idsColunas);
+  const nomeDe = colunas?.find((c) => c.id === tarefaAtual?.coluna_id)?.nome ?? "?";
+  const nomePara = colunas?.find((c) => c.id === novaColunaId)?.nome ?? "?";
+
+  const { error } = await supabase.from("tarefas").update({ coluna_id: novaColunaId }).eq("id", tarefaId);
 
   if (error) {
     throw new Error(`Falha ao mover tarefa: ${error.message}`);
@@ -319,14 +361,122 @@ export async function moverTarefa(tarefaId: string, projetoId: string, novoStatu
     projetoId,
     tarefaId,
     tipo: "movida",
-    detalhe: { de: tarefaAtual?.status ?? "?", para: novoStatus },
+    detalhe: { de: nomeDe, para: nomePara },
   });
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
-export async function deletarTarefa(tarefaId: string, projetoId: string) {
+// ---------------------------------------------------------------------------
+// Colunas do kanban (configuráveis por projeto — só "Concluído" é fixa)
+// ---------------------------------------------------------------------------
+
+export async function criarColuna(projetoId: string, formData: FormData) {
+  const tenantId = await garantirWorkspace();
   const supabase = await createClient();
+  const nome = campoObrigatorio(formData, "nome");
+
+  const { count } = await supabase
+    .from("colunas_kanban")
+    .select("id", { count: "exact", head: true })
+    .eq("projeto_id", projetoId)
+    .eq("concluido", false);
+
+  const { error } = await supabase
+    .from("colunas_kanban")
+    .insert({ tenant_id: tenantId, projeto_id: projetoId, nome, ordem: count ?? 0 });
+
+  if (error) {
+    throw new Error(`Falha ao criar coluna: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+export async function renomearColuna(colunaId: string, projetoId: string, formData: FormData) {
+  const supabase = await createClient();
+  const nome = campoObrigatorio(formData, "nome");
+
+  const { data: coluna } = await supabase
+    .from("colunas_kanban")
+    .select("concluido")
+    .eq("id", colunaId)
+    .maybeSingle();
+
+  if (coluna?.concluido) {
+    throw new Error('A coluna "Concluído" é fixa e não pode ser renomeada.');
+  }
+
+  const { error } = await supabase.from("colunas_kanban").update({ nome }).eq("id", colunaId);
+
+  if (error) {
+    throw new Error(`Falha ao renomear coluna: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+export async function excluirColuna(colunaId: string, projetoId: string) {
+  const tenantId = await garantirWorkspace();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const souOwner = (await obterPapelAtual(tenantId)) === "owner";
+  const souGestor = Boolean(user) && (await eSouGestorDoProjeto(projetoId, user!.id));
+
+  if (!souOwner && !souGestor) {
+    throw new Error("Só o gestor do projeto (ou o dono do workspace) pode apagar uma coluna.");
+  }
+
+  const { data: coluna } = await supabase
+    .from("colunas_kanban")
+    .select("concluido")
+    .eq("id", colunaId)
+    .maybeSingle();
+
+  if (coluna?.concluido) {
+    throw new Error('A coluna "Concluído" é fixa e não pode ser apagada.');
+  }
+
+  const { count } = await supabase
+    .from("tarefas")
+    .select("id", { count: "exact", head: true })
+    .eq("coluna_id", colunaId);
+
+  if ((count ?? 0) > 0) {
+    throw new Error("Mova ou apague os cartões desta coluna antes de excluí-la.");
+  }
+
+  const { error } = await supabase.from("colunas_kanban").delete().eq("id", colunaId);
+
+  if (error) {
+    throw new Error(`Falha ao excluir coluna: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+export async function deletarTarefa(tarefaId: string, projetoId: string) {
+  const tenantId = await garantirWorkspace();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const souOwner = (await obterPapelAtual(tenantId)) === "owner";
+  const souGestor = Boolean(user) && (await eSouGestorDoProjeto(projetoId, user!.id));
+
+  if (!souOwner && !souGestor) {
+    throw new Error("Só o gestor do projeto (ou o dono do workspace) pode apagar um cartão.");
+  }
+
+  // Registra a exclusão (e avisa os responsáveis por e-mail) antes de
+  // apagar de fato — o registro fica no histórico mesmo depois que o
+  // cartão some (tarefa_id vira null, mas a atividade permanece).
+  await registrarAtividade({ tenantId, projetoId, tarefaId, tipo: "excluida" });
+
   const { error } = await supabase.from("tarefas").delete().eq("id", tarefaId);
 
   if (error) {
