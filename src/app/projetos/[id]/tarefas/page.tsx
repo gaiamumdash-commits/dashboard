@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { listarMembros, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
-import type { ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
+import type { ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
+import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
@@ -33,6 +34,8 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     { count: totalMetasSmart },
     { data: tarefaMembros },
     { data: checklistItens },
+    { data: tarefaEtiquetas },
+    etiquetas,
     membros,
     papelAtual,
     acessoCompleto,
@@ -48,6 +51,8 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     supabase.from("tarefa_membros").select("*").eq("tenant_id", tenantId),
     supabase.from("tarefa_checklist_itens").select("*").eq("tenant_id", tenantId).order("ordem"),
+    supabase.from("tarefa_etiquetas").select("*").eq("tenant_id", tenantId),
+    listarEtiquetasDoTenant(tenantId),
     listarMembros(tenantId),
     obterPapelAtual(tenantId),
     temAcessoCompleto(tenantId),
@@ -89,6 +94,8 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
             membrosDoTenant={membros}
             tarefaMembrosIniciais={(tarefaMembros as TarefaMembro[]) ?? []}
             checklistItensIniciais={(checklistItens as ChecklistItem[]) ?? []}
+            etiquetasDoTenant={etiquetas}
+            tarefaEtiquetasIniciais={(tarefaEtiquetas as TarefaEtiqueta[]) ?? []}
             usuarioAtualId={user?.id ?? null}
             podeExcluirTarefa={podeExcluirTarefa}
           />

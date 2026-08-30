@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { ChecklistItem, ColunaKanban, MembroTenant, Prioridade, Tarefa } from "@/lib/ecc/tipos";
+import type { ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Prioridade, Tarefa } from "@/lib/ecc/tipos";
+import { CLASSE_COR_ETIQUETA } from "@/lib/ecc/kanban";
 import {
   adicionarChecklistItem,
   alternarChecklistItem,
@@ -13,6 +14,7 @@ import {
   moverTarefa,
   removerChecklistItem,
 } from "@/lib/ecc/actions";
+import { adicionarEtiquetaNaTarefa, removerEtiquetaDaTarefa } from "@/lib/ecc/etiquetas";
 
 const PRIORIDADES: Prioridade[] = ["P1", "P2", "P3", "P4"];
 
@@ -23,6 +25,8 @@ export function DetalheTarefa({
   membrosDoTenant,
   membrosDaTarefa,
   checklist,
+  etiquetasDoTenant,
+  etiquetasDaTarefa,
   aoFechar,
 }: {
   tarefa: Tarefa;
@@ -31,11 +35,39 @@ export function DetalheTarefa({
   membrosDoTenant: MembroTenant[];
   membrosDaTarefa: string[];
   checklist: ChecklistItem[];
+  etiquetasDoTenant: Etiqueta[];
+  etiquetasDaTarefa: string[];
   aoFechar: () => void;
 }) {
   const [descricao, setDescricao] = useState(tarefa.descricao ?? "");
+  const [buscaEtiqueta, setBuscaEtiqueta] = useState("");
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
+
+  const etiquetasAnexadas = etiquetasDoTenant.filter((e) => etiquetasDaTarefa.includes(e.id));
+  const sugestoesEtiqueta =
+    buscaEtiqueta.trim() === ""
+      ? []
+      : etiquetasDoTenant.filter(
+          (e) =>
+            !etiquetasDaTarefa.includes(e.id) && e.nome.toLowerCase().includes(buscaEtiqueta.trim().toLowerCase()),
+        );
+
+  function anexarEtiqueta(nome: string) {
+    if (!nome.trim()) return;
+    setBuscaEtiqueta("");
+    iniciarTransicao(async () => {
+      await adicionarEtiquetaNaTarefa(tarefa.id, projetoId, nome);
+      router.refresh();
+    });
+  }
+
+  function desanexarEtiqueta(etiquetaId: string) {
+    iniciarTransicao(async () => {
+      await removerEtiquetaDaTarefa(tarefa.id, etiquetaId, projetoId);
+      router.refresh();
+    });
+  }
 
   const concluidos = checklist.filter((item) => item.concluido).length;
 
@@ -170,6 +202,63 @@ export function DetalheTarefa({
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
             />
           </label>
+        </div>
+
+        <div className="relative mt-4 flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-gaiamum-text-muted">Etiquetas</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {etiquetasAnexadas.map((etiqueta) => (
+              <span
+                key={etiqueta.id}
+                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${CLASSE_COR_ETIQUETA[etiqueta.cor]}`}
+              >
+                {etiqueta.nome}
+                <button
+                  type="button"
+                  onClick={() => desanexarEtiqueta(etiqueta.id)}
+                  className="opacity-70 hover:opacity-100"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            <input
+              value={buscaEtiqueta}
+              onChange={(e) => setBuscaEtiqueta(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  anexarEtiqueta(buscaEtiqueta);
+                }
+              }}
+              placeholder="Nomear ou buscar etiqueta..."
+              className="min-w-[140px] flex-1 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1 text-xs text-gaiamum-text outline-none focus:border-gaiamum-primary"
+            />
+          </div>
+
+          {buscaEtiqueta.trim() !== "" && (
+            <div className="absolute top-full z-10 mt-1 flex w-full flex-col gap-1 rounded-lg border border-gaiamum-border bg-gaiamum-surface p-1.5 shadow-lg">
+              {sugestoesEtiqueta.map((etiqueta) => (
+                <button
+                  key={etiqueta.id}
+                  type="button"
+                  onClick={() => anexarEtiqueta(etiqueta.nome)}
+                  className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
+                >
+                  <span className={`rounded-full border px-2 py-0.5 text-xs ${CLASSE_COR_ETIQUETA[etiqueta.cor]}`}>
+                    {etiqueta.nome}
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => anexarEtiqueta(buscaEtiqueta)}
+                className="rounded px-2 py-1 text-left text-sm text-gaiamum-primary hover:bg-gaiamum-surface-raised"
+              >
+                + Criar etiqueta &quot;{buscaEtiqueta.trim()}&quot;
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex flex-col gap-1.5">

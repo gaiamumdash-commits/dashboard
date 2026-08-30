@@ -24,6 +24,12 @@
   --gaiamum-tag-purple: #a855f7;
   --gaiamum-tag-teal: #14b8a6;
   --gaiamum-tag-yellow: #eab308;
+
+  /* Etiquetas do kanban — paleta fixa de 6 cores, atribuída automaticamente
+     por ordem de criação (ver src/lib/ecc/etiquetas.ts). */
+  --gaiamum-tag-blue: #3b82f6;
+  --gaiamum-tag-coral: #f43f5e;
+  --gaiamum-tag-lime: #84cc16;
 }
 
 /* Tema claro — aplicação em fundo branco da marca (Logo Gaimum no branco.png):
@@ -73,6 +79,9 @@
   --color-gaiamum-tag-purple: var(--gaiamum-tag-purple);
   --color-gaiamum-tag-teal: var(--gaiamum-tag-teal);
   --color-gaiamum-tag-yellow: var(--gaiamum-tag-yellow);
+  --color-gaiamum-tag-blue: var(--gaiamum-tag-blue);
+  --color-gaiamum-tag-coral: var(--gaiamum-tag-coral);
+  --color-gaiamum-tag-lime: var(--gaiamum-tag-lime);
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }

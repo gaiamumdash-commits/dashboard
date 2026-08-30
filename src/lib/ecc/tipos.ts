@@ -35,7 +35,6 @@ export type Tarefa = {
   descricao: string | null;
   coluna_id: string;
   prioridade: Prioridade;
-  tag: string | null;
   data_inicio: string | null;
   data_limite: string | null;
   tempo_estimado_min: number | null;
@@ -102,6 +101,24 @@ export type RegraCategoria = {
   tenant_id: string;
   palavra_chave: string;
   categoria: CategoriaFinanceira;
+  criado_em: string;
+};
+
+export type CorEtiqueta = "purple" | "teal" | "yellow" | "blue" | "coral" | "lime";
+
+export type Etiqueta = {
+  id: string;
+  tenant_id: string;
+  nome: string;
+  cor: CorEtiqueta;
+  criado_em: string;
+};
+
+export type TarefaEtiqueta = {
+  id: string;
+  tenant_id: string;
+  tarefa_id: string;
+  etiqueta_id: string;
   criado_em: string;
 };
 

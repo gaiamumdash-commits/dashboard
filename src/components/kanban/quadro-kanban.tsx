@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import type { ChecklistItem, ColunaKanban, MembroTenant, Tarefa, TarefaMembro } from "@/lib/ecc/tipos";
-import { urgenciaDoPrazo } from "@/lib/ecc/kanban";
+import type { ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
+import { CLASSE_COR_ETIQUETA, urgenciaDoPrazo } from "@/lib/ecc/kanban";
 import {
   criarColuna,
   criarTarefa,
@@ -29,6 +29,8 @@ export function QuadroKanban({
   membrosDoTenant,
   tarefaMembrosIniciais,
   checklistItensIniciais,
+  etiquetasDoTenant,
+  tarefaEtiquetasIniciais,
   usuarioAtualId,
   podeExcluirTarefa,
 }: {
@@ -38,6 +40,8 @@ export function QuadroKanban({
   membrosDoTenant: MembroTenant[];
   tarefaMembrosIniciais: TarefaMembro[];
   checklistItensIniciais: ChecklistItem[];
+  etiquetasDoTenant: Etiqueta[];
+  tarefaEtiquetasIniciais: TarefaEtiqueta[];
   usuarioAtualId: string | null;
   podeExcluirTarefa: boolean;
 }) {
@@ -184,11 +188,20 @@ export function QuadroKanban({
                 <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
                   {tarefa.prioridade}
                 </span>
-                {tarefa.tag && (
-                  <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
-                    {tarefa.tag}
-                  </span>
-                )}
+                {tarefaEtiquetasIniciais
+                  .filter((te) => te.tarefa_id === tarefa.id)
+                  .map((te) => {
+                    const etiqueta = etiquetasDoTenant.find((e) => e.id === te.etiqueta_id);
+                    if (!etiqueta) return null;
+                    return (
+                      <span
+                        key={te.id}
+                        className={`rounded-full border px-2 py-0.5 ${CLASSE_COR_ETIQUETA[etiqueta.cor]}`}
+                      >
+                        {etiqueta.nome}
+                      </span>
+                    );
+                  })}
                 {tarefa.data_limite && (
                   <span className={`rounded-full border px-2 py-0.5 ${CLASSE_PRAZO[urgencia]}`}>
                     {new Date(`${tarefa.data_limite}T00:00:00`).toLocaleDateString("pt-BR")}
@@ -292,6 +305,10 @@ export function QuadroKanban({
             .filter((m) => m.tarefa_id === tarefaAberta.id)
             .map((m) => m.user_id)}
           checklist={checklistItensIniciais.filter((c) => c.tarefa_id === tarefaAberta.id)}
+          etiquetasDoTenant={etiquetasDoTenant}
+          etiquetasDaTarefa={tarefaEtiquetasIniciais
+            .filter((te) => te.tarefa_id === tarefaAberta.id)
+            .map((te) => te.etiqueta_id)}
           aoFechar={fecharModal}
         />
       )}

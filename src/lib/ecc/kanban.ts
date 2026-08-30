@@ -1,4 +1,13 @@
-import type { Tarefa } from "@/lib/ecc/tipos";
+import type { CorEtiqueta, Tarefa } from "@/lib/ecc/tipos";
+
+export const CLASSE_COR_ETIQUETA: Record<CorEtiqueta, string> = {
+  purple: "border-gaiamum-tag-purple/40 bg-gaiamum-tag-purple/15 text-gaiamum-tag-purple",
+  teal: "border-gaiamum-tag-teal/40 bg-gaiamum-tag-teal/15 text-gaiamum-tag-teal",
+  yellow: "border-gaiamum-tag-yellow/40 bg-gaiamum-tag-yellow/15 text-gaiamum-tag-yellow",
+  blue: "border-gaiamum-tag-blue/40 bg-gaiamum-tag-blue/15 text-gaiamum-tag-blue",
+  coral: "border-gaiamum-tag-coral/40 bg-gaiamum-tag-coral/15 text-gaiamum-tag-coral",
+  lime: "border-gaiamum-tag-lime/40 bg-gaiamum-tag-lime/15 text-gaiamum-tag-lime",
+};
 
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
