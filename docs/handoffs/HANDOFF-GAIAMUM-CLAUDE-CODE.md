@@ -403,3 +403,17 @@ Feito, em ordem: push publicado (`76de5ab..6d5a905`); processo antigo da porta 3
 Duas decisões de escopo perguntadas e fechadas: histórico de atividade do cartão (UI de consulta) e colunas configuráveis do kanban por projeto — as duas ficam pra depois, por decisão do Fabio seguindo a recomendação dada (nenhuma das duas bloqueia o uso real definido pro produto: piloto FAMA + organização pessoal). Próxima frente escolhida pelo Fabio: não é código novo, é destravar o piloto real com a PI usando a colaboração em equipe já pronta — a Onda de "Colaboração em Equipe" implementada nas sessões anteriores está pronta pra uso real agora.
 
 **Pendente:** Fabio confirmar recebimento de e-mail sem cair em spam; decidir com calma quando começar o piloto com a PI (nenhuma ação técnica bloqueando).
+
+### 2026-08-30 (sessão nova, tarde/noite) — colunas configuráveis, regras de permissão, Módulo Financeiro completo
+
+Sessão longa. Retomada confirmando 3 pendentes (e-mail não cai mais em spam, piloto da PI começa quarta-feira 2026-09-02, usuário de teste mantém) — ver seção "Estado confirmado" pros detalhes de cada bloco. Três frentes grandes nesta sessão, todas migradas em produção e testadas de ponta a ponta via Playwright real:
+
+1. **Colunas do kanban configuráveis por projeto** + selo do caranguejo em "Concluído" (pedido comparando com o Trello). Migration `0006`.
+2. **Regras de permissão do gestor** — só owner cria projeto/convida, só gestor/owner apaga (cartão ou coluna), exclusão de cartão sempre registrada. Migration `0007`. No meio do teste desta parte, descobri que a mesma janela do Chrome estava sendo usada pelo Fabio em paralelo (ele mesmo confirmou) — gerou uma navegação inesperada que achei que fosse bug, mas era só concorrência de sessão.
+3. **Módulo Financeiro (Onda 3), primeira versão inteira** — plano aprovado via `EnterPlanMode` antes de codar (arquivo em `C:\Users\proff\.claude\plans\valiant-zooming-sutton.md`). Migration `0008`: contas fixas recorrentes (cron mensal), checklist com data de pagamento, comprovante anexado (Supabase Storage, bucket privado), 3 categorias (consumo/investimento/despesa), consolidação global, importar extrato CSV com categorização por regra de palavra-chave. Nibo Empresas ficou de fora (sem credencial — Fabio mandou WhatsApp pro contador pedindo). Durante o teste, o Fabio pediu 2 ajustes ainda na mesma sessão: (a) editar valor/vencimento da cobrança gerada sem recadastrar o modelo (contas como luz variam de valor todo mês) — feito; (b) redesenho visual dos cards seguindo o padrão do app do Nibo que ele usa (prints reais mandados por ele) — cards com pill de status, grid vencimento/valor, interruptor — feito com as cores do próprio Gaiamum, não a marca do Nibo.
+
+**Feedback do Fabio sobre o kanban, registrado como próxima frente (não implementado agora):** anexo de arquivo no cartão de tarefa (mesma peça técnica do comprovante, schema já preparado) e prioridade editável depois da criação do cartão (hoje só dá pra definir na criação) — ver bullet "Melhorar o cartão de tarefa" em "Estado confirmado" pros detalhes.
+
+3 commits publicados nesta sessão (`52da0ac..d21caef`): colunas+permissões, financeiro completo, edição de valor/vencimento + redesenho visual.
+
+**Pendente:** nada bloqueando tecnicamente. Esperar o contador responder sobre a credencial do Nibo (Fabio decide se completa a integração quando isso chegar). Piloto da PI começa quarta-feira, 2026-09-02.
