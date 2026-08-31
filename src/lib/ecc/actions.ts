@@ -644,15 +644,15 @@ export async function enviarConsolidacaoProjeto(projetoId: string): Promise<{ en
   for (const tarefa of listaTarefas) {
     const coluna = listaColunas.find((c) => c.id === tarefa.coluna_id);
     const concluido = coluna?.concluido ?? false;
-    const diasParaPrazo = tarefa.data_limite
-      ? diasEntre(hoje, new Date(`${tarefa.data_limite}T00:00:00`))
-      : null;
+    const diasParaPrazo = tarefa.data_limite ? diasEntre(hoje, new Date(tarefa.data_limite)) : null;
 
     itensPorTarefa.set(tarefa.id, {
       titulo: tarefa.titulo,
       status: concluido ? "concluido" : diasParaPrazo !== null && diasParaPrazo < 0 ? "atrasado" : "aberto",
       diasEmAberto: Math.max(0, diasEntre(new Date(tarefa.criado_em), hoje)),
-      prazoFormatado: tarefa.data_limite ? new Date(`${tarefa.data_limite}T00:00:00`).toLocaleDateString("pt-BR") : null,
+      prazoFormatado: tarefa.data_limite
+        ? new Date(tarefa.data_limite).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+        : null,
       diasParaPrazo,
     });
   }

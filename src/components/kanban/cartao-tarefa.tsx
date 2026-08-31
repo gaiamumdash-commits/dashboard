@@ -74,6 +74,11 @@ export function CartaoTarefa({
         souResponsavel ? "border-gaiamum-border-forte border-l-4 border-l-gaiamum-primary" : "border-gaiamum-border-forte"
       }`}
     >
+      {/* Traço de urgência — só em P1, pedido do Fabio pra chamar mais
+          atenção nos cartões mais urgentes. bg-gaiamum-danger é fixo
+          (#ef4444) nos 3 temas, já com contraste ok em claro e escuro. */}
+      {tarefa.prioridade === "P1" && <div className="h-1.5 bg-gaiamum-danger" />}
+
       {/* Andar 1 — título, só renomeia */}
       <div className="flex items-center gap-1.5 border-b border-gaiamum-border-forte bg-gaiamum-titulo-cartao px-3 py-1.5">
         {coluna.concluido && (
@@ -136,7 +141,7 @@ export function CartaoTarefa({
           })}
           {tarefa.data_limite && (
             <span className={`rounded-full border px-2 py-0.5 ${CLASSE_PRAZO[urgencia]}`}>
-              {new Date(`${tarefa.data_limite}T00:00:00`).toLocaleDateString("pt-BR")}
+              {new Date(tarefa.data_limite).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
             </span>
           )}
           {checklistDaTarefa.length > 0 && (

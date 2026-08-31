@@ -12,7 +12,7 @@ import type {
   Prioridade,
   Tarefa,
 } from "@/lib/ecc/tipos";
-import { CLASSE_COR_ETIQUETA, tocarSomConcluido } from "@/lib/ecc/kanban";
+import { CLASSE_COR_ETIQUETA, paraDatetimeLocal, tocarSomConcluido } from "@/lib/ecc/kanban";
 import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
 import {
   adicionarChecklistItem,
@@ -124,7 +124,13 @@ export function DetalheTarefa({
     iniciarTransicao(async () => {
       const formData = new FormData();
       formData.set("data_inicio", campo === "data_inicio" ? valor : (tarefa.data_inicio ?? ""));
-      formData.set("data_limite", campo === "data_limite" ? valor : (tarefa.data_limite ?? ""));
+      // O <input type="datetime-local"> devolve hora local sem fuso — new
+      // Date(valor) interpreta como hora local do navegador, .toISOString()
+      // converte pra UTC certo antes de salvar. Sem isso, o horário exibido
+      // depois de salvar não batia com o que a pessoa digitou.
+      const dataLimiteValor =
+        campo === "data_limite" ? (valor ? new Date(valor).toISOString() : "") : (tarefa.data_limite ?? "");
+      formData.set("data_limite", dataLimiteValor);
       await atualizarDatasTarefa(tarefa.id, projetoId, formData);
       router.refresh();
     });
@@ -237,10 +243,10 @@ export function DetalheTarefa({
           </label>
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-            Data de entrega
+            Data e hora de entrega
             <input
-              type="date"
-              defaultValue={tarefa.data_limite ?? ""}
+              type="datetime-local"
+              defaultValue={tarefa.data_limite ? paraDatetimeLocal(tarefa.data_limite) : ""}
               onBlur={(e) => salvarDatas("data_limite", e.target.value)}
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
             />

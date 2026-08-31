@@ -29,6 +29,16 @@ export function tocarSomConcluido() {
   new Audio("/sons/gaiamum-chegou.mp3").play().catch(() => {});
 }
 
+/** Converte um timestamp UTC (vindo do banco) pro formato que
+ * `<input type="datetime-local">` espera, já na hora local do navegador —
+ * sem isso, reabrir o campo mostraria a hora UTC crua em vez da hora que
+ * a pessoa realmente digitou. */
+export function paraDatetimeLocal(isoUtc: string): string {
+  const data = new Date(isoUtc);
+  const local = new Date(data.getTime() - data.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
 export const CLASSE_PRAZO: Record<UrgenciaPrazo, string> = {
@@ -38,11 +48,13 @@ export const CLASSE_PRAZO: Record<UrgenciaPrazo, string> = {
   sem_prazo: "border-gaiamum-border text-gaiamum-text-muted",
 };
 
-const DIAS_PARA_ALERTA_AMARELO = 2;
+const HORAS_PARA_ALERTA_AMARELO = 48;
 
-/** Amarelo faltando até 48h (2 dias), vermelho no dia do prazo ou depois.
- * `colunaConcluida` vem da coluna atual da tarefa (`ColunaKanban.concluido`),
- * não de um status fixo — uma vez que colunas são configuráveis por projeto. */
+/** Amarelo faltando até 48h de verdade (não "2 dias de calendário" — o
+ * prazo agora tem hora, então é preciso), vermelho a partir do horário
+ * exato do prazo. `colunaConcluida` vem da coluna atual da tarefa
+ * (`ColunaKanban.concluido`), não de um status fixo — colunas são
+ * configuráveis por projeto. */
 export function urgenciaDoPrazo(
   tarefa: Pick<Tarefa, "data_limite">,
   colunaConcluida: boolean,
@@ -51,12 +63,9 @@ export function urgenciaDoPrazo(
     return tarefa.data_limite ? "ok" : "sem_prazo";
   }
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const limite = new Date(`${tarefa.data_limite}T00:00:00`);
-  const diasRestantes = Math.round((limite.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+  const horasRestantes = (new Date(tarefa.data_limite).getTime() - Date.now()) / (1000 * 60 * 60);
 
-  if (diasRestantes <= 0) return "atrasado";
-  if (diasRestantes <= DIAS_PARA_ALERTA_AMARELO) return "proximo";
+  if (horasRestantes <= 0) return "atrasado";
+  if (horasRestantes <= HORAS_PARA_ALERTA_AMARELO) return "proximo";
   return "ok";
 }
