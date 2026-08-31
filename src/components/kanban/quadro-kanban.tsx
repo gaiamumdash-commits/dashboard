@@ -15,6 +15,7 @@ import {
 } from "@/lib/ecc/actions";
 import { DetalheTarefa } from "@/components/kanban/detalhe-tarefa";
 import { CartaoTarefa } from "@/components/kanban/cartao-tarefa";
+import { BarraProgresso } from "@/components/ui/barra-progresso";
 
 export function QuadroKanban({
   projetoId,
@@ -202,6 +203,8 @@ export function QuadroKanban({
   const tarefaAberta = tarefas.find((t) => t.id === tarefaAbertaId) ?? null;
   const colunasAbertas = colunas.filter((c) => !c.concluido);
   const colunaFixa = colunas.find((c) => c.concluido) ?? null;
+  const tarefasConcluidas = colunaFixa ? tarefas.filter((t) => t.coluna_id === colunaFixa.id).length : 0;
+  const percentualConcluido = tarefas.length > 0 ? Math.round((tarefasConcluidas / tarefas.length) * 100) : 0;
 
   function renderColuna(coluna: ColunaKanban, ehFixa: boolean) {
     const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id);
@@ -355,6 +358,12 @@ export function QuadroKanban({
 
         {colunaFixa && renderColuna(colunaFixa, true)}
       </div>
+
+      {tarefas.length > 0 && (
+        <div className="mt-6 max-w-md">
+          <BarraProgresso percentual={percentualConcluido} rotulo={`Cartões concluídos (${tarefasConcluidas}/${tarefas.length})`} />
+        </div>
+      )}
 
       {tarefaAberta && (
         <DetalheTarefa
