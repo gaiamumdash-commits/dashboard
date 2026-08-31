@@ -25,7 +25,7 @@ export default async function PaginaMarketing() {
           Perfil do negócio, produtos digitais e o público de cada um.
         </p>
 
-        <section className="mt-8">
+        <section className="mt-8 grid gap-3 sm:grid-cols-2">
           <Link
             href="/marketing/perfil"
             className="flex items-center justify-between rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5 transition hover:border-gaiamum-primary"
@@ -37,6 +37,19 @@ export default async function PaginaMarketing() {
               </p>
             </div>
             <span className="text-sm text-gaiamum-primary">{perfil ? "Editar →" : "Preencher →"}</span>
+          </Link>
+
+          <Link
+            href="/marketing/entrevista"
+            className="flex items-center justify-between rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5 transition hover:border-gaiamum-primary"
+          >
+            <div>
+              <p className="font-semibold text-gaiamum-text">Entrevista guiada</p>
+              <p className="mt-1 text-sm text-gaiamum-text-muted">
+                Prompts prontos pra rodar no Claude Code, sem gastar API.
+              </p>
+            </div>
+            <span className="text-sm text-gaiamum-primary">Começar →</span>
           </Link>
         </section>
 

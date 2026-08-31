@@ -267,9 +267,19 @@ export type AvatarItem = {
 export type EstagioEntrevista = "situacao" | "problema" | "implicacao" | "necessidade" | "concluida";
 export type StatusEntrevista = "em_andamento" | "concluida" | "abandonada";
 
+/** Usado pelo caminho automático (Incremento 2b, ainda não construído —
+ * chamada direta à API). */
 export type MensagemEntrevista = {
   autor: "usuario" | "ia";
   texto: string;
+};
+
+/** Usado pelo caminho manual (o que está em uso hoje): cada etapa da
+ * entrevista roda como um prompt copiado pro Claude Code/claude.ai fora do
+ * Gaiamum, e o resultado é colado de volta aqui. */
+export type EtapaEntrevistaColada = {
+  estagio: Exclude<EstagioEntrevista, "concluida">;
+  texto_colado: string;
 };
 
 export type EntrevistaIA = {
@@ -278,7 +288,7 @@ export type EntrevistaIA = {
   produto_digital_id: string | null;
   estagio_atual: EstagioEntrevista;
   status: StatusEntrevista;
-  transcript: MensagemEntrevista[];
+  transcript: EtapaEntrevistaColada[];
   criado_em: string;
   atualizado_em: string;
 };
