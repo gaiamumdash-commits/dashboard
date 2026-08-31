@@ -3,9 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
-import type { Projeto } from "@/lib/ecc/tipos";
+import type { Convite, PapelProjeto, Projeto } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConfiguracoesQuadro } from "@/components/projetos/configuracoes-quadro";
+import { EquipeDoQuadro, type MembroDoQuadro } from "@/components/projetos/equipe-do-quadro";
 
 export default async function PaginaConfiguracoesQuadro({ params }: { params: Promise<{ id: string }> }) {
   const { id: projetoId } = await params;
@@ -27,11 +28,12 @@ export default async function PaginaConfiguracoesQuadro({ params }: { params: Pr
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [papelAtual, souGestor, { data: projetoMembros }, quemVe] = await Promise.all([
+  const [papelAtual, souGestor, { data: projetoMembros }, quemVe, { data: convites }] = await Promise.all([
     obterPapelAtual(tenantId),
     user ? eSouGestorDoProjeto(projetoId, user.id) : Promise.resolve(false),
     supabase.from("projeto_membros").select("user_id, papel").eq("projeto_id", projetoId),
     listarMembrosComAcessoAoProjeto(tenantId, projetoId),
+    supabase.from("convites").select("*").eq("projeto_id", projetoId).eq("status", "pendente"),
   ]);
 
   const souOwner = papelAtual === "owner";
@@ -40,7 +42,16 @@ export default async function PaginaConfiguracoesQuadro({ params }: { params: Pr
     redirect(`/projetos/${projetoId}/tarefas`);
   }
 
-  const idsProjetoMembros = new Set((projetoMembros ?? []).map((m) => m.user_id as string));
+  const papelPorMembro = new Map(
+    (projetoMembros ?? []).map((m) => [m.user_id as string, m.papel as PapelProjeto]),
+  );
+
+  const membrosDoQuadro: MembroDoQuadro[] = quemVe.map((membro) => ({
+    user_id: membro.user_id,
+    email: membro.email,
+    origem: membro.papel === "owner" ? "owner" : papelPorMembro.has(membro.user_id) ? "projeto" : "workspace",
+    papelProjeto: papelPorMembro.get(membro.user_id) ?? null,
+  }));
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">
@@ -55,19 +66,12 @@ export default async function PaginaConfiguracoesQuadro({ params }: { params: Pr
           <ConfiguracoesQuadro projeto={projeto as Projeto} />
         </div>
 
-        <div className="mt-8 flex flex-col gap-1.5 border-t border-gaiamum-border pt-6">
-          <span className="text-xs font-medium text-gaiamum-text-muted">Visibilidade</span>
-          <p className="text-sm text-gaiamum-text-muted">Quem tem acesso a este quadro hoje:</p>
-          <ul className="mt-1 flex flex-col gap-1">
-            {quemVe.map((membro) => (
-              <li key={membro.user_id} className="text-sm text-gaiamum-text">
-                {membro.email}{" "}
-                <span className="text-xs text-gaiamum-text-muted">
-                  ({membro.papel === "owner" ? "dono do workspace" : idsProjetoMembros.has(membro.user_id) ? "membro do quadro" : "acesso completo ao workspace"})
-                </span>
-              </li>
-            ))}
-          </ul>
+        <div className="mt-8">
+          <EquipeDoQuadro
+            projetoId={projetoId}
+            membros={membrosDoQuadro}
+            convitesPendentes={(convites as Convite[] | null) ?? []}
+          />
         </div>
       </main>
     </div>

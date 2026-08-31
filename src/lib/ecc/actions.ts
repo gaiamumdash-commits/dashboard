@@ -17,6 +17,7 @@ import type {
   Horizonte,
   MetaSmart,
   Papel,
+  PapelProjeto,
   Prioridade,
   StatusProjeto,
   Tarefa,
@@ -211,6 +212,106 @@ export async function alternarArquivadoProjeto(projetoId: string, arquivado: boo
   }
 
   revalidatePath("/projetos");
+}
+
+/** Promove/despromove um membro a "coordenador" do quadro (papel 'gestor'
+ * em `projeto_membros`) — pedido do Fabio: alguém que convida e gerencia
+ * gente do próprio projeto (mesmo poder de apagar cartão/coluna do
+ * gestor), mas sem Financeiro/Metas SMART/Equipe se foi convidado só pra
+ * esse quadro (escopo já fica de fora disso, é orthogonal). Upsert porque
+ * quem tem acesso via escopo completo do workspace pode nunca ter tido
+ * linha em `projeto_membros`. */
+export async function definirPapelDoMembroNoProjeto(
+  projetoId: string,
+  userId: string,
+  papel: PapelProjeto,
+) {
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user?.id === userId) {
+    throw new Error("Peça pra outro gestor/coordenador mudar o seu próprio papel no quadro.");
+  }
+
+  const { error } = await supabase
+    .from("projeto_membros")
+    .upsert(
+      { tenant_id: tenantId, projeto_id: projetoId, user_id: userId, papel },
+      { onConflict: "projeto_id,user_id" },
+    );
+
+  if (error) {
+    throw new Error(`Falha ao definir papel no quadro: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/configuracoes`);
+}
+
+/** Tira alguém do quadro (não do workspace inteiro — quem quer remover a
+ * conta de vez continua fazendo isso em /equipe, só o owner). */
+export async function removerMembroDoProjeto(projetoId: string, userId: string) {
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user?.id === userId) {
+    throw new Error("Peça pra outro gestor/coordenador te remover do quadro.");
+  }
+
+  const { error } = await supabase
+    .from("projeto_membros")
+    .delete()
+    .eq("projeto_id", projetoId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Falha ao remover do quadro: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/configuracoes`);
+}
+
+/** Convite direto pro quadro, sem passar por /equipe — necessário pro
+ * coordenador convidar gente, já que ele não enxerga a Equipe do workspace
+ * inteiro (só quem tem acesso completo chega lá). RLS de `convites` já
+ * libera gestor de projeto pra isso (migration 0003). */
+export async function convidarParaProjeto(projetoId: string, formData: FormData) {
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Usuário não autenticado.");
+  }
+
+  const email = campoObrigatorio(formData, "email").toLowerCase();
+
+  const { error } = await supabase.from("convites").insert({
+    tenant_id: tenantId,
+    email,
+    papel: "member",
+    convidado_por: user.id,
+    projeto_id: projetoId,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("Já existe um convite pendente para esse e-mail.");
+    }
+    throw new Error(`Falha ao convidar: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/configuracoes`);
 }
 
 // ---------------------------------------------------------------------------
