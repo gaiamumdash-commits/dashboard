@@ -296,6 +296,24 @@ export async function atualizarPrioridadeTarefa(tarefaId: string, projetoId: str
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
+export async function atualizarTituloTarefa(tarefaId: string, projetoId: string, titulo: string) {
+  await garantirWorkspace();
+  const supabase = await createClient();
+  const tituloLimpo = titulo.trim();
+
+  if (!tituloLimpo) {
+    throw new Error("O título não pode ficar vazio.");
+  }
+
+  const { error } = await supabase.from("tarefas").update({ titulo: tituloLimpo }).eq("id", tarefaId);
+
+  if (error) {
+    throw new Error(`Falha ao renomear cartão: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
 export async function alternarMembroTarefa(tarefaId: string, userId: string, projetoId: string) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();

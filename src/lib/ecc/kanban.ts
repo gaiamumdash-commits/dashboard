@@ -22,6 +22,13 @@ export const CLASSE_FUNDO_QUADRO: Record<CorEtiqueta, string> = {
 
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
+export const CLASSE_PRAZO: Record<UrgenciaPrazo, string> = {
+  atrasado: "border-gaiamum-danger text-gaiamum-danger",
+  proximo: "border-gaiamum-warning text-gaiamum-warning",
+  ok: "border-gaiamum-border text-gaiamum-text-muted",
+  sem_prazo: "border-gaiamum-border text-gaiamum-text-muted",
+};
+
 const DIAS_PARA_ALERTA_AMARELO = 2;
 
 /** Amarelo faltando até 48h (2 dias), vermelho no dia do prazo ou depois.
