@@ -65,6 +65,32 @@ export async function temAcessoCompleto(tenantId: string): Promise<boolean> {
   return membership?.escopo !== "projeto";
 }
 
+/** Quem enxerga um projeto específico: owner do tenant, membros com acesso
+ * completo ao workspace, e quem foi colocado explicitamente em
+ * `projeto_membros`. Mesma regra usada em "Configurações do quadro" e na
+ * consolidação (Freeze) — centralizado aqui pra não duplicar a lógica. */
+export async function listarMembrosComAcessoAoProjeto(
+  tenantId: string,
+  projetoId: string,
+): Promise<MembroTenant[]> {
+  const supabase = await createClient();
+
+  const [membrosDoTenant, { data: projetoMembros }, { data: memberships }] = await Promise.all([
+    listarMembros(tenantId),
+    supabase.from("projeto_membros").select("user_id").eq("projeto_id", projetoId),
+    supabase.from("memberships").select("user_id, escopo").eq("tenant_id", tenantId),
+  ]);
+
+  const idsEscopoCompleto = new Set(
+    (memberships ?? []).filter((m) => m.escopo === "completo").map((m) => m.user_id as string),
+  );
+  const idsProjetoMembros = new Set((projetoMembros ?? []).map((m) => m.user_id as string));
+
+  return membrosDoTenant.filter(
+    (m) => m.papel === "owner" || idsEscopoCompleto.has(m.user_id) || idsProjetoMembros.has(m.user_id),
+  );
+}
+
 /** Busca um convite pendente e não expirado pro e-mail do usuário, em
  * qualquer tenant (usa service client — RLS de `convites` só libera pra
  * quem já é membro do tenant, e quem ainda não aceitou não é). */

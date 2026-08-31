@@ -7,6 +7,7 @@ import type { Anexo, ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiquet
 import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
 import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
+import { BotaoFreeze } from "@/components/kanban/botao-freeze";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
 export default async function PaginaTarefas({ params }: { params: Promise<{ id: string }> }) {
@@ -105,12 +106,15 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
             )}
           </div>
           {podeExcluirTarefa && (
-            <Link
-              href={`/projetos/${projetoId}/configuracoes`}
-              className="shrink-0 rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-            >
-              ⚙ Configurações
-            </Link>
+            <div className="flex shrink-0 items-start gap-2">
+              <BotaoFreeze projetoId={projetoId} />
+              <Link
+                href={`/projetos/${projetoId}/configuracoes`}
+                className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+              >
+                ⚙ Configurações
+              </Link>
+            </div>
           )}
         </div>
 

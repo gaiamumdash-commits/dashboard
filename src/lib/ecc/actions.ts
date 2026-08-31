@@ -7,8 +7,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
-import { eSouGestorDoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
+import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
+import { enviarEmailConsolidacao, type ItemConsolidacao, type SecaoConsolidacao } from "@/lib/ecc/notificacoes";
 import type {
   AtividadeTarefa,
   CorEtiqueta,
@@ -18,6 +19,7 @@ import type {
   Papel,
   Prioridade,
   StatusProjeto,
+  Tarefa,
 } from "@/lib/ecc/tipos";
 
 function campoObrigatorio(formData: FormData, nome: string): string {
@@ -607,6 +609,90 @@ export async function comentarNaTarefa(tarefaId: string, projetoId: string, form
   await registrarAtividade({ tenantId, projetoId, tarefaId, tipo: "comentario", detalhe: { texto } });
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+// ---------------------------------------------------------------------------
+// Freeze — ponto de situação do quadro, por e-mail pra todo mundo com acesso
+// ---------------------------------------------------------------------------
+
+function diasEntre(dataA: Date, dataB: Date): number {
+  const umDia = 1000 * 60 * 60 * 24;
+  const a = new Date(dataA.getFullYear(), dataA.getMonth(), dataA.getDate());
+  const b = new Date(dataB.getFullYear(), dataB.getMonth(), dataB.getDate());
+  return Math.round((b.getTime() - a.getTime()) / umDia);
+}
+
+export async function enviarConsolidacaoProjeto(projetoId: string): Promise<{ enviados: number }> {
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
+  const supabase = await createClient();
+
+  const [{ data: projeto }, { data: tarefas }, { data: colunas }, { data: tarefaMembros }, membrosComAcesso] =
+    await Promise.all([
+      supabase.from("projetos").select("nome").eq("id", projetoId).maybeSingle(),
+      supabase.from("tarefas").select("*").eq("projeto_id", projetoId),
+      supabase.from("colunas_kanban").select("id, concluido").eq("projeto_id", projetoId),
+      supabase.from("tarefa_membros").select("tarefa_id, user_id").eq("tenant_id", tenantId),
+      listarMembrosComAcessoAoProjeto(tenantId, projetoId),
+    ]);
+
+  const listaTarefas = (tarefas ?? []) as Tarefa[];
+  const listaColunas = (colunas ?? []) as { id: string; concluido: boolean }[];
+  const hoje = new Date();
+
+  const itensPorTarefa = new Map<string, ItemConsolidacao>();
+  for (const tarefa of listaTarefas) {
+    const coluna = listaColunas.find((c) => c.id === tarefa.coluna_id);
+    const concluido = coluna?.concluido ?? false;
+    const diasParaPrazo = tarefa.data_limite
+      ? diasEntre(hoje, new Date(`${tarefa.data_limite}T00:00:00`))
+      : null;
+
+    itensPorTarefa.set(tarefa.id, {
+      titulo: tarefa.titulo,
+      status: concluido ? "concluido" : diasParaPrazo !== null && diasParaPrazo < 0 ? "atrasado" : "aberto",
+      diasEmAberto: Math.max(0, diasEntre(new Date(tarefa.criado_em), hoje)),
+      prazoFormatado: tarefa.data_limite ? new Date(`${tarefa.data_limite}T00:00:00`).toLocaleDateString("pt-BR") : null,
+      diasParaPrazo,
+    });
+  }
+
+  const itensPorResponsavel = new Map<string, ItemConsolidacao[]>();
+  const idsComResponsavel = new Set<string>();
+
+  for (const tm of (tarefaMembros ?? []) as { tarefa_id: string; user_id: string }[]) {
+    const item = itensPorTarefa.get(tm.tarefa_id);
+    if (!item) continue;
+    idsComResponsavel.add(tm.tarefa_id);
+    const membro = membrosComAcesso.find((m) => m.user_id === tm.user_id);
+    const chave = membro?.email ?? "Responsável fora do quadro";
+    if (!itensPorResponsavel.has(chave)) itensPorResponsavel.set(chave, []);
+    itensPorResponsavel.get(chave)!.push(item);
+  }
+
+  const semResponsavel = listaTarefas
+    .filter((t) => !idsComResponsavel.has(t.id))
+    .map((t) => itensPorTarefa.get(t.id))
+    .filter((item): item is ItemConsolidacao => Boolean(item));
+
+  const secoes: SecaoConsolidacao[] = [...itensPorResponsavel.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([nomeResponsavel, itens]) => ({ nomeResponsavel, itens }));
+
+  if (semResponsavel.length > 0) {
+    secoes.push({ nomeResponsavel: "Sem responsável", itens: semResponsavel });
+  }
+
+  const destinatarios = membrosComAcesso.map((m) => m.email);
+
+  await enviarEmailConsolidacao({
+    destinatarios,
+    nomeProjeto: (projeto?.nome as string | undefined) ?? "Gaiamum",
+    secoes,
+    projetoId,
+  });
+
+  return { enviados: destinatarios.length };
 }
 
 // ---------------------------------------------------------------------------

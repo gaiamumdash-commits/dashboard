@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
-import { eSouGestorDoProjeto, listarMembros, obterPapelAtual } from "@/lib/ecc/equipe";
+import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import type { Projeto } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConfiguracoesQuadro } from "@/components/projetos/configuracoes-quadro";
@@ -27,14 +27,12 @@ export default async function PaginaConfiguracoesQuadro({ params }: { params: Pr
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [papelAtual, souGestor, { data: projetoMembros }, membrosDoTenant, { data: memberships }] =
-    await Promise.all([
-      obterPapelAtual(tenantId),
-      user ? eSouGestorDoProjeto(projetoId, user.id) : Promise.resolve(false),
-      supabase.from("projeto_membros").select("user_id, papel").eq("projeto_id", projetoId),
-      listarMembros(tenantId),
-      supabase.from("memberships").select("user_id, escopo").eq("tenant_id", tenantId),
-    ]);
+  const [papelAtual, souGestor, { data: projetoMembros }, quemVe] = await Promise.all([
+    obterPapelAtual(tenantId),
+    user ? eSouGestorDoProjeto(projetoId, user.id) : Promise.resolve(false),
+    supabase.from("projeto_membros").select("user_id, papel").eq("projeto_id", projetoId),
+    listarMembrosComAcessoAoProjeto(tenantId, projetoId),
+  ]);
 
   const souOwner = papelAtual === "owner";
 
@@ -42,14 +40,7 @@ export default async function PaginaConfiguracoesQuadro({ params }: { params: Pr
     redirect(`/projetos/${projetoId}/tarefas`);
   }
 
-  const idsEscopoCompleto = new Set(
-    (memberships ?? []).filter((m) => m.escopo === "completo").map((m) => m.user_id as string),
-  );
   const idsProjetoMembros = new Set((projetoMembros ?? []).map((m) => m.user_id as string));
-
-  const quemVe = membrosDoTenant.filter(
-    (m) => m.papel === "owner" || idsEscopoCompleto.has(m.user_id) || idsProjetoMembros.has(m.user_id),
-  );
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">

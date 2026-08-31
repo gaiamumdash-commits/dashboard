@@ -73,6 +73,170 @@ function montarHtmlAtividade({
 </html>`.trim();
 }
 
+export type ItemConsolidacao = {
+  titulo: string;
+  status: "concluido" | "atrasado" | "aberto";
+  diasEmAberto: number;
+  prazoFormatado: string | null;
+  diasParaPrazo: number | null;
+};
+
+export type SecaoConsolidacao = {
+  nomeResponsavel: string;
+  itens: ItemConsolidacao[];
+};
+
+const COR_STATUS: Record<ItemConsolidacao["status"], { fundo: string; texto: string; rotulo: string }> = {
+  concluido: { fundo: "#dcfce7", texto: "#166534", rotulo: "Concluído" },
+  atrasado: { fundo: "#fee2e2", texto: "#991b1b", rotulo: "Atrasado" },
+  aberto: { fundo: "#fef9c3", texto: "#854d0e", rotulo: "Em aberto" },
+};
+
+function linhaPrazo(item: ItemConsolidacao): string {
+  if (item.status === "concluido") return "";
+  if (!item.prazoFormatado || item.diasParaPrazo === null) return "sem prazo definido";
+  if (item.diasParaPrazo < 0) return `venceu em ${item.prazoFormatado} — ${Math.abs(item.diasParaPrazo)} dia(s) em atraso`;
+  if (item.diasParaPrazo === 0) return `vence hoje (${item.prazoFormatado})`;
+  return `prazo ${item.prazoFormatado} — faltam ${item.diasParaPrazo} dia(s)`;
+}
+
+function montarHtmlConsolidacao({
+  nomeProjeto,
+  secoes,
+  linkProjeto,
+  dataFreeze,
+}: {
+  nomeProjeto: string;
+  secoes: SecaoConsolidacao[];
+  linkProjeto: string;
+  dataFreeze: string;
+}): string {
+  const blocosSecao = secoes
+    .map((secao) => {
+      const linhasItens = secao.itens
+        .map((item) => {
+          const cor = COR_STATUS[item.status];
+          return `
+            <tr>
+              <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;">
+                <span style="display:inline-block;background-color:${cor.fundo};color:${cor.texto};font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-right:8px;">
+                  ${cor.rotulo}
+                </span>
+                <span style="color:#002559;font-size:14px;font-weight:600;">${item.titulo}</span>
+                <div style="margin-top:2px;color:#5b6b85;font-size:12px;">
+                  aberto há ${item.diasEmAberto} dia(s)${item.status !== "concluido" ? ` · ${linhaPrazo(item)}` : ""}
+                </div>
+              </td>
+            </tr>`;
+        })
+        .join("");
+
+      return `
+        <tr>
+          <td style="padding:20px 0 8px;">
+            <h2 style="margin:0;color:#011f51;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;">
+              ${secao.nomeResponsavel}
+            </h2>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              ${linhasItens}
+            </table>
+          </td>
+        </tr>`;
+    })
+    .join("");
+
+  return `
+<!doctype html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:0;background-color:#ffffff;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;padding:24px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#ffffff;">
+            <tr>
+              <td style="border-bottom:2px solid #011f51;padding-bottom:16px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="${URL_LOGO}" width="32" height="32" alt="" style="display:block;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <span style="color:#011f51;font-size:18px;font-weight:700;">Gaiamum</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 0 4px;">
+                <p style="margin:0;color:#5b6b85;font-size:12px;">Ponto de situação · ${dataFreeze}</p>
+                <h1 style="margin:4px 0 0;color:#011f51;font-size:22px;font-weight:700;">${nomeProjeto}</h1>
+              </td>
+            </tr>
+            ${blocosSecao}
+            <tr>
+              <td style="padding:24px 0 8px;border-top:1px solid #e5e7eb;">
+                <a
+                  href="${linkProjeto}"
+                  style="display:inline-block;background-color:#0069fd;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;"
+                >
+                  Ver quadro no Gaiamum
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`.trim();
+}
+
+export async function enviarEmailConsolidacao({
+  destinatarios,
+  nomeProjeto,
+  secoes,
+  projetoId,
+}: {
+  destinatarios: string[];
+  nomeProjeto: string;
+  secoes: SecaoConsolidacao[];
+  projetoId: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || destinatarios.length === 0) return;
+
+  const resend = new Resend(apiKey);
+  const linkProjeto = `${URL_SITE}/projetos/${projetoId}/tarefas`;
+  const dataFreeze = new Date().toLocaleString("pt-BR", { dateStyle: "long", timeStyle: "short" });
+  const html = montarHtmlConsolidacao({ nomeProjeto, secoes, linkProjeto, dataFreeze });
+
+  await Promise.all(
+    destinatarios.map((email) =>
+      resend.emails
+        .send({
+          from: REMETENTE_PADRAO,
+          to: email,
+          subject: `Ponto de situação — ${nomeProjeto}`,
+          html,
+          text: `Ponto de situação de "${nomeProjeto}" em ${dataFreeze}. Veja em: ${linkProjeto}`,
+        })
+        .then(({ error }) => {
+          if (error) {
+            console.error(`Falha ao enviar consolidação pra ${email}:`, error);
+          }
+        })
+        .catch((erro) => {
+          console.error(`Falha ao enviar consolidação pra ${email}:`, erro);
+        }),
+    ),
+  );
+}
+
 export async function enviarEmailAtividade({
   destinatarios,
   atorEmail,
