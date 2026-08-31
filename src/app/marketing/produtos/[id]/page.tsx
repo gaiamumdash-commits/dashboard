@@ -27,14 +27,22 @@ export default async function PaginaProdutoDigital({ params }: { params: Promise
         <Link href="/marketing/produtos" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">
           ← Produtos digitais
         </Link>
-        <div className="mt-2 flex items-center justify-between">
+        <div className="mt-2 flex items-center justify-between gap-3">
           <h1 className="text-3xl font-semibold text-gaiamum-text">{produto.nome}</h1>
-          <Link
-            href={`/marketing/produtos/${produto.id}/avatar`}
-            className="rounded-lg border border-gaiamum-border px-4 py-2 text-sm text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-text"
-          >
-            Avatar do Cliente Ideal →
-          </Link>
+          <div className="flex shrink-0 gap-3">
+            <Link
+              href={`/marketing/produtos/${produto.id}/avatar`}
+              className="rounded-lg border border-gaiamum-border px-4 py-2 text-sm text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-text"
+            >
+              Avatar do Cliente Ideal →
+            </Link>
+            <Link
+              href={`/marketing/produtos/${produto.id}/ideias`}
+              className="rounded-lg border border-gaiamum-border px-4 py-2 text-sm text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-text"
+            >
+              Gerar ideias de conteúdo →
+            </Link>
+          </div>
         </div>
 
         <div className="mt-8">

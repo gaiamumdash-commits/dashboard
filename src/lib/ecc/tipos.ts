@@ -292,3 +292,42 @@ export type EntrevistaIA = {
   criado_em: string;
   atualizado_em: string;
 };
+
+// ---------------------------------------------------------------------------
+// Marketing / Mandala de Anúncios (Incremento 3, fluxo manual)
+// ---------------------------------------------------------------------------
+
+export type TipoAnuncio = "ultra_segmentado" | "problema_solucao" | "pesquisa_cientifica" | "atualidades_trend";
+
+export type IdeiaConteudo = {
+  id: string;
+  tenant_id: string;
+  produto_digital_id: string;
+  lote_id: string;
+  numero: number;
+  tipo_anuncio: TipoAnuncio;
+  titulo_gancho: string;
+  checklist_avisos: string | null;
+  criado_em: string;
+};
+
+export type FaseFunil = "descoberta" | "relacionamento" | "conversao" | "remarketing";
+
+export type PecaConteudo = {
+  id: string;
+  tenant_id: string;
+  produto_digital_id: string;
+  ideia_id: string;
+  gancho: string;
+  paragrafo_1: string;
+  paragrafo_2: string;
+  cta_descoberta: string;
+  cta_relacionamento: string;
+  cta_conversao: string;
+  cta_remarketing: string;
+  cta_escolhida: FaseFunil | null;
+  checklist_avisos: string | null;
+  tarefa_id: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};

@@ -2,22 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { EtapaEntrevistaColada } from "@/lib/ecc/tipos";
-import { registrarRespostaEtapa, finalizarComExtracaoColada } from "@/lib/ecc/entrevista";
-import { ROTULO_ETAPA } from "@/lib/ecc/prompt-entrevista";
 
-export function GeradorPromptEntrevista({
-  entrevistaId,
-  modo,
-  rotuloEtapaAtual,
+export function GeradorPromptColavel({
+  tituloPrompt,
   prompt,
-  etapasAnteriores,
+  labelBotaoSalvar,
+  aoSalvar,
 }: {
-  entrevistaId: string;
-  modo: "etapa" | "extracao";
-  rotuloEtapaAtual: string;
+  tituloPrompt: string;
   prompt: string;
-  etapasAnteriores: EtapaEntrevistaColada[];
+  labelBotaoSalvar: string;
+  /** Precisa ser uma Server Action (ou o resultado de `.bind()` numa) —
+   * é assim que o Next.js consegue mandar essa função pro client sem
+   * expor o resto do módulo server-only que a chamou. */
+  aoSalvar: (colado: string) => Promise<void>;
 }) {
   const [copiado, setCopiado] = useState(false);
   const [colado, setColado] = useState("");
@@ -36,11 +34,7 @@ export function GeradorPromptEntrevista({
     setErro(null);
     iniciarTransicao(async () => {
       try {
-        if (modo === "extracao") {
-          await finalizarComExtracaoColada(entrevistaId, colado);
-        } else {
-          await registrarRespostaEtapa(entrevistaId, colado);
-        }
+        await aoSalvar(colado);
         setColado("");
         router.refresh();
       } catch (e) {
@@ -51,27 +45,9 @@ export function GeradorPromptEntrevista({
 
   return (
     <div className="flex flex-col gap-6">
-      {etapasAnteriores.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-            Etapas já respondidas
-          </h2>
-          {etapasAnteriores.map((e, i) => (
-            <details key={i} className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2">
-              <summary className="cursor-pointer text-sm font-medium text-gaiamum-text">
-                {ROTULO_ETAPA[e.estagio]}
-              </summary>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-gaiamum-text-muted">{e.texto_colado}</p>
-            </details>
-          ))}
-        </div>
-      )}
-
       <div>
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gaiamum-text">
-            {modo === "extracao" ? "Prompt final — resumo estruturado" : `Prompt da etapa: ${rotuloEtapaAtual}`}
-          </h2>
+          <h2 className="text-sm font-semibold text-gaiamum-text">{tituloPrompt}</h2>
           <button
             type="button"
             onClick={copiar}
@@ -98,7 +74,7 @@ export function GeradorPromptEntrevista({
           value={colado}
           onChange={(e) => setColado(e.target.value)}
           rows={8}
-          placeholder="Cole aqui a conversa/resumo que o Claude devolveu..."
+          placeholder="Cole aqui a resposta que o Claude devolveu..."
           className="mt-2 w-full rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
         />
         <button
@@ -107,7 +83,7 @@ export function GeradorPromptEntrevista({
           disabled={pendente || !colado.trim()}
           className="mt-3 rounded-lg bg-gaiamum-primary px-5 py-2 text-sm font-medium text-white transition hover:bg-gaiamum-primary-dark disabled:opacity-60"
         >
-          {pendente ? "Salvando..." : modo === "extracao" ? "Concluir entrevista" : "Salvar e continuar"}
+          {pendente ? "Salvando..." : labelBotaoSalvar}
         </button>
         {erro && <p className="mt-2 text-sm text-gaiamum-danger">{erro}</p>}
       </div>

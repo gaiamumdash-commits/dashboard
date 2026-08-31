@@ -1,4 +1,5 @@
 import { ExtracaoEntrevistaSchema, type ExtracaoEntrevista } from "@/lib/ecc/entrevista-schemas";
+import { parsearBlocoCampoValor } from "@/lib/ecc/parser-campo-valor";
 import type { EstagioEntrevista, EtapaEntrevistaColada } from "@/lib/ecc/tipos";
 
 export const ETAPAS: Exclude<EstagioEntrevista, "concluida">[] = [
@@ -86,13 +87,7 @@ const FORMATOS_VALIDOS = ["curso", "ebook", "mentoria", "template", "comunidade"
  * no final da entrevista. Lança erro com o nome exato do campo faltando,
  * pra pedir só o que falta em vez de refazer tudo. */
 export function parsearResultadoEntrevista(textoColado: string): ExtracaoEntrevista {
-  const campos: Record<string, string> = {};
-  for (const linha of textoColado.split("\n")) {
-    const match = linha.match(/^([A-Z_0-9]+):\s?(.*)$/);
-    if (match && match[2].trim()) {
-      campos[match[1]] = match[2].trim();
-    }
-  }
+  const campos = parsearBlocoCampoValor(textoColado);
 
   function obrigatorio(chave: string): string {
     const valor = campos[chave];
