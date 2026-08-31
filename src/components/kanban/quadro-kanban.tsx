@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { tocarSomConcluido } from "@/lib/ecc/kanban";
@@ -51,13 +51,13 @@ export function QuadroKanban({
   const [criandoColuna, setCriandoColuna] = useState(false);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
+  const inputNovaColunaRef = useRef<HTMLInputElement>(null);
 
   // Mantém o estado local em dia com o que o servidor manda depois de um
-  // router.refresh() (ex.: cartão novo criado pelo "+ Adicionar cartão") —
-  // sem isso, o cartão recém-criado não aparece pra abrir sozinho. Update
-  // durante o render (padrão recomendado pelo React pra "ajustar estado
-  // quando uma prop muda"), não num useEffect — evita um passo de render
-  // extra.
+  // router.refresh() (ex.: ao fechar o modal de detalhe da tarefa, que edita
+  // vários campos por lá). Update durante o render (padrão recomendado pelo
+  // React pra "ajustar estado quando uma prop muda"), não num useEffect —
+  // evita um passo de render extra.
   if (tarefasIniciais !== tarefasIniciaisAnteriores) {
     setTarefasIniciaisAnteriores(tarefasIniciais);
     setTarefas(tarefasIniciais);
@@ -80,6 +80,92 @@ export function QuadroKanban({
     iniciarTransicao(() => deletarTarefa(tarefaId, projetoId));
   }
 
+  // Cartão aparece na hora, sem esperar o servidor confirmar — mesmo padrão
+  // de moverPara/excluir acima. Os ids nascem no cliente (crypto.randomUUID)
+  // e vão junto pro insert, então o otimista e o real são a mesma linha, sem
+  // precisar reconciliar depois. Se a Server Action falhar, desfaz.
+  function criarCartaoOtimista(colunaId: string, tituloBruto: string) {
+    const titulos = tituloBruto
+      .split("\n")
+      .map((linha) => linha.trim())
+      .filter((linha) => linha.length > 0);
+    if (titulos.length === 0) return;
+
+    const ids = titulos.map(() => crypto.randomUUID());
+    const agora = new Date().toISOString();
+    const novas: Tarefa[] = titulos.map((titulo, indice) => ({
+      id: ids[indice],
+      tenant_id: "",
+      projeto_id: projetoId,
+      titulo,
+      descricao: null,
+      coluna_id: colunaId,
+      prioridade: "P3",
+      data_inicio: null,
+      data_limite: null,
+      tempo_estimado_min: null,
+      tempo_realizado_min: null,
+      criado_em: agora,
+    }));
+
+    setTarefas((atual) => [...atual, ...novas]);
+
+    const formData = new FormData();
+    formData.set("titulo", tituloBruto);
+    iniciarTransicao(() => {
+      criarTarefa(projetoId, colunaId, formData, ids).catch((err) => {
+        setTarefas((atual) => atual.filter((t) => !ids.includes(t.id)));
+        window.alert(err instanceof Error ? err.message : "Falha ao criar tarefa.");
+      });
+    });
+  }
+
+  // Mesma lógica: fecha a edição e troca o nome na hora, sem esperar
+  // resposta do servidor.
+  function renomearColunaOtimista(colunaId: string, novoNome: string) {
+    if (!novoNome.trim()) {
+      setColunaEditandoId(null);
+      return;
+    }
+    const nomeAnterior = colunas.find((c) => c.id === colunaId)?.nome ?? "";
+    setColunas((atual) => atual.map((c) => (c.id === colunaId ? { ...c, nome: novoNome } : c)));
+    setColunaEditandoId(null);
+
+    const formData = new FormData();
+    formData.set("nome", novoNome);
+    iniciarTransicao(() => {
+      renomearColuna(colunaId, projetoId, formData).catch((err) => {
+        setColunas((atual) => atual.map((c) => (c.id === colunaId ? { ...c, nome: nomeAnterior } : c)));
+        window.alert(err instanceof Error ? err.message : "Falha ao renomear coluna.");
+      });
+    });
+  }
+
+  function criarColunaOtimista(nome: string) {
+    if (!nome.trim()) return;
+    const id = crypto.randomUUID();
+    const novaColuna: ColunaKanban = {
+      id,
+      tenant_id: "",
+      projeto_id: projetoId,
+      nome,
+      ordem: colunasAbertas.length,
+      concluido: false,
+      criado_em: new Date().toISOString(),
+    };
+    setColunas((atual) => [...colunasAbertas, novaColuna, ...atual.filter((c) => c.concluido)]);
+    setCriandoColuna(false);
+
+    const formData = new FormData();
+    formData.set("nome", nome);
+    iniciarTransicao(() => {
+      criarColuna(projetoId, formData).catch((err) => {
+        setColunas((atual) => atual.filter((c) => c.id !== id));
+        window.alert(err instanceof Error ? err.message : "Falha ao criar coluna.");
+      });
+    });
+  }
+
   function soltarColuna(colunaAlvoId: string) {
     if (!colunaArrastadaId || colunaArrastadaId === colunaAlvoId) return;
 
@@ -96,14 +182,16 @@ export function QuadroKanban({
     iniciarTransicao(() => reordenarColunas(projetoId, semArrastada.map((c) => c.id)));
   }
 
-  async function apagarColuna(colunaId: string) {
+  function apagarColuna(colunaId: string) {
     if (!window.confirm("Apagar esta coluna?")) return;
-    try {
-      await excluirColuna(colunaId, projetoId);
-      router.refresh();
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Falha ao excluir coluna.");
-    }
+    const colunaRemovida = colunas.find((c) => c.id === colunaId);
+    setColunas((atual) => atual.filter((c) => c.id !== colunaId));
+    iniciarTransicao(() => {
+      excluirColuna(colunaId, projetoId).catch((err) => {
+        if (colunaRemovida) setColunas((atual) => [...atual, colunaRemovida]);
+        window.alert(err instanceof Error ? err.message : "Falha ao excluir coluna.");
+      });
+    });
   }
 
   function fecharModal() {
@@ -137,23 +225,17 @@ export function QuadroKanban({
       >
         <div className="flex items-center justify-between gap-2">
           {colunaEditandoId === coluna.id ? (
-            <form
-              action={async (formData) => {
-                await renomearColuna(coluna.id, projetoId, formData);
-                setColunaEditandoId(null);
-                router.refresh();
+            <input
+              name="nome"
+              defaultValue={coluna.nome}
+              autoFocus
+              onBlur={(e) => renomearColunaOtimista(coluna.id, e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") setColunaEditandoId(null);
               }}
-              className="flex flex-1 gap-1"
-            >
-              <input
-                name="nome"
-                defaultValue={coluna.nome}
-                autoFocus
-                required
-                onBlur={(e) => e.currentTarget.form?.requestSubmit()}
-                className="w-full rounded border border-gaiamum-primary bg-gaiamum-surface-raised px-2 py-0.5 text-sm text-gaiamum-text outline-none"
-              />
-            </form>
+              className="w-full flex-1 rounded border border-gaiamum-primary bg-gaiamum-surface-raised px-2 py-0.5 text-sm text-gaiamum-text outline-none"
+            />
           ) : (
             <h2
               draggable={!ehFixa}
@@ -209,20 +291,17 @@ export function QuadroKanban({
           );
         })}
 
-        <form
-          action={async (formData) => {
-            const novoId = await criarTarefa(projetoId, coluna.id, formData);
-            if (novoId) setTarefaAbertaId(novoId);
-            router.refresh();
+        <input
+          name="titulo"
+          placeholder="+ Adicionar cartão"
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            criarCartaoOtimista(coluna.id, e.currentTarget.value);
+            e.currentTarget.value = "";
           }}
-        >
-          <input
-            name="titulo"
-            required
-            placeholder="+ Adicionar cartão"
-            className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-gaiamum-text-muted outline-none transition hover:border-gaiamum-border focus:border-gaiamum-primary focus:bg-gaiamum-surface-raised focus:text-gaiamum-text"
-          />
-        </form>
+          className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-gaiamum-text-muted outline-none transition hover:border-gaiamum-border focus:border-gaiamum-primary focus:bg-gaiamum-surface-raised focus:text-gaiamum-text"
+        />
       </div>
     );
   }
@@ -233,27 +312,23 @@ export function QuadroKanban({
         {colunasAbertas.map((coluna) => renderColuna(coluna, false))}
 
         {criandoColuna ? (
-          <form
-            action={async (formData) => {
-              await criarColuna(projetoId, formData);
-              setCriandoColuna(false);
-              router.refresh();
-            }}
-            className="flex h-fit w-56 shrink-0 flex-col gap-2 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3"
-          >
+          <div className="flex h-fit w-56 shrink-0 flex-col gap-2 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3">
             <input
-              name="nome"
+              ref={inputNovaColunaRef}
               autoFocus
-              required
               placeholder="Nome da coluna"
               onKeyDown={(e) => {
                 if (e.key === "Escape") setCriandoColuna(false);
+                if (e.key === "Enter") {
+                  criarColunaOtimista(e.currentTarget.value);
+                }
               }}
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
             />
             <div className="flex gap-2">
               <button
-                type="submit"
+                type="button"
+                onClick={() => criarColunaOtimista(inputNovaColunaRef.current?.value ?? "")}
                 className="rounded-lg bg-gaiamum-primary px-3 py-1 text-xs font-medium text-white transition hover:bg-gaiamum-primary-dark"
               >
                 Adicionar
@@ -266,7 +341,7 @@ export function QuadroKanban({
                 Cancelar
               </button>
             </div>
-          </form>
+          </div>
         ) : (
           <button
             type="button"

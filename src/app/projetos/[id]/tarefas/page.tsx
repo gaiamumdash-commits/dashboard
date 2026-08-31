@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { listarMembros, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import type { Anexo, ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
@@ -14,23 +14,10 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
   const { id: projetoId } = await params;
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
-
-  const { data: projeto } = await supabase
-    .from("projetos")
-    .select("*")
-    .eq("id", projetoId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-
-  if (!projeto) {
-    notFound();
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   const [
+    { data: projeto },
     { data: colunas },
     { data: tarefas },
     { count: totalMetasSmart },
@@ -43,6 +30,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     acessoCompleto,
     { data: gestorDoProjeto },
   ] = await Promise.all([
+    supabase.from("projetos").select("*").eq("id", projetoId).eq("tenant_id", tenantId).maybeSingle(),
     supabase
       .from("colunas_kanban")
       .select("*")
@@ -68,6 +56,10 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+
+  if (!projeto) {
+    notFound();
+  }
 
   const podeExcluirTarefa = papelAtual === "owner" || Boolean(gestorDoProjeto);
   const listaTarefas = (tarefas as Tarefa[]) ?? [];

@@ -318,7 +318,11 @@ export async function convidarParaProjeto(projetoId: string, formData: FormData)
 // Módulo 2 — Tarefas (Kanban)
 // ---------------------------------------------------------------------------
 
-export async function criarTarefa(projetoId: string, colunaId: string, formData: FormData) {
+// `ids` (opcional) vem do cliente quando ele já inseriu a tarefa
+// otimisticamente na tela (mesmo id aqui e lá, sem precisar reconciliar
+// depois) — mesma ordem de `titulos`. Sem `ids`, o Postgres gera sozinho
+// (default gen_random_uuid()).
+export async function criarTarefa(projetoId: string, colunaId: string, formData: FormData, ids?: string[]) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
@@ -335,7 +339,8 @@ export async function criarTarefa(projetoId: string, colunaId: string, formData:
 
   // Criação rápida: só o título agora, o resto (prioridade, tag, datas) o
   // usuário preenche depois abrindo o cartão.
-  const linhas = titulos.map((titulo) => ({
+  const linhas = titulos.map((titulo, indice) => ({
+    ...(ids?.[indice] ? { id: ids[indice] } : {}),
     tenant_id: tenantId,
     projeto_id: projetoId,
     coluna_id: colunaId,
@@ -343,18 +348,13 @@ export async function criarTarefa(projetoId: string, colunaId: string, formData:
     prioridade: "P3" as Prioridade,
   }));
 
-  const { data: criadas, error } = await supabase.from("tarefas").insert(linhas).select("id");
+  const { error } = await supabase.from("tarefas").insert(linhas);
 
   if (error) {
     throw new Error(`Falha ao criar tarefa: ${error.message}`);
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
-
-  // Devolve o id do primeiro cartão criado — a UI abre ele direto pra
-  // configurar (prioridade, data, etiqueta, etc.), sem precisar de um
-  // segundo clique.
-  return (criadas?.[0]?.id as string | undefined) ?? null;
 }
 
 export async function atualizarDescricaoTarefa(tarefaId: string, projetoId: string, formData: FormData) {

@@ -1,5 +1,6 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { cache } from "react";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Convite, EscopoMembership, MembroTenant, Papel } from "@/lib/ecc/tipos";
 
@@ -21,24 +22,25 @@ export async function listarConvitesPendentes(tenantId: string): Promise<Convite
   return (data as Convite[]) ?? [];
 }
 
-async function obterMembershipAtual(
-  tenantId: string,
-): Promise<{ papel: Papel; escopo: EscopoMembership } | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+// obterPapelAtual() e temAcessoCompleto() são chamadas juntas em quase toda
+// página (geralmente dentro do mesmo Promise.all) e cada uma precisava da
+// mesma linha de membership — cache() por request evita rodar a query 2x.
+const obterMembershipAtual = cache(
+  async (tenantId: string): Promise<{ papel: Papel; escopo: EscopoMembership } | null> => {
+    const supabase = await createClient();
+    const user = await obterUsuarioAtual();
+    if (!user) return null;
 
-  const { data } = await supabase
-    .from("memberships")
-    .select("papel, escopo")
-    .eq("tenant_id", tenantId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+    const { data } = await supabase
+      .from("memberships")
+      .select("papel, escopo")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-  return (data as { papel: Papel; escopo: EscopoMembership } | null) ?? null;
-}
+    return (data as { papel: Papel; escopo: EscopoMembership } | null) ?? null;
+  },
+);
 
 export async function obterPapelAtual(tenantId: string): Promise<Papel | null> {
   const membership = await obterMembershipAtual(tenantId);

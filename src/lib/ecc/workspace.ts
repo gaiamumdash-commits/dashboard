@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buscarConvitePendentePorEmail, vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 
@@ -14,9 +14,7 @@ import { buscarConvitePendentePorEmail, vincularUsuarioAoConvite } from "@/lib/e
  */
 export async function garantirWorkspace(): Promise<string> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   if (!user) {
     throw new Error("Usuário não autenticado.");
