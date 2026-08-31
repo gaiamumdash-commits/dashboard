@@ -10,7 +10,18 @@
 
 ---
 
-## Estado confirmado (2026-08-31, sessão nova #4 — última atualização)
+## Estado confirmado (2026-08-31, sessão nova #5 — última atualização)
+
+- **Item 5 da lista de UX do Kanban (etiquetas com cor escolhida na criação) — implementado, testado de ponta a ponta em build de produção isolado (porta 3055), commit local ainda NÃO publicado — falta só o `git push`.** Fabio confirmou a direção via pergunta direta: "fitinhas inline" — ao digitar um nome de etiqueta que ainda não existe no workspace, aparecem as 6 bolinhas de cor (`CORES_ETIQUETA`, mesma paleta de sempre) logo abaixo do campo; clicar numa já cria a etiqueta com aquela cor e anexa ao cartão, sem passo de confirmação separado. Se o nome digitado já existe (case-insensitive, `ilike`), o comportamento antigo se mantém — Enter ou clique na sugestão reanexa a etiqueta existente preservando a cor dela, sem mostrar o seletor de cor (não faz sentido escolher cor de algo que já tem uma).
+  - `adicionarEtiquetaNaTarefa` (`src/lib/ecc/etiquetas.ts`) ganhou um 4º parâmetro opcional `cor?: CorEtiqueta` — só é usado quando a etiqueta é nova; se já existir, o parâmetro é ignorado e a cor original prevalece. Sem o parâmetro, cai no fallback antigo (`SEQUENCIA_CORES` por ordem de criação) — mantém compatibilidade pra qualquer outro chamador futuro.
+  - `detalhe-tarefa.tsx`: nova constante `nomeJaExiste` (match exato case-insensitive contra `etiquetasDoTenant`) decide se mostra os chips de cor ou não; Enter só cria/anexa direto quando `nomeJaExiste` é `true` — quando é uma etiqueta nova, Enter não faz nada, força escolher uma cor clicando.
+  - Testado no navegador (Playwright, build de produção porta 3055, conta `gaiamumdash@gmail.com`, quadro "Recredenciamento FAMA"): criei etiqueta nova "Prova de Cor" → 6 chips apareceram → cliquei em coral → etiqueta criada e anexada instantaneamente, cor coral confirmada no cartão e na lista do quadro. Removi e digitei de novo com case diferente ("prova de cor") → só a sugestão existente apareceu, sem chips → Enter reanexou preservando a cor coral original, sem duplicar. Cartão e etiqueta de teste removidos do banco depois (etiqueta "Prova de Cor" ficou sem uso no tenant, sem UI pra apagar etiqueta órfã — mesma lacuna que já existia antes, não é regressão desta mudança). Typecheck e `npm run build` limpos.
+  - **Pendente imediato:** pedir confirmação do Fabio pra `git push`.
+- **Pedido novo do Fabio nesta sessão, ainda NÃO desenhado nem implementado — próxima frente:** menção com `@` em comentários (e potencialmente em qualquer texto livre do cartão) pra chamar a atenção de um membro específico do projeto, com um avatar "bolinha com a inicial da pessoa" aparecendo tanto na menção quanto em qualquer lugar que hoje só mostra e-mail cru (ex.: lista de responsáveis do cartão, que já usa essa bolinha de forma simples — ver `GA` nos cartões). Fabio perguntou se era viável antes de pedir pra construir — respondi que sim e expliquei o mecanismo (autocomplete ao digitar `@`, reaproveitando `membrosDoTenant`/`membrosDaTarefa` já carregados; reaproveitar o sistema de notificação por e-mail via Resend pra avisar quem foi mencionado, mesmo padrão já usado em atribuição de cartão). Fabio escolheu a ordem: fechar e publicar a etiqueta com cor primeiro, emendar a menção `@` na sequência da mesma sessão. **Nada disso foi desenhado ainda** — próxima ação da sessão depois do push.
+
+---
+
+## Estado confirmado (2026-08-31, sessão nova #4)
 
 - **Push do Incremento 3 do Marketing (Mandala de Anúncios, commit `b37c14e`) publicado** — era a pendência aberta no início desta sessão, resolvida logo de cara.
 - **Lentidão geral do app — causa raiz encontrada e corrigida, publicada (commits `eb0cdc9`, `62a0346`, `dc2fbe8`).** Veio do item 1/4 da lista de UX do Kanban registrada no checkpoint anterior (Enter não criava cartão / app lento). Investigação ao vivo com o Fabio testando no dev server (`localhost:3001`) enquanto eu mexia no código — **lição de processo: nunca editar arquivo raiz (`layout.tsx`) ou qualquer arquivo compartilhado enquanto o Fabio testa no mesmo dev server ao mesmo tempo**, o Fast Refresh resultante mascarou o diagnóstico por um bom tempo (ele via lentidão/travamento que na real era recompilação minha, não o bug real). Duas causas raiz reais, confirmadas testando em build de produção isolado (porta 3055, nunca no dev server dele):
@@ -24,7 +35,7 @@
   - Item 1 (Enter não cria cartão) e item 4 (app lento) — **resolvidos junto** (mesma causa raiz, ver acima). Fabio ainda não testou a sensação geral pós-fix fora do fluxo específico que investigamos — vale confirmar na próxima sessão se a lentidão sumiu em outras telas também (Financeiro, Marketing), já que o fix de `auth.getUser()` cacheado é só nos módulos que eu toquei (`workspace.ts`, `equipe.ts`, a página de tarefas) — os outros ~10 arquivos que ainda chamam `supabase.auth.getUser()` direto (`atividade.ts`, `anexos.ts`, `producao-conteudo.ts`, `app/page.tsx`, `app/projetos/page.tsx`, `app/projetos/[id]/configuracoes/page.tsx`, `app/convite/[token]/page.tsx`) não foram tocados — mesmo fix de trocar por `obterUsuarioAtual()` provavelmente vale a pena se a lentidão aparecer em algum desses.
   - Item 2 (confirmação visual de ações no desktop) — **resolvido como efeito colateral** do update otimista acima (criar/renomear/apagar já dão feedback instantâneo agora).
   - Item 3 ("enviar atividade" pouco claro) — **resolvido e publicado.** Fabio escolheu a direção: renomear o rótulo da seção de "Atividade" pra "Comentários" no cartão (`detalhe-tarefa.tsx`) — mensagem de vazio também ajustada ("Nenhum comentário ainda."). O histórico de mover/editar/etc continua aparecendo na mesma lista (não virou uma seção separada), só o rótulo mudou.
-  - Item 5 (etiquetas com cor escolhida na criação, contraste nos 3 temas) — **ainda NÃO implementado.** As 6 cores fixas de etiqueta (`SEQUENCIA_CORES` em `etiquetas.ts`) já são tokens CSS únicos (não variam por tema) usados como fundo 15% opacidade + texto sólido — esquema que já tende a ter bom contraste nos 3 temas sem cálculo extra. Provável direção: trocar "cor automática por sequência" por "fitinhas" (chips) das 6 cores pra escolher ao criar etiqueta nova, mantendo a mesma paleta — não confirmado com o Fabio ainda.
+  - Item 5 (etiquetas com cor escolhida na criação, contraste nos 3 temas) — **resolvido na sessão #5**, ver entrada mais acima no topo do arquivo.
 
 ---
 
@@ -388,6 +399,12 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-08-31 (sessão nova #5) — etiquetas com cor escolhida, pedido de menção @ registrado
+
+Retomando o item 5, único pendente da lista de UX do Kanban levantada em sessões anteriores. Confirmei o formato com o Fabio antes de codar (pergunta direta com preview): "fitinhas inline" — 6 bolinhas de cor aparecem ao digitar nome de etiqueta nova, clicar já cria e anexa. Implementado, testado de ponta a ponta em build de produção isolado (porta 3055) com Playwright, cartão/etiqueta de teste removidos depois. Detalhe técnico completo na seção "Estado confirmado" no topo do arquivo. Falta só pedir `git push`.
+
+No meio da sessão, Fabio interrompeu com um pedido novo (mensagem de voz, formato solto): menção com `@` em comentários pra chamar atenção de um membro específico do projeto, com avatar de inicial. Confirmei viabilidade técnica na hora (reaproveita membros já carregados + sistema de notificação por e-mail existente) sem implementar ainda — Fabio escolheu terminar a etiqueta primeiro. Registrado como próxima frente da mesma sessão.
 
 ### 2026-08-29 (fim de tarde) — infra completa, AIOX instalado, tema claro
 

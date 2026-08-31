@@ -14,10 +14,16 @@ export async function listarEtiquetasDoTenant(tenantId: string): Promise<Etiquet
 }
 
 /** Anexa uma etiqueta na tarefa pelo nome — reaproveita se já existir
- * (case-insensitive) no workspace, ou cria uma nova com a próxima cor da
- * sequência de 6. Dá mais liberdade sem duplicar etiqueta por causa de
- * maiúscula/minúscula diferente. */
-export async function adicionarEtiquetaNaTarefa(tarefaId: string, projetoId: string, nome: string) {
+ * (case-insensitive) no workspace, ou cria uma nova. Dá mais liberdade sem
+ * duplicar etiqueta por causa de maiúscula/minúscula diferente.
+ * `cor` só é usada quando a etiqueta é nova (escolhida nas fitinhas da UI);
+ * se a etiqueta já existir, a cor dela é preservada e o parâmetro é ignorado. */
+export async function adicionarEtiquetaNaTarefa(
+  tarefaId: string,
+  projetoId: string,
+  nome: string,
+  cor?: CorEtiqueta,
+) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
   const nomeLimpo = nome.trim();
@@ -36,16 +42,18 @@ export async function adicionarEtiquetaNaTarefa(tarefaId: string, projetoId: str
   let etiquetaId = existente?.id as string | undefined;
 
   if (!etiquetaId) {
-    const { count } = await supabase
-      .from("etiquetas")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId);
-
-    const cor = SEQUENCIA_CORES[(count ?? 0) % SEQUENCIA_CORES.length];
+    let corEscolhida = cor;
+    if (!corEscolhida) {
+      const { count } = await supabase
+        .from("etiquetas")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId);
+      corEscolhida = SEQUENCIA_CORES[(count ?? 0) % SEQUENCIA_CORES.length];
+    }
 
     const { data: nova, error: erroCriar } = await supabase
       .from("etiquetas")
-      .insert({ tenant_id: tenantId, nome: nomeLimpo, cor })
+      .insert({ tenant_id: tenantId, nome: nomeLimpo, cor: corEscolhida })
       .select("id")
       .single();
 
