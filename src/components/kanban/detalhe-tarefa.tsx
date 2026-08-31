@@ -58,7 +58,7 @@ export function DetalheTarefa({
   const [descricao, setDescricao] = useState(tarefa.descricao ?? "");
   const [buscaEtiqueta, setBuscaEtiqueta] = useState("");
   const [atividades, setAtividades] = useState<AtividadeTarefa[] | null>(null);
-  const [, iniciarTransicao] = useTransition();
+  const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
 
   useEffect(() => {
@@ -192,13 +192,12 @@ export function DetalheTarefa({
       >
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold text-gaiamum-text">{tarefa.titulo}</h2>
-          <button
-            type="button"
-            onClick={aoFechar}
-            className="shrink-0 text-gaiamum-text-muted hover:text-gaiamum-text"
-          >
-            ✕
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {pendente && <span className="text-xs text-gaiamum-text-muted">Salvando…</span>}
+            <button type="button" onClick={aoFechar} className="text-gaiamum-text-muted hover:text-gaiamum-text">
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -237,7 +236,7 @@ export function DetalheTarefa({
             <input
               type="date"
               defaultValue={tarefa.data_inicio ?? ""}
-              onBlur={(e) => salvarDatas("data_inicio", e.target.value)}
+              onChange={(e) => salvarDatas("data_inicio", e.target.value)}
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
             />
           </label>
@@ -247,7 +246,7 @@ export function DetalheTarefa({
             <input
               type="datetime-local"
               defaultValue={tarefa.data_limite ? paraDatetimeLocal(tarefa.data_limite) : ""}
-              onBlur={(e) => salvarDatas("data_limite", e.target.value)}
+              onChange={(e) => salvarDatas("data_limite", e.target.value)}
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
             />
           </label>
