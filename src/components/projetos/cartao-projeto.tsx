@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import Link from "next/link";
 import type { Projeto, StatusProjeto } from "@/lib/ecc/tipos";
 import { atualizarStatusProjeto, deletarProjeto } from "@/lib/ecc/actions";
+import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
 
 const ROTULO_STATUS: Record<StatusProjeto, string> = {
   ativo: "Ativo",
@@ -11,7 +12,15 @@ const ROTULO_STATUS: Record<StatusProjeto, string> = {
   concluido: "Concluído",
 };
 
-export function CartaoProjeto({ projeto, podeExcluir }: { projeto: Projeto; podeExcluir: boolean }) {
+export function CartaoProjeto({
+  projeto,
+  podeExcluir,
+  podeConfigurar,
+}: {
+  projeto: Projeto;
+  podeExcluir: boolean;
+  podeConfigurar: boolean;
+}) {
   const [pendente, iniciarTransicao] = useTransition();
 
   function mudarStatus(status: StatusProjeto) {
@@ -25,6 +34,7 @@ export function CartaoProjeto({ projeto, podeExcluir }: { projeto: Projeto; pode
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
+      <div className={`-mx-5 -mt-5 h-1.5 rounded-t-2xl ${CLASSE_FUNDO_QUADRO[projeto.cor_fundo]}`} />
       <div className="flex items-start justify-between gap-2">
         <Link href={`/projetos/${projeto.id}/tarefas`} className="text-lg font-semibold text-gaiamum-text hover:text-gaiamum-primary">
           {projeto.nome}
@@ -49,16 +59,27 @@ export function CartaoProjeto({ projeto, podeExcluir }: { projeto: Projeto; pode
         <Link href={`/projetos/${projeto.id}/tarefas`} className="text-sm text-gaiamum-primary hover:underline">
           Ver kanban →
         </Link>
-        {podeExcluir && (
-          <button
-            type="button"
-            onClick={excluir}
-            disabled={pendente}
-            className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-          >
-            Excluir
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {podeConfigurar && (
+            <Link
+              href={`/projetos/${projeto.id}/configuracoes`}
+              className="text-xs text-gaiamum-text-muted hover:text-gaiamum-text"
+              title="Configurações do quadro"
+            >
+              ⚙
+            </Link>
+          )}
+          {podeExcluir && (
+            <button
+              type="button"
+              onClick={excluir}
+              disabled={pendente}
+              className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
+            >
+              Excluir
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

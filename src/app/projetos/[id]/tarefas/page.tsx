@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { listarMembros, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import type { Anexo, ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
+import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
@@ -89,15 +90,29 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
         acessoCompleto={acessoCompleto}
         souOwner={papelAtual === "owner"}
       />
-      <main className="mx-auto max-w-6xl flex-1 px-4 py-12">
+      <main className="mx-auto max-w-6xl flex-1 px-4 py-10">
+        <div className={`-mx-4 -mt-10 mb-8 h-2 sm:-mx-4 ${CLASSE_FUNDO_QUADRO[(projeto as Projeto).cor_fundo]}`} />
+
         <Link href="/projetos" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">
           ← Projetos
         </Link>
 
-        <h1 className="mt-2 text-3xl font-semibold text-gaiamum-text">{(projeto as Projeto).nome}</h1>
-        {(projeto as Projeto).descricao && (
-          <p className="mt-1 text-gaiamum-text-muted">{(projeto as Projeto).descricao}</p>
-        )}
+        <div className="mt-2 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-semibold text-gaiamum-text">{(projeto as Projeto).nome}</h1>
+            {(projeto as Projeto).descricao && (
+              <p className="mt-1 text-gaiamum-text-muted">{(projeto as Projeto).descricao}</p>
+            )}
+          </div>
+          {podeExcluirTarefa && (
+            <Link
+              href={`/projetos/${projetoId}/configuracoes`}
+              className="shrink-0 rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+            >
+              ⚙ Configurações
+            </Link>
+          )}
+        </div>
 
         <div className="mt-8">
           <QuadroKanban

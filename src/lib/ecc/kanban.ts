@@ -9,6 +9,17 @@ export const CLASSE_COR_ETIQUETA: Record<CorEtiqueta, string> = {
   lime: "border-gaiamum-tag-lime/40 bg-gaiamum-tag-lime/15 text-gaiamum-tag-lime",
 };
 
+/** Versão sólida (sem opacidade) das mesmas 6 cores — pra faixa/banner do
+ * quadro (cor de fundo do projeto), diferente do chip translúcido acima. */
+export const CLASSE_FUNDO_QUADRO: Record<CorEtiqueta, string> = {
+  purple: "bg-gaiamum-tag-purple",
+  teal: "bg-gaiamum-tag-teal",
+  yellow: "bg-gaiamum-tag-yellow",
+  blue: "bg-gaiamum-tag-blue",
+  coral: "bg-gaiamum-tag-coral",
+  lime: "bg-gaiamum-tag-lime",
+};
+
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
 const DIAS_PARA_ALERTA_AMARELO = 2;

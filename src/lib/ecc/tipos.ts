@@ -22,6 +22,8 @@ export type Projeto = {
   descricao: string | null;
   status: StatusProjeto;
   meta_smart_id: string | null;
+  cor_fundo: CorEtiqueta;
+  arquivado: boolean;
   criado_em: string;
 };
 

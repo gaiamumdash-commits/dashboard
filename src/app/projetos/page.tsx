@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { temAcessoCompleto, obterPapelAtual } from "@/lib/ecc/equipe";
@@ -6,7 +7,12 @@ import { FormularioNovoProjeto } from "@/components/projetos/formulario-novo-pro
 import { CartaoProjeto } from "@/components/projetos/cartao-projeto";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
-export default async function PaginaProjetos() {
+export default async function PaginaProjetos({
+  searchParams,
+}: {
+  searchParams: Promise<{ arquivados?: string }>;
+}) {
+  const { arquivados: verArquivados } = await searchParams;
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
@@ -16,7 +22,12 @@ export default async function PaginaProjetos() {
 
   const [{ data: projetos }, { count: totalMetasSmart }, acessoCompleto, papelAtual, { data: projetosGeridos }] =
     await Promise.all([
-      supabase.from("projetos").select("*").eq("tenant_id", tenantId).order("criado_em", { ascending: false }),
+      supabase
+        .from("projetos")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("arquivado", Boolean(verArquivados))
+        .order("criado_em", { ascending: false }),
       supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
       temAcessoCompleto(tenantId),
       obterPapelAtual(tenantId),
@@ -36,12 +47,24 @@ export default async function PaginaProjetos() {
         souOwner={souOwner}
       />
       <main className="mx-auto max-w-5xl flex-1 px-4 py-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-gaiamum-text">Projetos</h1>
-          <p className="mt-1 text-gaiamum-text-muted">Cada projeto isola suas próprias tarefas.</p>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold text-gaiamum-text">
+              {verArquivados ? "Projetos arquivados" : "Projetos"}
+            </h1>
+            <p className="mt-1 text-gaiamum-text-muted">
+              {verArquivados ? "Quadros arquivados — desarquive pra voltar a usar." : "Cada projeto isola suas próprias tarefas."}
+            </p>
+          </div>
+          <Link
+            href={verArquivados ? "/projetos" : "/projetos?arquivados=1"}
+            className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text"
+          >
+            {verArquivados ? "← Ativos" : "Ver arquivados"}
+          </Link>
         </div>
 
-        {souOwner && <FormularioNovoProjeto />}
+        {!verArquivados && souOwner && <FormularioNovoProjeto />}
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(projetos as Projeto[] | null)?.map((projeto) => (
@@ -49,11 +72,12 @@ export default async function PaginaProjetos() {
               key={projeto.id}
               projeto={projeto}
               podeExcluir={souOwner || idsProjetosGeridos.has(projeto.id)}
+              podeConfigurar={souOwner || idsProjetosGeridos.has(projeto.id)}
             />
           ))}
           {(!projetos || projetos.length === 0) && (
             <p className="col-span-full text-gaiamum-text-muted">
-              Nenhum projeto ainda. Crie o primeiro acima.
+              {verArquivados ? "Nenhum projeto arquivado." : "Nenhum projeto ainda. Crie o primeiro acima."}
             </p>
           )}
         </div>

@@ -9,7 +9,16 @@ import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { eSouGestorDoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
-import type { AtividadeTarefa, Convite, Horizonte, MetaSmart, Papel, Prioridade, StatusProjeto } from "@/lib/ecc/tipos";
+import type {
+  AtividadeTarefa,
+  CorEtiqueta,
+  Convite,
+  Horizonte,
+  MetaSmart,
+  Papel,
+  Prioridade,
+  StatusProjeto,
+} from "@/lib/ecc/tipos";
 
 function campoObrigatorio(formData: FormData, nome: string): string {
   const valor = formData.get(nome);
@@ -136,6 +145,67 @@ export async function deletarProjeto(projetoId: string) {
 
   if (error) {
     throw new Error(`Falha ao excluir projeto: ${error.message}`);
+  }
+
+  revalidatePath("/projetos");
+}
+
+async function exigirGestorOuOwner(tenantId: string, projetoId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const souOwner = (await obterPapelAtual(tenantId)) === "owner";
+  const souGestor = Boolean(user) && (await eSouGestorDoProjeto(projetoId, user!.id));
+
+  if (!souOwner && !souGestor) {
+    throw new Error("Só o gestor do projeto (ou o dono do workspace) mexe nas configurações do quadro.");
+  }
+}
+
+export async function renomearProjeto(projetoId: string, formData: FormData) {
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
+  const supabase = await createClient();
+  const nome = campoObrigatorio(formData, "nome");
+
+  const { error } = await supabase.from("projetos").update({ nome }).eq("id", projetoId);
+
+  if (error) {
+    throw new Error(`Falha ao renomear projeto: ${error.message}`);
+  }
+
+  revalidatePath("/projetos");
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+  revalidatePath(`/projetos/${projetoId}/configuracoes`);
+}
+
+export async function mudarCorProjeto(projetoId: string, cor: CorEtiqueta) {
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("projetos").update({ cor_fundo: cor }).eq("id", projetoId);
+
+  if (error) {
+    throw new Error(`Falha ao mudar cor do quadro: ${error.message}`);
+  }
+
+  revalidatePath("/projetos");
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+  revalidatePath(`/projetos/${projetoId}/configuracoes`);
+}
+
+export async function alternarArquivadoProjeto(projetoId: string, arquivado: boolean) {
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("projetos").update({ arquivado }).eq("id", projetoId);
+
+  if (error) {
+    throw new Error(`Falha ao ${arquivado ? "arquivar" : "desarquivar"} projeto: ${error.message}`);
   }
 
   revalidatePath("/projetos");
