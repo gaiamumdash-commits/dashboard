@@ -9,6 +9,7 @@ import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
 const CORES: CorEtiqueta[] = ["purple", "teal", "yellow", "blue", "coral", "lime"];
 
 export function ConfiguracoesQuadro({ projeto }: { projeto: Projeto }) {
+  const [salvandoNome, iniciarTransicaoNome] = useTransition();
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
 
@@ -25,15 +26,27 @@ export function ConfiguracoesQuadro({ projeto }: { projeto: Projeto }) {
     });
   }
 
+  function salvarNome(formData: FormData) {
+    iniciarTransicaoNome(async () => {
+      await renomearProjeto(projeto.id, formData);
+      router.refresh();
+    });
+  }
+
+  function salvarCor(cor: CorEtiqueta) {
+    iniciarTransicao(async () => {
+      await mudarCorProjeto(projeto.id, cor);
+      router.refresh();
+    });
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <form
-        action={(formData) => iniciarTransicao(() => renomearProjeto(projeto.id, formData))}
-        className="flex flex-col gap-1.5"
-      >
+      <form action={salvarNome} className="flex flex-col gap-1.5">
         <label className="text-xs font-medium text-gaiamum-text-muted">Nome do quadro</label>
         <div className="flex gap-2">
           <input
+            key={projeto.nome}
             name="nome"
             required
             defaultValue={projeto.nome}
@@ -41,9 +54,10 @@ export function ConfiguracoesQuadro({ projeto }: { projeto: Projeto }) {
           />
           <button
             type="submit"
-            className="rounded-lg border border-gaiamum-border px-3 py-2 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+            disabled={salvandoNome}
+            className="rounded-lg border border-gaiamum-border px-3 py-2 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text disabled:opacity-50"
           >
-            Salvar
+            {salvandoNome ? "Salvando…" : "Salvar"}
           </button>
         </div>
       </form>
@@ -55,7 +69,7 @@ export function ConfiguracoesQuadro({ projeto }: { projeto: Projeto }) {
             <button
               key={cor}
               type="button"
-              onClick={() => iniciarTransicao(() => mudarCorProjeto(projeto.id, cor))}
+              onClick={() => salvarCor(cor)}
               title={cor}
               className={`h-8 w-8 rounded-full ${CLASSE_FUNDO_QUADRO[cor]} ${
                 projeto.cor_fundo === cor ? "ring-2 ring-gaiamum-text ring-offset-2 ring-offset-gaiamum-surface" : ""
