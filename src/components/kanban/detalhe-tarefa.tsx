@@ -408,7 +408,7 @@ export function DetalheTarefa({
         </div>
 
         <div className="mt-5">
-          <span className="text-xs font-medium text-gaiamum-text-muted">Atividade</span>
+          <span className="text-xs font-medium text-gaiamum-text-muted">Comentários</span>
 
           <form action={comentar} className="mt-1.5 flex gap-2">
             <input
@@ -428,7 +428,7 @@ export function DetalheTarefa({
           <div className="mt-3 flex flex-col gap-2">
             {atividades === null && <p className="text-xs text-gaiamum-text-muted">Carregando...</p>}
             {atividades !== null && atividades.length === 0 && (
-              <p className="text-xs text-gaiamum-text-muted">Nenhuma atividade ainda.</p>
+              <p className="text-xs text-gaiamum-text-muted">Nenhum comentário ainda.</p>
             )}
             {atividades?.map((atividade) => (
               <div key={atividade.id} className="text-xs text-gaiamum-text-muted">
