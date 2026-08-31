@@ -664,6 +664,28 @@ export async function excluirColuna(colunaId: string, projetoId: string) {
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
+/** Reordena as colunas abertas (não mexe na "Concluído", que é sempre a
+ * última) — pedido do Fabio: poder arrastar as colunas pra reorganizar o
+ * quadro, não só os cartões. Recebe a lista inteira de ids já na nova
+ * ordem e regrava `ordem` de cada uma. */
+export async function reordenarColunas(projetoId: string, idsEmOrdem: string[]) {
+  await garantirWorkspace();
+  const supabase = await createClient();
+
+  const atualizacoes = idsEmOrdem.map((colunaId, indice) =>
+    supabase.from("colunas_kanban").update({ ordem: indice }).eq("id", colunaId).eq("projeto_id", projetoId),
+  );
+
+  const resultados = await Promise.all(atualizacoes);
+  const erro = resultados.find((r) => r.error)?.error;
+
+  if (erro) {
+    throw new Error(`Falha ao reordenar colunas: ${erro.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
 export async function deletarTarefa(tarefaId: string, projetoId: string) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();

@@ -11,6 +11,7 @@ import {
   excluirColuna,
   moverTarefa,
   renomearColuna,
+  reordenarColunas,
 } from "@/lib/ecc/actions";
 import { DetalheTarefa } from "@/components/kanban/detalhe-tarefa";
 import { CartaoTarefa } from "@/components/kanban/cartao-tarefa";
@@ -42,8 +43,12 @@ export function QuadroKanban({
 }) {
   const [tarefas, setTarefas] = useState(tarefasIniciais);
   const [tarefasIniciaisAnteriores, setTarefasIniciaisAnteriores] = useState(tarefasIniciais);
+  const [colunas, setColunas] = useState(colunasIniciais);
+  const [colunasIniciaisAnteriores, setColunasIniciaisAnteriores] = useState(colunasIniciais);
   const [tarefaAbertaId, setTarefaAbertaId] = useState<string | null>(null);
   const [colunaEditandoId, setColunaEditandoId] = useState<string | null>(null);
+  const [colunaArrastadaId, setColunaArrastadaId] = useState<string | null>(null);
+  const [criandoColuna, setCriandoColuna] = useState(false);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
 
@@ -57,6 +62,10 @@ export function QuadroKanban({
     setTarefasIniciaisAnteriores(tarefasIniciais);
     setTarefas(tarefasIniciais);
   }
+  if (colunasIniciais !== colunasIniciaisAnteriores) {
+    setColunasIniciaisAnteriores(colunasIniciais);
+    setColunas(colunasIniciais);
+  }
 
   function moverPara(tarefaId: string, novaColunaId: string) {
     if (colunasIniciais.find((c) => c.id === novaColunaId)?.concluido) {
@@ -69,6 +78,22 @@ export function QuadroKanban({
   function excluir(tarefaId: string) {
     setTarefas((atual) => atual.filter((t) => t.id !== tarefaId));
     iniciarTransicao(() => deletarTarefa(tarefaId, projetoId));
+  }
+
+  function soltarColuna(colunaAlvoId: string) {
+    if (!colunaArrastadaId || colunaArrastadaId === colunaAlvoId) return;
+
+    const abertas = colunas.filter((c) => !c.concluido);
+    const fixa = colunas.filter((c) => c.concluido);
+    const semArrastada = abertas.filter((c) => c.id !== colunaArrastadaId);
+    const arrastada = abertas.find((c) => c.id === colunaArrastadaId);
+    const indiceAlvo = semArrastada.findIndex((c) => c.id === colunaAlvoId);
+    if (!arrastada || indiceAlvo === -1) return;
+
+    semArrastada.splice(indiceAlvo, 0, arrastada);
+    setColunas([...semArrastada, ...fixa]);
+    setColunaArrastadaId(null);
+    iniciarTransicao(() => reordenarColunas(projetoId, semArrastada.map((c) => c.id)));
   }
 
   async function apagarColuna(colunaId: string) {
@@ -87,8 +112,8 @@ export function QuadroKanban({
   }
 
   const tarefaAberta = tarefas.find((t) => t.id === tarefaAbertaId) ?? null;
-  const colunasAbertas = colunasIniciais.filter((c) => !c.concluido);
-  const colunaFixa = colunasIniciais.find((c) => c.concluido) ?? null;
+  const colunasAbertas = colunas.filter((c) => !c.concluido);
+  const colunaFixa = colunas.find((c) => c.concluido) ?? null;
 
   function renderColuna(coluna: ColunaKanban, ehFixa: boolean) {
     const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id);
@@ -98,10 +123,17 @@ export function QuadroKanban({
         key={coluna.id}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
+          const colunaArrastada = e.dataTransfer.getData("text/coluna-id");
+          if (colunaArrastada) {
+            soltarColuna(coluna.id);
+            return;
+          }
           const tarefaId = e.dataTransfer.getData("text/tarefa-id");
           if (tarefaId) moverPara(tarefaId, coluna.id);
         }}
-        className="flex min-h-[16rem] w-72 shrink-0 flex-col gap-3 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-4"
+        className={`flex min-h-[16rem] w-64 shrink-0 flex-col gap-2.5 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3 transition ${
+          colunaArrastadaId === coluna.id ? "opacity-50" : ""
+        }`}
       >
         <div className="flex items-center justify-between gap-2">
           {colunaEditandoId === coluna.id ? (
@@ -124,11 +156,17 @@ export function QuadroKanban({
             </form>
           ) : (
             <h2
+              draggable={!ehFixa}
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/coluna-id", coluna.id);
+                setColunaArrastadaId(coluna.id);
+              }}
+              onDragEnd={() => setColunaArrastadaId(null)}
               onClick={() => !ehFixa && setColunaEditandoId(coluna.id)}
               className={`text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted ${
-                ehFixa ? "" : "cursor-text hover:text-gaiamum-text"
+                ehFixa ? "" : "cursor-grab hover:text-gaiamum-text active:cursor-grabbing"
               }`}
-              title={ehFixa ? undefined : "Clique para renomear"}
+              title={ehFixa ? undefined : "Arraste pra reordenar, clique pra renomear"}
             >
               {coluna.nome} <span className="text-gaiamum-text">({tarefasDaColuna.length})</span>
             </h2>
@@ -191,29 +229,54 @@ export function QuadroKanban({
 
   return (
     <>
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div className="flex gap-3 overflow-x-auto pb-2">
         {colunasAbertas.map((coluna) => renderColuna(coluna, false))}
 
-        <form
-          action={async (formData) => {
-            await criarColuna(projetoId, formData);
-            router.refresh();
-          }}
-          className="flex h-fit w-72 shrink-0 flex-col gap-2 rounded-2xl border border-dashed border-gaiamum-border bg-gaiamum-surface/50 p-4"
-        >
-          <input
-            name="nome"
-            required
-            placeholder="Nome da nova coluna"
-            className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
-          />
-          <button
-            type="submit"
-            className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-text"
+        {criandoColuna ? (
+          <form
+            action={async (formData) => {
+              await criarColuna(projetoId, formData);
+              setCriandoColuna(false);
+              router.refresh();
+            }}
+            className="flex h-fit w-56 shrink-0 flex-col gap-2 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3"
           >
-            + Nova coluna
+            <input
+              name="nome"
+              autoFocus
+              required
+              placeholder="Nome da coluna"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setCriandoColuna(false);
+              }}
+              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="rounded-lg bg-gaiamum-primary px-3 py-1 text-xs font-medium text-white transition hover:bg-gaiamum-primary-dark"
+              >
+                Adicionar
+              </button>
+              <button
+                type="button"
+                onClick={() => setCriandoColuna(false)}
+                className="text-xs text-gaiamum-text-muted hover:text-gaiamum-text"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCriandoColuna(true)}
+            title="Nova coluna"
+            className="h-9 w-9 shrink-0 self-start rounded-xl border border-dashed border-gaiamum-border text-lg leading-none text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-primary"
+          >
+            +
           </button>
-        </form>
+        )}
 
         {colunaFixa && renderColuna(colunaFixa, true)}
       </div>
@@ -222,7 +285,7 @@ export function QuadroKanban({
         <DetalheTarefa
           tarefa={tarefaAberta}
           projetoId={projetoId}
-          colunasDoProjeto={colunasIniciais}
+          colunasDoProjeto={colunas}
           membrosDoTenant={membrosDoTenant}
           membrosDaTarefa={tarefaMembrosIniciais
             .filter((m) => m.tarefa_id === tarefaAberta.id)
