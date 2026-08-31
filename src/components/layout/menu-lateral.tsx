@@ -12,12 +12,20 @@ export function MenuLateral({
 }) {
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-gaiamum-border bg-gaiamum-surface px-4 py-6 sm:flex">
-      <Link href="/projetos" className="mb-8 flex items-center gap-2 px-2">
+      <Link href="/" className="mb-8 flex items-center gap-2 px-2">
         <Image src="/brand/crab-mark.png" alt="" width={32} height={32} />
         <span className="text-lg font-semibold text-gaiamum-text">Gaiamum</span>
       </Link>
 
       <nav className="flex flex-col gap-1">
+        {acessoCompleto && (
+          <Link
+            href="/"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
+          >
+            Início
+          </Link>
+        )}
         <Link
           href="/projetos"
           className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
