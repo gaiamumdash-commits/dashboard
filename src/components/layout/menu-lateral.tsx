@@ -54,12 +54,20 @@ export function MenuLateral({
           </>
         )}
         {souOwner && (
-          <Link
-            href="/financeiro"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-          >
-            Financeiro
-          </Link>
+          <>
+            <Link
+              href="/marketing"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
+            >
+              Marketing
+            </Link>
+            <Link
+              href="/financeiro"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
+            >
+              Financeiro
+            </Link>
+          </>
         )}
       </nav>
     </aside>

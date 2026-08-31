@@ -211,3 +211,74 @@ export type AtividadeTarefa = {
   detalhe: Record<string, string>;
   criado_em: string;
 };
+
+// ---------------------------------------------------------------------------
+// Marketing / Criação de Produto Digital
+// ---------------------------------------------------------------------------
+
+export type PerfilNegocio = {
+  id: string;
+  tenant_id: string;
+  nome_negocio: string;
+  nicho: string;
+  site_url: string | null;
+  instagram: string | null;
+  tom_de_voz: string | null;
+  resumo_diagnostico: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export type FormatoProdutoDigital = "curso" | "ebook" | "mentoria" | "template" | "comunidade" | "outro";
+export type StatusProdutoDigital = "rascunho" | "validando" | "ativo" | "pausado";
+
+export type ProdutoDigital = {
+  id: string;
+  tenant_id: string;
+  nome: string;
+  formato: FormatoProdutoDigital;
+  promessa: string | null;
+  preco: number | null;
+  status: StatusProdutoDigital;
+  criado_em: string;
+};
+
+export type AvatarCliente = {
+  id: string;
+  tenant_id: string;
+  produto_digital_id: string;
+  dor_unificada: string | null;
+  gatilho_compra: string | null;
+  criado_em: string;
+};
+
+export type TipoItemAvatar = "dor" | "desejo";
+
+export type AvatarItem = {
+  id: string;
+  tenant_id: string;
+  avatar_id: string;
+  tipo: TipoItemAvatar;
+  texto: string;
+  ordem: number;
+  criado_em: string;
+};
+
+export type EstagioEntrevista = "situacao" | "problema" | "implicacao" | "necessidade" | "concluida";
+export type StatusEntrevista = "em_andamento" | "concluida" | "abandonada";
+
+export type MensagemEntrevista = {
+  autor: "usuario" | "ia";
+  texto: string;
+};
+
+export type EntrevistaIA = {
+  id: string;
+  tenant_id: string;
+  produto_digital_id: string | null;
+  estagio_atual: EstagioEntrevista;
+  status: StatusEntrevista;
+  transcript: MensagemEntrevista[];
+  criado_em: string;
+  atualizado_em: string;
+};
