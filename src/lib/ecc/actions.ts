@@ -2,14 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { after } from "next/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
-import { enviarEmailConsolidacao, type ItemConsolidacao, type SecaoConsolidacao } from "@/lib/ecc/notificacoes";
+import {
+  enviarEmailConsolidacao,
+  enviarEmailConvite,
+  type ItemConsolidacao,
+  type SecaoConsolidacao,
+} from "@/lib/ecc/notificacoes";
 import type {
   AtividadeTarefa,
   CorEtiqueta,
@@ -286,9 +292,7 @@ export async function convidarParaProjeto(projetoId: string, formData: FormData)
   const tenantId = await garantirWorkspace();
   await exigirGestorOuOwner(tenantId, projetoId);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   if (!user) {
     throw new Error("Usuário não autenticado.");
@@ -296,13 +300,17 @@ export async function convidarParaProjeto(projetoId: string, formData: FormData)
 
   const email = campoObrigatorio(formData, "email").toLowerCase();
 
-  const { error } = await supabase.from("convites").insert({
-    tenant_id: tenantId,
-    email,
-    papel: "member",
-    convidado_por: user.id,
-    projeto_id: projetoId,
-  });
+  const { data: convite, error } = await supabase
+    .from("convites")
+    .insert({
+      tenant_id: tenantId,
+      email,
+      papel: "member",
+      convidado_por: user.id,
+      projeto_id: projetoId,
+    })
+    .select("token")
+    .single();
 
   if (error) {
     if (error.code === "23505") {
@@ -310,6 +318,16 @@ export async function convidarParaProjeto(projetoId: string, formData: FormData)
     }
     throw new Error(`Falha ao convidar: ${error.message}`);
   }
+
+  after(async () => {
+    const { data: projeto } = await supabase.from("projetos").select("nome").eq("id", projetoId).maybeSingle();
+    await enviarEmailConvite({
+      destinatario: email,
+      emailConvidante: user.email ?? "Alguém do Gaiamum",
+      nomeProjeto: projeto?.nome ?? null,
+      token: convite.token as string,
+    });
+  });
 
   revalidatePath(`/projetos/${projetoId}/configuracoes`);
 }
@@ -825,9 +843,7 @@ export async function enviarConsolidacaoProjeto(projetoId: string): Promise<{ en
 export async function convidarMembro(formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   if (!user) {
     throw new Error("Usuário não autenticado.");
@@ -837,13 +853,17 @@ export async function convidarMembro(formData: FormData) {
   const papel = (formData.get("papel") as Papel | null) ?? "member";
   const projetoId = (formData.get("projeto_id") as string | null) || null;
 
-  const { error } = await supabase.from("convites").insert({
-    tenant_id: tenantId,
-    email,
-    papel,
-    convidado_por: user.id,
-    projeto_id: projetoId,
-  });
+  const { data: convite, error } = await supabase
+    .from("convites")
+    .insert({
+      tenant_id: tenantId,
+      email,
+      papel,
+      convidado_por: user.id,
+      projeto_id: projetoId,
+    })
+    .select("token")
+    .single();
 
   if (error) {
     if (error.code === "23505") {
@@ -851,6 +871,18 @@ export async function convidarMembro(formData: FormData) {
     }
     throw new Error(`Falha ao convidar: ${error.message}`);
   }
+
+  after(async () => {
+    const nomeProjeto = projetoId
+      ? (await supabase.from("projetos").select("nome").eq("id", projetoId).maybeSingle()).data?.nome ?? null
+      : null;
+    await enviarEmailConvite({
+      destinatario: email,
+      emailConvidante: user.email ?? "Alguém do Gaiamum",
+      nomeProjeto,
+      token: convite.token as string,
+    });
+  });
 
   revalidatePath("/equipe");
 }

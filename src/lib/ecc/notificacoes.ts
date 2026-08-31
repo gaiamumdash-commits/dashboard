@@ -237,6 +237,99 @@ export async function enviarEmailConsolidacao({
   );
 }
 
+function montarHtmlConvite({
+  emailConvidante,
+  nomeProjeto,
+  linkConvite,
+}: {
+  emailConvidante: string;
+  nomeProjeto: string | null;
+  linkConvite: string;
+}): string {
+  const escopo = nomeProjeto ? `pro quadro <strong>${nomeProjeto}</strong>` : "pro workspace inteiro";
+  return `
+<!doctype html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:0;background-color:#f5e9dc;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5e9dc;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:#011f51;padding:20px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="${URL_LOGO}" width="28" height="28" alt="" style="display:block;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <span style="color:#f5e9dc;font-size:16px;font-weight:600;">Gaiamum</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <h1 style="margin:0 0 16px;color:#011f51;font-size:19px;font-weight:600;">Você foi convidado pro Gaiamum</h1>
+                <p style="margin:0 0 24px;color:#1f2937;font-size:15px;line-height:1.5;">
+                  <strong>${emailConvidante}</strong> te convidou ${escopo}.
+                </p>
+                <a
+                  href="${linkConvite}"
+                  style="display:inline-block;background-color:#0069fd;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;"
+                >
+                  Aceitar convite
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px;border-top:1px solid #e5e7eb;">
+                <p style="margin:0;color:#9ca3af;font-size:12px;">Este convite expira em 7 dias.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`.trim();
+}
+
+export async function enviarEmailConvite({
+  destinatario,
+  emailConvidante,
+  nomeProjeto,
+  token,
+}: {
+  destinatario: string;
+  emailConvidante: string;
+  nomeProjeto: string | null;
+  token: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+
+  const resend = new Resend(apiKey);
+  const linkConvite = `${URL_SITE}/convite/${token}`;
+  const html = montarHtmlConvite({ emailConvidante, nomeProjeto, linkConvite });
+  const escopoTexto = nomeProjeto ? `pro quadro "${nomeProjeto}"` : "pro workspace inteiro";
+
+  const { error } = await resend.emails
+    .send({
+      from: REMETENTE_PADRAO,
+      to: destinatario,
+      subject: `${emailConvidante} te convidou pro Gaiamum`,
+      html,
+      text: `${emailConvidante} te convidou ${escopoTexto}. Aceite em: ${linkConvite}`,
+    })
+    .catch((erro) => ({ error: erro }));
+
+  if (error) {
+    console.error(`Falha ao enviar e-mail de convite pra ${destinatario}:`, error);
+  }
+}
+
 export async function enviarEmailAtividade({
   destinatarios,
   atorEmail,
