@@ -140,7 +140,6 @@ export function QuadroKanban({
               key={tarefa.id}
               tarefa={tarefa}
               coluna={coluna}
-              colunasDoQuadro={colunasIniciais}
               projetoId={projetoId}
               checklistDaTarefa={checklistItensIniciais.filter((c) => c.tarefa_id === tarefa.id)}
               anexosDaTarefa={anexosIniciais.filter((a) => a.entidade_id === tarefa.id)}
@@ -151,7 +150,6 @@ export function QuadroKanban({
               souResponsavel={souResponsavel}
               podeExcluir={podeExcluirTarefa}
               onAbrir={() => setTarefaAbertaId(tarefa.id)}
-              onMover={(novaColunaId) => moverPara(tarefa.id, novaColunaId)}
               onExcluir={() => excluir(tarefa.id)}
             />
           );

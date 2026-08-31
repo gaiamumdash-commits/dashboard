@@ -17,15 +17,13 @@ import { CLASSE_COR_ETIQUETA, CLASSE_PRAZO, urgenciaDoPrazo } from "@/lib/ecc/ka
 import { atualizarTituloTarefa } from "@/lib/ecc/actions";
 
 /** Cartão em 2 andares: o de cima só renomeia (clique no título vira um
- * campo de texto), o de baixo abre o cartão por dentro — os quick-move
- * buttons dentro do andar de baixo têm stopPropagation pra não abrir o
- * modal junto. O elemento arrastável é o cartão inteiro, os dois andares
- * se movem juntos porque são uma coisa só. Pedido do Fabio depois de
- * confundir "renomear" com "abrir" no cartão de uma peça só. */
+ * campo de texto), o de baixo abre o cartão por dentro. Mover de coluna é
+ * só por arrasto (o cartão inteiro é arrastável, os dois andares se movem
+ * juntos por serem uma coisa só) — sem atalho de clique, pedido do Fabio
+ * pra manter só a dinâmica de arrastar. */
 export function CartaoTarefa({
   tarefa,
   coluna,
-  colunasDoQuadro,
   projetoId,
   checklistDaTarefa,
   anexosDaTarefa,
@@ -36,12 +34,10 @@ export function CartaoTarefa({
   souResponsavel,
   podeExcluir,
   onAbrir,
-  onMover,
   onExcluir,
 }: {
   tarefa: Tarefa;
   coluna: ColunaKanban;
-  colunasDoQuadro: ColunaKanban[];
   projetoId: string;
   checklistDaTarefa: ChecklistItem[];
   anexosDaTarefa: Anexo[];
@@ -52,7 +48,6 @@ export function CartaoTarefa({
   souResponsavel: boolean;
   podeExcluir: boolean;
   onAbrir: () => void;
-  onMover: (novaColunaId: string) => void;
   onExcluir: () => void;
 }) {
   const [editandoTitulo, setEditandoTitulo] = useState(false);
@@ -75,12 +70,12 @@ export function CartaoTarefa({
     <div
       draggable
       onDragStart={(e) => e.dataTransfer.setData("text/tarefa-id", tarefa.id)}
-      className={`cursor-grab overflow-hidden rounded-xl border bg-gaiamum-surface-raised shadow-sm transition hover:shadow-md active:cursor-grabbing ${
-        souResponsavel ? "border-gaiamum-border border-l-4 border-l-gaiamum-primary" : "border-gaiamum-border"
+      className={`cursor-grab overflow-hidden rounded-xl border-2 bg-gaiamum-surface-raised shadow-sm transition hover:shadow-md active:cursor-grabbing ${
+        souResponsavel ? "border-gaiamum-border-forte border-l-4 border-l-gaiamum-primary" : "border-gaiamum-border-forte"
       }`}
     >
       {/* Andar 1 — título, só renomeia */}
-      <div className="flex items-center gap-1.5 border-b border-gaiamum-border bg-gaiamum-surface px-3 py-1.5">
+      <div className="flex items-center gap-1.5 border-b border-gaiamum-border-forte bg-gaiamum-surface px-3 py-1.5">
         {coluna.concluido && (
           <Image
             src="/brand/crab-mark.png"
@@ -172,21 +167,6 @@ export function CartaoTarefa({
             })}
           </div>
         )}
-
-        <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
-          {colunasDoQuadro
-            .filter((c) => c.id !== coluna.id)
-            .map((destino) => (
-              <button
-                key={destino.id}
-                type="button"
-                onClick={() => onMover(destino.id)}
-                className="text-xs text-gaiamum-primary hover:underline"
-              >
-                → {destino.nome}
-              </button>
-            ))}
-        </div>
       </div>
     </div>
   );
