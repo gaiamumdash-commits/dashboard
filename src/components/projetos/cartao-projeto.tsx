@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Projeto, StatusProjeto } from "@/lib/ecc/tipos";
 import { atualizarStatusProjeto, deletarProjeto } from "@/lib/ecc/actions";
@@ -22,14 +23,21 @@ export function CartaoProjeto({
   podeConfigurar: boolean;
 }) {
   const [pendente, iniciarTransicao] = useTransition();
+  const router = useRouter();
 
   function mudarStatus(status: StatusProjeto) {
-    iniciarTransicao(() => atualizarStatusProjeto(projeto.id, status));
+    iniciarTransicao(async () => {
+      await atualizarStatusProjeto(projeto.id, status);
+      router.refresh();
+    });
   }
 
   function excluir() {
     if (!confirm(`Excluir o projeto "${projeto.nome}"? As tarefas dele também somem.`)) return;
-    iniciarTransicao(() => deletarProjeto(projeto.id));
+    iniciarTransicao(async () => {
+      await deletarProjeto(projeto.id);
+      router.refresh();
+    });
   }
 
   return (

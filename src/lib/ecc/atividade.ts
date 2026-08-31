@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { listarMembros } from "@/lib/ecc/equipe";
 import { enviarEmailAtividade } from "@/lib/ecc/notificacoes";
@@ -52,40 +53,47 @@ export async function registrarAtividade({
     console.error("[registrarAtividade] falha ao gravar atividade:", erroInsert);
   }
 
-  const [{ data: tarefa, error: erroTarefa }, { data: projeto, error: erroProjeto }, { data: responsaveis, error: erroResponsaveis }] =
-    await Promise.all([
-      supabase.from("tarefas").select("titulo").eq("id", tarefaId).maybeSingle(),
-      supabase.from("projetos").select("nome").eq("id", projetoId).maybeSingle(),
-      supabase.from("tarefa_membros").select("user_id").eq("tarefa_id", tarefaId),
-    ]);
+  // O envio de e-mail roda depois que a resposta já foi enviada ao cliente
+  // (after(), Next.js) — sem isso, mover/editar/comentar num cartão ficava
+  // esperando a API do Resend responder antes de voltar pra tela, e isso
+  // acontece em praticamente toda mutação de tarefa (é aqui que quase todas
+  // chamam registrarAtividade).
+  after(async () => {
+    const [{ data: tarefa, error: erroTarefa }, { data: projeto, error: erroProjeto }, { data: responsaveis, error: erroResponsaveis }] =
+      await Promise.all([
+        supabase.from("tarefas").select("titulo").eq("id", tarefaId).maybeSingle(),
+        supabase.from("projetos").select("nome").eq("id", projetoId).maybeSingle(),
+        supabase.from("tarefa_membros").select("user_id").eq("tarefa_id", tarefaId),
+      ]);
 
-  if (erroTarefa || erroProjeto || erroResponsaveis) {
-    console.error("[registrarAtividade] falha ao buscar dados pra notificação:", {
-      erroTarefa,
-      erroProjeto,
-      erroResponsaveis,
+    if (erroTarefa || erroProjeto || erroResponsaveis) {
+      console.error("[registrarAtividade] falha ao buscar dados pra notificação:", {
+        erroTarefa,
+        erroProjeto,
+        erroResponsaveis,
+      });
+    }
+
+    const idsResponsaveis = Array.from(
+      new Set([...(responsaveis ?? []).map((r) => r.user_id as string), ...notificarTambem]),
+    ).filter((id) => id !== user.id);
+
+    if (idsResponsaveis.length === 0) return;
+
+    const membros = await listarMembros(tenantId);
+    const emails = membros
+      .filter((m) => idsResponsaveis.includes(m.user_id))
+      .map((m) => m.email);
+
+    if (emails.length === 0) return;
+
+    await enviarEmailAtividade({
+      destinatarios: emails,
+      atorEmail: user.email ?? "alguém",
+      acao: MENSAGEM_POR_TIPO[tipo](detalhe),
+      tituloTarefa: (tarefa?.titulo as string | undefined) ?? "uma tarefa",
+      nomeProjeto: (projeto?.nome as string | undefined) ?? "Gaiamum",
+      projetoId,
     });
-  }
-
-  const idsResponsaveis = Array.from(
-    new Set([...(responsaveis ?? []).map((r) => r.user_id as string), ...notificarTambem]),
-  ).filter((id) => id !== user.id);
-
-  if (idsResponsaveis.length === 0) return;
-
-  const membros = await listarMembros(tenantId);
-  const emails = membros
-    .filter((m) => idsResponsaveis.includes(m.user_id))
-    .map((m) => m.email);
-
-  if (emails.length === 0) return;
-
-  await enviarEmailAtividade({
-    destinatarios: emails,
-    atorEmail: user.email ?? "alguém",
-    acao: MENSAGEM_POR_TIPO[tipo](detalhe),
-    tituloTarefa: (tarefa?.titulo as string | undefined) ?? "uma tarefa",
-    nomeProjeto: (projeto?.nome as string | undefined) ?? "Gaiamum",
-    projetoId,
   });
 }

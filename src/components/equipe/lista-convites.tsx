@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { Convite, Projeto } from "@/lib/ecc/tipos";
 import { cancelarConvite } from "@/lib/ecc/actions";
 
@@ -13,13 +14,21 @@ export function ListaConvites({
   origem: string;
   projetos: Pick<Projeto, "id" | "nome">[];
 }) {
-  const [, iniciarTransicao] = useTransition();
+  const [cancelandoId, iniciarTransicao] = useTransition();
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
+  const router = useRouter();
 
   function copiar(conviteId: string, link: string) {
     navigator.clipboard.writeText(link);
     setCopiadoId(conviteId);
     setTimeout(() => setCopiadoId(null), 2000);
+  }
+
+  function cancelar(conviteId: string) {
+    iniciarTransicao(async () => {
+      await cancelarConvite(conviteId);
+      router.refresh();
+    });
   }
 
   return (
@@ -52,8 +61,9 @@ export function ListaConvites({
                 </button>
                 <button
                   type="button"
-                  onClick={() => iniciarTransicao(() => cancelarConvite(convite.id))}
-                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
+                  onClick={() => cancelar(convite.id)}
+                  disabled={cancelandoId}
+                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger disabled:opacity-50"
                 >
                   Cancelar
                 </button>
