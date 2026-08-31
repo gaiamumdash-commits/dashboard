@@ -9,6 +9,9 @@
   --gaiamum-surface-raised: #163a76;
   --gaiamum-border: #24488c;
   --gaiamum-border-forte: #4671c4;
+  /* Andar de cima do cartão (título) — um pouco mais claro que o corpo
+     (surface-raised) nos temas escuros, um pouco mais escuro no claro. */
+  --gaiamum-titulo-cartao: #1d4785;
   --gaiamum-text: #f5e9dc;
   --gaiamum-text-muted: #9fb2d9;
 
@@ -41,6 +44,7 @@
   --gaiamum-surface-raised: #eef0f4;
   --gaiamum-border: #dde1e8;
   --gaiamum-border-forte: #9aa5b8;
+  --gaiamum-titulo-cartao: #e2e5eb;
   --gaiamum-text: #002559;
   --gaiamum-text-muted: #5b6b85;
 }
@@ -55,6 +59,7 @@
   --gaiamum-surface-raised: #1b1e2c;
   --gaiamum-border: #2a2d3d;
   --gaiamum-border-forte: #52586f;
+  --gaiamum-titulo-cartao: #242838;
   --gaiamum-text: #e8e9ee;
   --gaiamum-text-muted: #8a8fa0;
 
@@ -69,6 +74,7 @@
   --color-gaiamum-surface-raised: var(--gaiamum-surface-raised);
   --color-gaiamum-border: var(--gaiamum-border);
   --color-gaiamum-border-forte: var(--gaiamum-border-forte);
+  --color-gaiamum-titulo-cartao: var(--gaiamum-titulo-cartao);
   --color-gaiamum-text: var(--gaiamum-text);
   --color-gaiamum-text-muted: var(--gaiamum-text-muted);
 

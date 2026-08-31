@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
+import { tocarSomConcluido } from "@/lib/ecc/kanban";
 import {
   criarColuna,
   criarTarefa,
@@ -40,12 +41,27 @@ export function QuadroKanban({
   podeExcluirTarefa: boolean;
 }) {
   const [tarefas, setTarefas] = useState(tarefasIniciais);
+  const [tarefasIniciaisAnteriores, setTarefasIniciaisAnteriores] = useState(tarefasIniciais);
   const [tarefaAbertaId, setTarefaAbertaId] = useState<string | null>(null);
   const [colunaEditandoId, setColunaEditandoId] = useState<string | null>(null);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
 
+  // Mantém o estado local em dia com o que o servidor manda depois de um
+  // router.refresh() (ex.: cartão novo criado pelo "+ Adicionar cartão") —
+  // sem isso, o cartão recém-criado não aparece pra abrir sozinho. Update
+  // durante o render (padrão recomendado pelo React pra "ajustar estado
+  // quando uma prop muda"), não num useEffect — evita um passo de render
+  // extra.
+  if (tarefasIniciais !== tarefasIniciaisAnteriores) {
+    setTarefasIniciaisAnteriores(tarefasIniciais);
+    setTarefas(tarefasIniciais);
+  }
+
   function moverPara(tarefaId: string, novaColunaId: string) {
+    if (colunasIniciais.find((c) => c.id === novaColunaId)?.concluido) {
+      tocarSomConcluido();
+    }
     setTarefas((atual) => atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: novaColunaId } : t)));
     iniciarTransicao(() => moverTarefa(tarefaId, projetoId, novaColunaId));
   }
@@ -157,7 +173,8 @@ export function QuadroKanban({
 
         <form
           action={async (formData) => {
-            await criarTarefa(projetoId, coluna.id, formData);
+            const novoId = await criarTarefa(projetoId, coluna.id, formData);
+            if (novoId) setTarefaAbertaId(novoId);
             router.refresh();
           }}
         >

@@ -12,7 +12,7 @@ import type {
   Prioridade,
   Tarefa,
 } from "@/lib/ecc/tipos";
-import { CLASSE_COR_ETIQUETA } from "@/lib/ecc/kanban";
+import { CLASSE_COR_ETIQUETA, tocarSomConcluido } from "@/lib/ecc/kanban";
 import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
 import {
   adicionarChecklistItem,
@@ -138,6 +138,9 @@ export function DetalheTarefa({
   }
 
   function moverPara(novaColunaId: string) {
+    if (colunasDoProjeto.find((c) => c.id === novaColunaId)?.concluido) {
+      tocarSomConcluido();
+    }
     iniciarTransicao(async () => {
       await moverTarefa(tarefa.id, projetoId, novaColunaId);
       router.refresh();

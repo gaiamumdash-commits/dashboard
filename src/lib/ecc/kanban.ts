@@ -20,6 +20,15 @@ export const CLASSE_FUNDO_QUADRO: Record<CorEtiqueta, string> = {
   lime: "bg-gaiamum-tag-lime",
 };
 
+/** Toca quando um cartão entra na coluna "Concluído" — pedido do Fabio,
+ * arquivo dele em public/sons/gaiamum-chegou.mp3. `.catch` porque alguns
+ * navegadores bloqueiam áudio sem interação prévia do usuário; como isso
+ * só dispara depois de um clique/arrasto real, na prática sempre toca. */
+export function tocarSomConcluido() {
+  if (typeof window === "undefined") return;
+  new Audio("/sons/gaiamum-chegou.mp3").play().catch(() => {});
+}
+
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
 export const CLASSE_PRAZO: Record<UrgenciaPrazo, string> = {

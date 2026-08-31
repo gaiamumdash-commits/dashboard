@@ -75,7 +75,7 @@ export function CartaoTarefa({
       }`}
     >
       {/* Andar 1 — título, só renomeia */}
-      <div className="flex items-center gap-1.5 border-b border-gaiamum-border-forte bg-gaiamum-surface px-3 py-1.5">
+      <div className="flex items-center gap-1.5 border-b border-gaiamum-border-forte bg-gaiamum-titulo-cartao px-3 py-1.5">
         {coluna.concluido && (
           <Image
             src="/brand/crab-mark.png"

@@ -240,13 +240,18 @@ export async function criarTarefa(projetoId: string, colunaId: string, formData:
     prioridade: "P3" as Prioridade,
   }));
 
-  const { error } = await supabase.from("tarefas").insert(linhas);
+  const { data: criadas, error } = await supabase.from("tarefas").insert(linhas).select("id");
 
   if (error) {
     throw new Error(`Falha ao criar tarefa: ${error.message}`);
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
+
+  // Devolve o id do primeiro cartão criado — a UI abre ele direto pra
+  // configurar (prioridade, data, etiqueta, etc.), sem precisar de um
+  // segundo clique.
+  return (criadas?.[0]?.id as string | undefined) ?? null;
 }
 
 export async function atualizarDescricaoTarefa(tarefaId: string, projetoId: string, formData: FormData) {
