@@ -51,6 +51,12 @@ export function MenuLateral({
             >
               Equipe
             </Link>
+            <Link
+              href="/agenda"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
+            >
+              Agenda
+            </Link>
           </>
         )}
         {souOwner && (

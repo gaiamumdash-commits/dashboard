@@ -331,3 +331,20 @@ export type PecaConteudo = {
   criado_em: string;
   atualizado_em: string;
 };
+
+// ---------------------------------------------------------------------------
+// Agenda / Google Calendar
+// ---------------------------------------------------------------------------
+
+export type EventoGoogleCalendar = {
+  id: string;
+  titulo: string;
+  inicio: string;
+  fim: string;
+  link: string | null;
+};
+
+export type ResultadoAgenda =
+  | { status: "nao_conectado" }
+  | { status: "expirado" }
+  | { status: "conectado"; googleEmail: string; eventos: EventoGoogleCalendar[] };
