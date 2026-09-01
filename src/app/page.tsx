@@ -2,17 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
-import { urgenciaDoPrazo } from "@/lib/ecc/kanban";
+import { primeiroDiaDoMesAtual, urgenciaDoPrazo } from "@/lib/ecc/kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConsolidacaoGlobal } from "@/components/financeiro/consolidacao-global";
 import type { ColunaKanban, ContaAPagar, MetaSmart, Projeto, Tarefa } from "@/lib/ecc/tipos";
 
 const ROTULO_HORIZONTE = { medio_prazo: "Médio prazo", longo_prazo: "Longo prazo" } as const;
-
-function primeiroDiaDoMesAtual(): string {
-  const hoje = new Date();
-  return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-01`;
-}
 
 export default async function PaginaInicial() {
   const supabase = await createClient();

@@ -10,6 +10,7 @@ import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import { extrairIdsMencionados } from "@/lib/ecc/mencoes";
+import { formatarDataHoraBrasil } from "@/lib/ecc/kanban";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
 import {
   enviarEmailConsolidacao,
@@ -88,9 +89,7 @@ export async function pularOnboarding() {
 export async function criarProjeto(formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   if (!user) {
     throw new Error("Usuário não autenticado.");
@@ -161,10 +160,7 @@ export async function deletarProjeto(projetoId: string) {
 }
 
 async function exigirGestorOuOwner(tenantId: string, projetoId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   const souOwner = (await obterPapelAtual(tenantId)) === "owner";
   const souGestor = Boolean(user) && (await eSouGestorDoProjeto(projetoId, user!.id));
@@ -236,14 +232,12 @@ export async function definirPapelDoMembroNoProjeto(
   const tenantId = await garantirWorkspace();
   await exigirGestorOuOwner(tenantId, projetoId);
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
   if (user?.id === userId) {
     throw new Error("Peça pra outro gestor/coordenador mudar o seu próprio papel no quadro.");
   }
 
+  const supabase = await createClient();
   const { error } = await supabase
     .from("projeto_membros")
     .upsert(
@@ -264,14 +258,12 @@ export async function removerMembroDoProjeto(projetoId: string, userId: string) 
   const tenantId = await garantirWorkspace();
   await exigirGestorOuOwner(tenantId, projetoId);
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
   if (user?.id === userId) {
     throw new Error("Peça pra outro gestor/coordenador te remover do quadro.");
   }
 
+  const supabase = await createClient();
   const { error } = await supabase
     .from("projeto_membros")
     .delete()
@@ -657,9 +649,7 @@ export async function renomearColuna(colunaId: string, projetoId: string, formDa
 export async function excluirColuna(colunaId: string, projetoId: string) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   const souOwner = (await obterPapelAtual(tenantId)) === "owner";
   const souGestor = Boolean(user) && (await eSouGestorDoProjeto(projetoId, user!.id));
@@ -721,9 +711,7 @@ export async function reordenarColunas(projetoId: string, idsEmOrdem: string[]) 
 export async function deletarTarefa(tarefaId: string, projetoId: string) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   const souOwner = (await obterPapelAtual(tenantId)) === "owner";
   const souGestor = Boolean(user) && (await eSouGestorDoProjeto(projetoId, user!.id));
@@ -816,7 +804,7 @@ export async function enviarConsolidacaoProjeto(projetoId: string): Promise<{ en
       status: concluido ? "concluido" : diasParaPrazo !== null && diasParaPrazo < 0 ? "atrasado" : "aberto",
       diasEmAberto: Math.max(0, diasEntre(new Date(tarefa.criado_em), hoje)),
       prazoFormatado: tarefa.data_limite
-        ? new Date(tarefa.data_limite).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+        ? formatarDataHoraBrasil(new Date(tarefa.data_limite), { dateStyle: "short", timeStyle: "short" })
         : null,
       diasParaPrazo,
     });
@@ -939,10 +927,7 @@ export async function removerMembro(userId: string) {
 }
 
 export async function aceitarConvite(token: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   if (!user) {
     throw new Error("Você precisa estar logado para aceitar o convite.");

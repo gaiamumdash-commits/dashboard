@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
+import { primeiroDiaDoMesAtual } from "@/lib/ecc/kanban";
 import type { Anexo, ContaAPagar, ContaFixaModelo } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConsolidacaoGlobal } from "@/components/financeiro/consolidacao-global";
@@ -10,11 +11,6 @@ import { ChecklistContas } from "@/components/financeiro/checklist-contas";
 import { FormularioContaFixa } from "@/components/financeiro/formulario-conta-fixa";
 import { FormularioDespesaAvulsa } from "@/components/financeiro/formulario-despesa-avulsa";
 import { ListaContasFixasModelo } from "@/components/financeiro/lista-contas-fixas-modelo";
-
-function primeiroDiaDoMesAtual(): string {
-  const hoje = new Date();
-  return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-01`;
-}
 
 export default async function PaginaFinanceiro() {
   const tenantId = await garantirWorkspace();

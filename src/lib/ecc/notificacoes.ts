@@ -1,5 +1,6 @@
 import "server-only";
 import { Resend } from "resend";
+import { formatarDataHoraBrasil } from "@/lib/ecc/kanban";
 
 // Enquanto o domínio gaiamum.com.br não estiver verificado no Resend, o
 // remetente de teste (onboarding@resend.dev) só entrega pro e-mail dono
@@ -212,7 +213,7 @@ export async function enviarEmailConsolidacao({
 
   const resend = new Resend(apiKey);
   const linkProjeto = `${URL_SITE}/projetos/${projetoId}/tarefas`;
-  const dataFreeze = new Date().toLocaleString("pt-BR", { dateStyle: "long", timeStyle: "short" });
+  const dataFreeze = formatarDataHoraBrasil(new Date(), { dateStyle: "long", timeStyle: "short" });
   const html = montarHtmlConsolidacao({ nomeProjeto, secoes, linkProjeto, dataFreeze });
 
   await Promise.all(

@@ -65,6 +65,37 @@ export function paraDatetimeLocal(isoUtc: string): string {
   return local.toISOString().slice(0, 16);
 }
 
+// O app não tem seleção de fuso por usuário — todo mundo é Brasil. Fixar
+// "America/Sao_Paulo" aqui evita o bug de calcular "hoje"/formatar data em
+// código que roda no servidor (Server Component, Server Action), que usa
+// UTC por padrão (Vercel/Node) — sem isso, `new Date().getMonth()` ou
+// `.toLocaleString()` sem `timeZone` ficam até 3h adiantados em relação ao
+// horário real de quem está usando o app.
+const FUSO_BRASIL = "America/Sao_Paulo";
+
+/** "YYYY-MM-01" do mês atual, sempre no fuso de Brasília — independe do
+ * fuso em que o processo do servidor está rodando. */
+export function primeiroDiaDoMesAtual(): string {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO_BRASIL,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const ano = partes.find((p) => p.type === "year")!.value;
+  const mes = partes.find((p) => p.type === "month")!.value;
+  return `${ano}-${mes}-01`;
+}
+
+/** `toLocaleString("pt-BR", ...)` fixado no fuso de Brasília — usar sempre
+ * que a formatação rodar em código server-side (Server Action, lib de
+ * e-mail), onde o fuso "local" do processo é UTC, não o do usuário. */
+export function formatarDataHoraBrasil(
+  data: Date,
+  opcoes: Intl.DateTimeFormatOptions,
+): string {
+  return data.toLocaleString("pt-BR", { ...opcoes, timeZone: FUSO_BRASIL });
+}
+
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
 export const CLASSE_PRAZO: Record<UrgenciaPrazo, string> = {
