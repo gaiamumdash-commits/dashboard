@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
 import { RegisterServiceWorker } from "@/components/register-service-worker";
 import { ThemeToggle } from "@/components/theme-toggle";
 import "./globals.css";
@@ -39,6 +40,7 @@ export default function RootLayout({
         {children}
         <ThemeToggle />
         <RegisterServiceWorker />
+        <Toaster position="bottom-right" richColors closeButton />
       </body>
     </html>
   );

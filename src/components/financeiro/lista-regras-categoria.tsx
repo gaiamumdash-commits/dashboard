@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { RegraCategoria } from "@/lib/ecc/tipos";
 import { criarRegraCategoria, removerRegraCategoria } from "@/lib/ecc/importacao-extrato";
 
@@ -36,8 +38,12 @@ export function ListaRegrasCategoria({ regras }: { regras: RegraCategoria[] }) {
               type="button"
               onClick={() =>
                 iniciarTransicao(async () => {
-                  await removerRegraCategoria(regra.id);
-                  router.refresh();
+                  try {
+                    await removerRegraCategoria(regra.id);
+                    router.refresh();
+                  } catch (err) {
+                    toast.error(mensagemDeErro(err, "Falha ao remover regra."));
+                  }
                 })
               }
               className="ml-auto text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
@@ -53,8 +59,12 @@ export function ListaRegrasCategoria({ regras }: { regras: RegraCategoria[] }) {
 
       <form
         action={async (formData) => {
-          await criarRegraCategoria(formData);
-          router.refresh();
+          try {
+            await criarRegraCategoria(formData);
+            router.refresh();
+          } catch (err) {
+            toast.error(mensagemDeErro(err, "Falha ao criar regra."));
+          }
         }}
         className="mt-4 flex flex-wrap items-end gap-2"
       >

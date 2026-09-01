@@ -2,6 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { tocarSomConcluido } from "@/lib/ecc/kanban";
 import {
@@ -72,14 +74,28 @@ export function QuadroKanban({
     if (colunasIniciais.find((c) => c.id === novaColunaId)?.concluido) {
       tocarSomConcluido();
     }
+    const colunaAnterior = tarefas.find((t) => t.id === tarefaId)?.coluna_id;
     setTarefas((atual) => atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: novaColunaId } : t)));
-    iniciarTransicao(() => moverTarefa(tarefaId, projetoId, novaColunaId));
+    iniciarTransicao(() => {
+      moverTarefa(tarefaId, projetoId, novaColunaId).catch((err) => {
+        if (colunaAnterior) {
+          setTarefas((atual) => atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: colunaAnterior } : t)));
+        }
+        toast.error(mensagemDeErro(err, "Falha ao mover cartão."));
+      });
+    });
   }
 
   function excluir(tarefaId: string) {
     if (!window.confirm("Apagar este cartão? Essa ação não pode ser desfeita.")) return;
+    const tarefaRemovida = tarefas.find((t) => t.id === tarefaId);
     setTarefas((atual) => atual.filter((t) => t.id !== tarefaId));
-    iniciarTransicao(() => deletarTarefa(tarefaId, projetoId));
+    iniciarTransicao(() => {
+      deletarTarefa(tarefaId, projetoId).catch((err) => {
+        if (tarefaRemovida) setTarefas((atual) => [...atual, tarefaRemovida]);
+        toast.error(mensagemDeErro(err, "Falha ao apagar cartão."));
+      });
+    });
   }
 
   // Cartão aparece na hora, sem esperar o servidor confirmar — mesmo padrão
@@ -117,7 +133,7 @@ export function QuadroKanban({
     iniciarTransicao(() => {
       criarTarefa(projetoId, colunaId, formData, ids).catch((err) => {
         setTarefas((atual) => atual.filter((t) => !ids.includes(t.id)));
-        window.alert(err instanceof Error ? err.message : "Falha ao criar tarefa.");
+        toast.error(mensagemDeErro(err, "Falha ao criar tarefa."));
       });
     });
   }
@@ -138,7 +154,7 @@ export function QuadroKanban({
     iniciarTransicao(() => {
       renomearColuna(colunaId, projetoId, formData).catch((err) => {
         setColunas((atual) => atual.map((c) => (c.id === colunaId ? { ...c, nome: nomeAnterior } : c)));
-        window.alert(err instanceof Error ? err.message : "Falha ao renomear coluna.");
+        toast.error(mensagemDeErro(err, "Falha ao renomear coluna."));
       });
     });
   }
@@ -163,7 +179,7 @@ export function QuadroKanban({
     iniciarTransicao(() => {
       criarColuna(projetoId, formData).catch((err) => {
         setColunas((atual) => atual.filter((c) => c.id !== id));
-        window.alert(err instanceof Error ? err.message : "Falha ao criar coluna.");
+        toast.error(mensagemDeErro(err, "Falha ao criar coluna."));
       });
     });
   }
@@ -171,6 +187,7 @@ export function QuadroKanban({
   function soltarColuna(colunaAlvoId: string) {
     if (!colunaArrastadaId || colunaArrastadaId === colunaAlvoId) return;
 
+    const ordemAnterior = colunas;
     const abertas = colunas.filter((c) => !c.concluido);
     const fixa = colunas.filter((c) => c.concluido);
     const semArrastada = abertas.filter((c) => c.id !== colunaArrastadaId);
@@ -181,7 +198,12 @@ export function QuadroKanban({
     semArrastada.splice(indiceAlvo, 0, arrastada);
     setColunas([...semArrastada, ...fixa]);
     setColunaArrastadaId(null);
-    iniciarTransicao(() => reordenarColunas(projetoId, semArrastada.map((c) => c.id)));
+    iniciarTransicao(() => {
+      reordenarColunas(projetoId, semArrastada.map((c) => c.id)).catch((err) => {
+        setColunas(ordemAnterior);
+        toast.error(mensagemDeErro(err, "Falha ao reordenar colunas."));
+      });
+    });
   }
 
   function apagarColuna(colunaId: string) {
@@ -191,7 +213,7 @@ export function QuadroKanban({
     iniciarTransicao(() => {
       excluirColuna(colunaId, projetoId).catch((err) => {
         if (colunaRemovida) setColunas((atual) => [...atual, colunaRemovida]);
-        window.alert(err instanceof Error ? err.message : "Falha ao excluir coluna.");
+        toast.error(mensagemDeErro(err, "Falha ao excluir coluna."));
       });
     });
   }

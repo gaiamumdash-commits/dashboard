@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { MembroTenant } from "@/lib/ecc/tipos";
 import { removerMembro } from "@/lib/ecc/actions";
 
@@ -13,8 +15,12 @@ export function ListaMembros({ membros, souOwner }: { membros: MembroTenant[]; s
     if (!window.confirm("Remover esta pessoa do workspace? Ela perde acesso a tudo, não só a este quadro."))
       return;
     iniciarTransicao(async () => {
-      await removerMembro(userId);
-      router.refresh();
+      try {
+        await removerMembro(userId);
+        router.refresh();
+      } catch (err) {
+        toast.error(mensagemDeErro(err, "Falha ao remover membro."));
+      }
     });
   }
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { convidarMembro } from "@/lib/ecc/actions";
+import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { Projeto } from "@/lib/ecc/tipos";
 
 export function FormularioConvite({ projetos }: { projetos: Pick<Projeto, "id" | "nome">[] }) {
@@ -17,7 +18,7 @@ export function FormularioConvite({ projetos }: { projetos: Pick<Projeto, "id" |
         try {
           await convidarMembro(formData);
         } catch (e) {
-          setErro(e instanceof Error ? e.message : "Falha ao convidar.");
+          setErro(mensagemDeErro(e, "Falha ao convidar."));
         } finally {
           setEnviando(false);
         }

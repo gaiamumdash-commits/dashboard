@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { Anexo, ContaAPagar } from "@/lib/ecc/tipos";
 import { atualizarValorEVencimento, desmarcarComoPaga, marcarComoPaga } from "@/lib/ecc/financeiro";
 import { enviarAnexoContaAPagar } from "@/lib/ecc/anexos";
@@ -54,13 +56,21 @@ function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
   function alternarPago() {
     if (conta.pago) {
       iniciarTransicao(async () => {
-        await desmarcarComoPaga(conta.id);
-        router.refresh();
+        try {
+          await desmarcarComoPaga(conta.id);
+          router.refresh();
+        } catch (err) {
+          toast.error(mensagemDeErro(err, "Falha ao desmarcar como paga."));
+        }
       });
     } else {
       iniciarTransicao(async () => {
-        await marcarComoPaga(conta.id, hojeISO());
-        router.refresh();
+        try {
+          await marcarComoPaga(conta.id, hojeISO());
+          router.refresh();
+        } catch (err) {
+          toast.error(mensagemDeErro(err, "Falha ao marcar como paga."));
+        }
       });
     }
   }
@@ -106,8 +116,12 @@ function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
             const novoVencimento = String(formData.get("data_vencimento"));
             setEditandoValor(false);
             iniciarTransicao(async () => {
-              await atualizarValorEVencimento(conta.id, novoValor, novoVencimento);
-              router.refresh();
+              try {
+                await atualizarValorEVencimento(conta.id, novoValor, novoVencimento);
+                router.refresh();
+              } catch (err) {
+                toast.error(mensagemDeErro(err, "Falha ao salvar valor/vencimento."));
+              }
             });
           }}
         >
@@ -172,8 +186,12 @@ function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
                 const novaData = e.currentTarget.value;
                 if (novaData) {
                   iniciarTransicao(async () => {
-                    await marcarComoPaga(conta.id, novaData);
-                    router.refresh();
+                    try {
+                      await marcarComoPaga(conta.id, novaData);
+                      router.refresh();
+                    } catch (err) {
+                      toast.error(mensagemDeErro(err, "Falha ao corrigir data de pagamento."));
+                    }
                   });
                 }
               }}

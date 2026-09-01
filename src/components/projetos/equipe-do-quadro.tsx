@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Convite, PapelProjeto } from "@/lib/ecc/tipos";
+import { mensagemDeErro } from "@/lib/erro-cliente";
 import {
   cancelarConvite,
   convidarParaProjeto,
@@ -48,7 +49,7 @@ export function EquipeDoQuadro({
         await definirPapelDoMembroNoProjeto(projetoId, userId, papel);
         router.refresh();
       } catch (e) {
-        setErro(e instanceof Error ? e.message : "Falha ao mudar papel no quadro.");
+        setErro(mensagemDeErro(e, "Falha ao mudar papel no quadro."));
       }
     });
   }
@@ -61,7 +62,7 @@ export function EquipeDoQuadro({
         await removerMembroDoProjeto(projetoId, userId);
         router.refresh();
       } catch (e) {
-        setErro(e instanceof Error ? e.message : "Falha ao remover do quadro.");
+        setErro(mensagemDeErro(e, "Falha ao remover do quadro."));
       }
     });
   }
@@ -73,7 +74,7 @@ export function EquipeDoQuadro({
         await convidarParaProjeto(projetoId, formData);
         router.refresh();
       } catch (e) {
-        setErro(e instanceof Error ? e.message : "Falha ao convidar.");
+        setErro(mensagemDeErro(e, "Falha ao convidar."));
       }
     });
   }

@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { criarContaFixa } from "@/lib/ecc/financeiro";
+import { mensagemDeErro } from "@/lib/erro-cliente";
 import { BotaoFormulario } from "@/components/botao-formulario";
 
 const CATEGORIAS = [
@@ -8,9 +12,18 @@ const CATEGORIAS = [
 ];
 
 export function FormularioContaFixa() {
+  const [erro, setErro] = useState<string | null>(null);
+
   return (
     <form
-      action={criarContaFixa}
+      action={async (formData) => {
+        setErro(null);
+        try {
+          await criarContaFixa(formData);
+        } catch (e) {
+          setErro(mensagemDeErro(e, "Falha ao cadastrar conta fixa."));
+        }
+      }}
       className="flex flex-col gap-3 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5 sm:flex-row sm:items-end sm:flex-wrap"
     >
       <label className="flex flex-1 min-w-[180px] flex-col gap-1 text-sm text-gaiamum-text-muted">
@@ -63,6 +76,8 @@ export function FormularioContaFixa() {
       </label>
 
       <BotaoFormulario label="Cadastrar conta fixa" labelPendente="Cadastrando..." />
+
+      {erro && <p className="text-sm text-gaiamum-danger sm:basis-full">{erro}</p>}
     </form>
   );
 }
