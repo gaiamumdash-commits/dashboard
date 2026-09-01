@@ -20,6 +20,7 @@
   - **Pendente pra próxima sessão, antes de considerar pronto:** (1) publicar o app novo no Google Cloud (tirar do modo Teste, senão o limite de 100 continua valendo); (2) adicionar `GOOGLE_LOGIN_CLIENT_ID`/`GOOGLE_LOGIN_CLIENT_SECRET` na Vercel (Production + Preview) e redeploy — hoje só existe em `.env.local` local; (3) teste final no domínio real (`www.gaiamum.com.br`), não só no isolado; (4) `git add`/commit local feito nesta sessão, push ainda pendente de aprovação.
 - **Achado à parte, registrado mas não resolvido nesta sessão:** se o domínio de e-mail de alguém da FAMA usar Google Workspace com "Controle de acesso de apps" restrito, o login pode ser bloqueado independente de tudo que fizemos aqui — vale perguntar à instituição antes do piloto, não é algo que dá pra resolver do nosso lado.
 - **Pedido novo do Fabio, ainda não iniciado — próxima frente depois do Marketing:** compromissos do Financeiro (contas a pagar) e cartões do Kanban aparecerem na Agenda/Calendar, com notificação configurável por item (ex.: 3h antes, 1 dia antes) e por canal (e-mail, notificação no app). Mensagem ainda cortada no meio ("preciso que todo compromisso...") — esclarecer o resto do escopo com o Fabio antes de desenhar. Registrado também como parte da preparação pro "uso coletivo" (piloto/equipe) que ele quer atacar na próxima sessão, junto com correção de bugs.
+- **Pedido novo do Fabio (2026-09-01), registrado, ainda não iniciado — ele marcou como muito importante pra ele pessoalmente:** (a) mandar mensagem de voz pro Gaiamum e o sistema transcrever e já criar o compromisso na Agenda, com alarme configurado; (b) preencher compromissos na Agenda rapidamente direto pelo app (fluxo manual mais ágil do que o que existe hoje — hoje só dá pra criar evento pela `/agenda` sem atalho rápido). Provavelmente compartilha o mesmo mecanismo de "alarme"/notificação do pedido do Financeiro/Kanban logo acima (um sistema de lembrete único, alimentado por vários caminhos: manual rápido, voz, ou automático a partir de outro módulo) — vale desenhar os dois juntos, não como features separadas. Ver detalhe e perguntas em aberto em "Próximos passos" → "Agenda — voz→evento com alarme + criação rápida".
 
 ---
 
@@ -262,6 +263,23 @@ AIOX_ACTIVE_AGENT=devops git push   # publicar (ver "Convenção de push")
   - **Decisão de visão registrada nesta sessão (2026-08-30):** as metas SMART do onboarding (Módulo 0) não são sobre colaboração — são a base do "Plano de Ação". O Fabio quer que o futuro Módulo 5 (relatórios/IA) use essas metas de médio/longo prazo como contexto pra IA sugerir ações nos relatórios, alinhadas aos objetivos que o dono do negócio definiu. Guardar isso pra quando o Módulo 5 for arquitetado — hoje as metas só existem em `metas_smart` e no export Markdown, sem nenhum consumo por IA ainda.
 - Avaliar se vale evoluir o Módulo 1/2 pra amarrar tarefa↔produto vendido (padrão visto na referência SOW).
 - **Colaboração em equipe (estilo Trello)** — ver seção dedicada abaixo. Prioridade estratégica do Fabio, considerar antes de aprofundar demais nos módulos 3-7.
+
+### Agenda — voz→evento com alarme + criação rápida, pedido 2026-09-01 (importante pro Fabio)
+
+Registrado a pedido explícito do Fabio ("registre isso que é muito importante pra mim"), ainda **nada desenhado nem codado**. Dois pedidos, ligados:
+
+1. **Mensagem de voz → evento na Agenda com alarme.** Fabio manda um áudio pro Gaiamum (canal ainda não definido — dentro do próprio app? WhatsApp, que já está no roadmap North Star? outro?), o sistema transcreve e já cria o compromisso na `/agenda` (a mesma Agenda do Google Calendar, ver seção "Checkpoints" 2026-09-01 madrugada) com um alarme/lembrete configurado.
+2. **Criação rápida de compromisso pelo app.** Hoje criar evento na `/agenda` (`painel-agenda.tsx`) não tem atalho rápido — Fabio quer conseguir preencher um compromisso rapidamente sem fricção.
+
+**Como conecta com o resto do que já está registrado:**
+- O pedido do Financeiro/Kanban→Agenda com "notificação configurável por item e por canal" (ver bullet logo acima em "Estado confirmado" da sessão #9) parece ser o mesmo mecanismo de alarme por baixo — um sistema de lembrete/notificação único alimentado por várias origens (manual rápido, voz, automático via Financeiro/Kanban). Vale desenhar os dois pedidos juntos numa sessão só, não como features separadas — vai evitar dois sistemas de notificação paralelos.
+- Transcrição de voz é capability nova no projeto (nenhuma integração de áudio/transcrição existe hoje). Precisa decidir: gravação client-side (mic do navegador/app) + upload, motor de transcrição (Whisper da OpenAI? algo nativo do navegador via Web Speech API, mais simples e sem custo mas pior em português/ruído? outro), e como o texto transcrito vira "CAMPO: valor" de evento (data/hora/título) — provavelmente reaproveita o mesmo padrão de extração determinística já usado no módulo de Marketing (`parsearBlocoCampoValor`), mas a entrada aqui é fala solta, não uma resposta estruturada — pode precisar de um parser mais flexível ou de uma etapa de IA (LLM) pra extrair data/hora/assunto do texto livre, o que reabre a mesma questão de custo de API já registrada no Incremento 2 do Marketing (`ANTHROPIC_API_KEY` sem crédito confirmado).
+
+**Não decidido ainda, perguntar antes de desenhar:**
+1. Canal de entrada da mensagem de voz: dentro do próprio Gaiamum (gravar no navegador/app) ou via WhatsApp (que já está no roadmap North Star, ver "Colaboração em equipe" abaixo)?
+2. Motor de transcrição e quem paga por ele (mesma questão de custo já enfrentada no módulo de Marketing).
+3. "Alarme" quer dizer notificação dentro do Gaiamum, e-mail, push no celular, ou todos — e é a mesma pergunta em aberto do pedido Financeiro/Kanban→Agenda, então decidir uma vez só pros dois.
+4. Formato da "criação rápida" pelo app: um campo de texto único tipo "reunião amanhã 15h com fulano" que a IA interpreta, ou um formulário compacto com poucos campos (mais simples, sem depender de IA)?
 
 ### Colaboração em equipe (estilo Trello) — decisão estratégica, 2026-08-29
 
