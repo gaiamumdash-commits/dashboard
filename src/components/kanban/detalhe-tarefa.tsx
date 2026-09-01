@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type {
   Anexo,
@@ -15,6 +15,7 @@ import type {
 } from "@/lib/ecc/tipos";
 import { CLASSE_COR_ETIQUETA, CLASSE_FUNDO_QUADRO, paraDatetimeLocal, tocarSomConcluido } from "@/lib/ecc/kanban";
 import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
+import { aplicarMencao, calcularBuscaMencao, dividirTextoPorMencoes } from "@/lib/ecc/mencoes";
 import {
   adicionarChecklistItem,
   alternarChecklistItem,
@@ -30,6 +31,7 @@ import {
 import { adicionarEtiquetaNaTarefa, removerEtiquetaDaTarefa } from "@/lib/ecc/etiquetas";
 import { enviarAnexoTarefa } from "@/lib/ecc/anexos";
 import { AnexoArquivo } from "@/components/anexo-arquivo";
+import { AvatarIniciais } from "@/components/avatar-iniciais";
 
 const PRIORIDADES: Prioridade[] = ["P1", "P2", "P3", "P4"];
 const CORES_ETIQUETA: CorEtiqueta[] = ["purple", "teal", "yellow", "blue", "coral", "lime"];
@@ -63,6 +65,112 @@ export function DetalheTarefa({
   const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
 
+  // Menção @membro — mesmo padrão nos 3 campos de texto livre do cartão:
+  // texto + cursor controlados, `busca` guarda o token em digitação (null =
+  // dropdown fechado). Ao escolher uma sugestão, o cursor pendente é
+  // reaplicado no DOM via ref, porque só atualizar o state não move o
+  // cursor real do <input>/<textarea>.
+  const [textoComentario, setTextoComentario] = useState("");
+  const [cursorComentario, setCursorComentario] = useState(0);
+  const [buscaMencaoComentario, setBuscaMencaoComentario] = useState<string | null>(null);
+  const refComentario = useRef<HTMLInputElement>(null);
+  const cursorPendenteComentarioRef = useRef<number | null>(null);
+
+  const [cursorDescricao, setCursorDescricao] = useState(0);
+  const [buscaMencaoDescricao, setBuscaMencaoDescricao] = useState<string | null>(null);
+  const refDescricao = useRef<HTMLTextAreaElement>(null);
+  const cursorPendenteDescricaoRef = useRef<number | null>(null);
+
+  const [textoItem, setTextoItem] = useState("");
+  const [cursorItem, setCursorItem] = useState(0);
+  const [buscaMencaoItem, setBuscaMencaoItem] = useState<string | null>(null);
+  const refItem = useRef<HTMLInputElement>(null);
+  const cursorPendenteItemRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (cursorPendenteComentarioRef.current !== null && refComentario.current) {
+      refComentario.current.setSelectionRange(cursorPendenteComentarioRef.current, cursorPendenteComentarioRef.current);
+      refComentario.current.focus();
+      cursorPendenteComentarioRef.current = null;
+    }
+  }, [textoComentario]);
+
+  useEffect(() => {
+    if (cursorPendenteDescricaoRef.current !== null && refDescricao.current) {
+      refDescricao.current.setSelectionRange(cursorPendenteDescricaoRef.current, cursorPendenteDescricaoRef.current);
+      refDescricao.current.focus();
+      cursorPendenteDescricaoRef.current = null;
+    }
+  }, [descricao]);
+
+  useEffect(() => {
+    if (cursorPendenteItemRef.current !== null && refItem.current) {
+      refItem.current.setSelectionRange(cursorPendenteItemRef.current, cursorPendenteItemRef.current);
+      refItem.current.focus();
+      cursorPendenteItemRef.current = null;
+    }
+  }, [textoItem]);
+
+  function sugestoesMencao(busca: string | null): MembroTenant[] {
+    if (busca === null) return [];
+    return membrosDoTenant.filter((m) => m.email.toLowerCase().includes(busca.toLowerCase()));
+  }
+
+  /** Chip destacado (bolinha + parte do e-mail antes do @) no lugar do
+   * `@email` cru — usado na timeline de comentários e nos itens do
+   * checklist já salvos. Descrição fica de fora (é sempre <textarea>). */
+  function renderTextoComMencoes(texto: string) {
+    return dividirTextoPorMencoes(texto, membrosDoTenant).map((parte, indice) =>
+      parte.membro ? (
+        <span key={indice} className="inline-flex items-center gap-1 align-middle">
+          <AvatarIniciais email={parte.membro.email} tamanho="sm" />
+          <span className="font-medium text-gaiamum-text">{parte.membro.email.split("@")[0]}</span>
+        </span>
+      ) : (
+        <span key={indice}>{parte.texto}</span>
+      ),
+    );
+  }
+
+  function aoMudarComentario(valor: string, cursor: number) {
+    setTextoComentario(valor);
+    setCursorComentario(cursor);
+    setBuscaMencaoComentario(calcularBuscaMencao(valor, cursor));
+  }
+
+  function escolherMencaoComentario(email: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(textoComentario, cursorComentario, email);
+    cursorPendenteComentarioRef.current = novoCursor;
+    setTextoComentario(novoTexto);
+    setBuscaMencaoComentario(null);
+  }
+
+  function aoMudarDescricao(valor: string, cursor: number) {
+    setDescricao(valor);
+    setCursorDescricao(cursor);
+    setBuscaMencaoDescricao(calcularBuscaMencao(valor, cursor));
+  }
+
+  function escolherMencaoDescricao(email: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(descricao, cursorDescricao, email);
+    cursorPendenteDescricaoRef.current = novoCursor;
+    setDescricao(novoTexto);
+    setBuscaMencaoDescricao(null);
+  }
+
+  function aoMudarItem(valor: string, cursor: number) {
+    setTextoItem(valor);
+    setCursorItem(cursor);
+    setBuscaMencaoItem(calcularBuscaMencao(valor, cursor));
+  }
+
+  function escolherMencaoItem(email: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(textoItem, cursorItem, email);
+    cursorPendenteItemRef.current = novoCursor;
+    setTextoItem(novoTexto);
+    setBuscaMencaoItem(null);
+  }
+
   useEffect(() => {
     let cancelado = false;
     listarAtividadesDaTarefa(tarefa.id).then((dados) => {
@@ -81,6 +189,8 @@ export function DetalheTarefa({
   function comentar(formData: FormData) {
     iniciarTransicao(async () => {
       await comentarNaTarefa(tarefa.id, projetoId, formData);
+      setTextoComentario("");
+      setBuscaMencaoComentario(null);
       const dados = await listarAtividadesDaTarefa(tarefa.id);
       setAtividades(dados);
     });
@@ -180,6 +290,8 @@ export function DetalheTarefa({
   function adicionarItem(formData: FormData) {
     iniciarTransicao(async () => {
       await adicionarChecklistItem(tarefa.id, projetoId, formData);
+      setTextoItem("");
+      setBuscaMencaoItem(null);
       router.refresh();
     });
   }
@@ -323,16 +435,33 @@ export function DetalheTarefa({
           )}
         </div>
 
-        <div className="mt-4 flex flex-col gap-1.5">
+        <div className="relative mt-4 flex flex-col gap-1.5">
           <span className="text-xs font-medium text-gaiamum-text-muted">Descrição</span>
           <textarea
+            ref={refDescricao}
             rows={3}
             value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
+            onChange={(e) => aoMudarDescricao(e.target.value, e.target.selectionStart ?? e.target.value.length)}
             onBlur={salvarDescricao}
-            placeholder="Adicionar uma descrição..."
+            placeholder="Adicionar uma descrição... (use @ pra mencionar alguém)"
             className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
           />
+          {sugestoesMencao(buscaMencaoDescricao).length > 0 && (
+            <div className="absolute top-full z-10 mt-1 flex w-full flex-col gap-0.5 rounded-lg border border-gaiamum-border bg-gaiamum-surface p-1.5 shadow-lg">
+              {sugestoesMencao(buscaMencaoDescricao).map((membro) => (
+                <button
+                  key={membro.user_id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => escolherMencaoDescricao(membro.email)}
+                  className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
+                >
+                  <AvatarIniciais email={membro.email} tamanho="sm" />
+                  {membro.email}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-5">
@@ -381,7 +510,7 @@ export function DetalheTarefa({
                 <span
                   className={`flex-1 text-sm ${item.concluido ? "text-gaiamum-text-muted line-through" : "text-gaiamum-text"}`}
                 >
-                  {item.texto}
+                  {renderTextoComMencoes(item.texto)}
                 </span>
                 <button
                   type="button"
@@ -394,20 +523,41 @@ export function DetalheTarefa({
             ))}
           </div>
 
-          <form action={adicionarItem} className="mt-2 flex gap-2">
-            <input
-              name="texto"
-              required
-              placeholder="Adicionar item"
-              className="flex-1 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
-            />
-            <button
-              type="submit"
-              className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-            >
-              Adicionar
-            </button>
-          </form>
+          <div className="relative mt-2">
+            <form action={adicionarItem} className="flex gap-2">
+              <input
+                ref={refItem}
+                name="texto"
+                value={textoItem}
+                onChange={(e) => aoMudarItem(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+                required
+                placeholder="Adicionar item (use @ pra mencionar alguém)"
+                className="flex-1 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+              />
+              <button
+                type="submit"
+                className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+              >
+                Adicionar
+              </button>
+            </form>
+            {sugestoesMencao(buscaMencaoItem).length > 0 && (
+              <div className="absolute top-full z-10 mt-1 flex w-full flex-col gap-0.5 rounded-lg border border-gaiamum-border bg-gaiamum-surface p-1.5 shadow-lg">
+                {sugestoesMencao(buscaMencaoItem).map((membro) => (
+                  <button
+                    key={membro.user_id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => escolherMencaoItem(membro.email)}
+                    className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
+                  >
+                    <AvatarIniciais email={membro.email} tamanho="sm" />
+                    {membro.email}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-5">
@@ -424,20 +574,43 @@ export function DetalheTarefa({
         <div className="mt-5">
           <span className="text-xs font-medium text-gaiamum-text-muted">Comentários</span>
 
-          <form action={comentar} className="mt-1.5 flex gap-2">
-            <input
-              name="texto"
-              required
-              placeholder="Comentar..."
-              className="flex-1 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
-            />
-            <button
-              type="submit"
-              className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-            >
-              Enviar
-            </button>
-          </form>
+          <div className="relative mt-1.5">
+            <form action={comentar} className="flex gap-2">
+              <input
+                ref={refComentario}
+                name="texto"
+                value={textoComentario}
+                onChange={(e) =>
+                  aoMudarComentario(e.target.value, e.target.selectionStart ?? e.target.value.length)
+                }
+                required
+                placeholder="Comentar... (use @ pra mencionar alguém)"
+                className="flex-1 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+              />
+              <button
+                type="submit"
+                className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+              >
+                Enviar
+              </button>
+            </form>
+            {sugestoesMencao(buscaMencaoComentario).length > 0 && (
+              <div className="absolute top-full z-10 mt-1 flex w-full flex-col gap-0.5 rounded-lg border border-gaiamum-border bg-gaiamum-surface p-1.5 shadow-lg">
+                {sugestoesMencao(buscaMencaoComentario).map((membro) => (
+                  <button
+                    key={membro.user_id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => escolherMencaoComentario(membro.email)}
+                    className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
+                  >
+                    <AvatarIniciais email={membro.email} tamanho="sm" />
+                    {membro.email}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="mt-3 flex flex-col gap-2">
             {atividades === null && <p className="text-xs text-gaiamum-text-muted">Carregando...</p>}
@@ -447,7 +620,11 @@ export function DetalheTarefa({
             {atividades?.map((atividade) => (
               <div key={atividade.id} className="text-xs text-gaiamum-text-muted">
                 <span className="font-medium text-gaiamum-text">{nomeDoAutor(atividade.user_id)}</span>{" "}
-                {MENSAGEM_POR_TIPO[atividade.tipo](atividade.detalhe)}
+                {atividade.tipo === "comentario" ? (
+                  <>comentou: &quot;{renderTextoComMencoes(atividade.detalhe.texto ?? "")}&quot;</>
+                ) : (
+                  MENSAGEM_POR_TIPO[atividade.tipo](atividade.detalhe)
+                )}
                 <span className="ml-1 text-gaiamum-text-muted">
                   · {new Date(atividade.criado_em).toLocaleString("pt-BR")}
                 </span>

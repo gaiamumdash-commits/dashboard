@@ -1,5 +1,10 @@
 import type { CorEtiqueta, Tarefa } from "@/lib/ecc/tipos";
 
+/** Fonte única das 6 cores fixas — reaproveitada pro fallback de cor
+ * automática de etiqueta (etiquetas.ts) e pro hash de cor de avatar
+ * (corAvatarPorEmail, abaixo). */
+export const CORES_ETIQUETA: CorEtiqueta[] = ["purple", "teal", "yellow", "blue", "coral", "lime"];
+
 export const CLASSE_COR_ETIQUETA: Record<CorEtiqueta, string> = {
   purple: "border-gaiamum-tag-purple/40 bg-gaiamum-tag-purple/15 text-gaiamum-tag-purple",
   teal: "border-gaiamum-tag-teal/40 bg-gaiamum-tag-teal/15 text-gaiamum-tag-teal",
@@ -19,6 +24,27 @@ export const CLASSE_FUNDO_QUADRO: Record<CorEtiqueta, string> = {
   coral: "bg-gaiamum-tag-coral",
   lime: "bg-gaiamum-tag-lime",
 };
+
+/** Cor de texto legível em cima do fundo sólido de CLASSE_FUNDO_QUADRO —
+ * yellow/lime são claras demais pro texto branco padrão. Preto/branco fixos
+ * (não os tokens de tema, que variam — `--gaiamum-bg` vira cinza-claro no
+ * tema claro e daria contraste ruim em cima do amarelo/lima). */
+export const TEXTO_SOBRE_FUNDO_QUADRO: Record<CorEtiqueta, string> = {
+  purple: "text-white",
+  teal: "text-white",
+  yellow: "text-black",
+  blue: "text-white",
+  coral: "text-white",
+  lime: "text-black",
+};
+
+/** Cor determinística por e-mail — pra bolinha de iniciais não ficar toda
+ * da mesma cor quando reaproveitada em vários lugares (menção, dropdown,
+ * membros do cartão). */
+export function corAvatarPorEmail(email: string): CorEtiqueta {
+  const soma = Array.from(email).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return CORES_ETIQUETA[soma % CORES_ETIQUETA.length];
+}
 
 /** Toca quando um cartão entra na coluna "Concluído" — pedido do Fabio,
  * arquivo dele em public/sons/gaiamum-chegou.mp3. `.catch` porque alguns

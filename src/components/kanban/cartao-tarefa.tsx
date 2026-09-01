@@ -15,6 +15,7 @@ import type {
 } from "@/lib/ecc/tipos";
 import { CLASSE_COR_ETIQUETA, CLASSE_PRAZO, urgenciaDoPrazo } from "@/lib/ecc/kanban";
 import { atualizarTituloTarefa } from "@/lib/ecc/actions";
+import { AvatarIniciais } from "@/components/avatar-iniciais";
 
 /** Cartão em 2 andares: o de cima só renomeia (clique no título vira um
  * campo de texto), o de baixo abre o cartão por dentro. Mover de coluna é
@@ -160,15 +161,7 @@ export function CartaoTarefa({
           <div className="mt-2 flex -space-x-1.5">
             {membrosDaTarefa.map((tm) => {
               const membro = membrosDoTenant.find((m) => m.user_id === tm.user_id);
-              return (
-                <span
-                  key={tm.id}
-                  title={membro?.email}
-                  className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-gaiamum-surface-raised bg-gaiamum-primary text-[10px] font-semibold text-white"
-                >
-                  {(membro?.email ?? "?").slice(0, 2).toUpperCase()}
-                </span>
-              );
+              return <AvatarIniciais key={tm.id} email={membro?.email ?? "?"} />;
             })}
           </div>
         )}

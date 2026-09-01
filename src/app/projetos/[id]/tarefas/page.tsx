@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
-import { listarMembros, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
+import { listarMembrosComAcessoAoProjeto, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import type { Anexo, ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
 import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
@@ -43,7 +43,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     supabase.from("tarefa_checklist_itens").select("*").eq("tenant_id", tenantId).order("ordem"),
     supabase.from("tarefa_etiquetas").select("*").eq("tenant_id", tenantId),
     listarEtiquetasDoTenant(tenantId),
-    listarMembros(tenantId),
+    listarMembrosComAcessoAoProjeto(tenantId, projetoId),
     obterPapelAtual(tenantId),
     temAcessoCompleto(tenantId),
     user

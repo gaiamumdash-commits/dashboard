@@ -3,9 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
+import { CORES_ETIQUETA as SEQUENCIA_CORES } from "@/lib/ecc/kanban";
 import type { CorEtiqueta, Etiqueta } from "@/lib/ecc/tipos";
-
-const SEQUENCIA_CORES: CorEtiqueta[] = ["purple", "teal", "yellow", "blue", "coral", "lime"];
 
 export async function listarEtiquetasDoTenant(tenantId: string): Promise<Etiqueta[]> {
   const supabase = await createClient();

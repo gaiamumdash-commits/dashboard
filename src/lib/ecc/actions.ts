@@ -9,6 +9,7 @@ import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
+import { extrairIdsMencionados } from "@/lib/ecc/mencoes";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
 import {
   enviarEmailConsolidacao,
@@ -386,7 +387,16 @@ export async function atualizarDescricaoTarefa(tarefaId: string, projetoId: stri
     throw new Error(`Falha ao salvar descrição: ${error.message}`);
   }
 
-  await registrarAtividade({ tenantId, projetoId, tarefaId, tipo: "descricao_editada" });
+  const membros = await listarMembrosComAcessoAoProjeto(tenantId, projetoId);
+  const mencionados = descricao ? extrairIdsMencionados(descricao, membros) : [];
+
+  await registrarAtividade({
+    tenantId,
+    projetoId,
+    tarefaId,
+    tipo: "descricao_editada",
+    notificarTambem: mencionados,
+  });
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
@@ -493,12 +503,16 @@ export async function adicionarChecklistItem(tarefaId: string, projetoId: string
     throw new Error(`Falha ao adicionar item do checklist: ${error.message}`);
   }
 
+  const membros = await listarMembrosComAcessoAoProjeto(tenantId, projetoId);
+  const mencionados = extrairIdsMencionados(texto, membros);
+
   await registrarAtividade({
     tenantId,
     projetoId,
     tarefaId,
     tipo: "checklist_item_adicionado",
     detalhe: { texto },
+    notificarTambem: mencionados,
   });
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
@@ -747,7 +761,17 @@ export async function comentarNaTarefa(tarefaId: string, projetoId: string, form
   const tenantId = await garantirWorkspace();
   const texto = campoObrigatorio(formData, "texto");
 
-  await registrarAtividade({ tenantId, projetoId, tarefaId, tipo: "comentario", detalhe: { texto } });
+  const membros = await listarMembrosComAcessoAoProjeto(tenantId, projetoId);
+  const mencionados = extrairIdsMencionados(texto, membros);
+
+  await registrarAtividade({
+    tenantId,
+    projetoId,
+    tarefaId,
+    tipo: "comentario",
+    detalhe: { texto },
+    notificarTambem: mencionados,
+  });
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }

@@ -61,7 +61,7 @@ function montarHtmlAtividade({
             <tr>
               <td style="padding:16px 28px;border-top:1px solid #e5e7eb;">
                 <p style="margin:0;color:#9ca3af;font-size:12px;">
-                  Você recebeu este e-mail porque é responsável por este cartão no Gaiamum.
+                  Você recebeu este e-mail porque está envolvido neste cartão no Gaiamum.
                 </p>
               </td>
             </tr>
