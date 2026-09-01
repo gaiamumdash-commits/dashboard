@@ -96,6 +96,41 @@ export function formatarDataHoraBrasil(
   return data.toLocaleString("pt-BR", { ...opcoes, timeZone: FUSO_BRASIL });
 }
 
+/** Converte uma string de `<input type="datetime-local">` ("AAAA-MM-DDTHH:mm")
+ * mais o fuso IANA de quem preencheu (ex.: "America/Sao_Paulo") pro instante
+ * UTC correto — sem isso, `new Date(valor)` num Server Action assumiria o
+ * fuso do SERVIDOR (UTC na Vercel), não o de quem está preenchendo, mesma
+ * classe de bug já corrigida na Agenda/Google Calendar (que evita isso
+ * delegando a conversão pra API do Google — aqui persistimos direto no
+ * nosso banco, então precisamos calcular). Sem biblioteca de fuso no
+ * projeto: técnica padrão via Intl.DateTimeFormat, sem dependência nova. */
+export function paraUtcDoFuso(dataHoraLocal: string, fuso: string): Date {
+  const [data, hora] = dataHoraLocal.split("T");
+  const [ano, mes, dia] = data.split("-").map(Number);
+  const [h, min] = hora.split(":").map(Number);
+
+  // "Chute" inicial: trata os componentes como se já fossem UTC.
+  const chuteUtc = Date.UTC(ano, mes - 1, dia, h, min);
+
+  // Descobre que horas esse instante representa no fuso alvo — a diferença
+  // entre o chute e essa leitura é exatamente o offset do fuso (cobre
+  // qualquer offset, incluindo horário de verão de outros países).
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: fuso,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(chuteUtc));
+
+  const valor = (tipo: string) => Number(partes.find((p) => p.type === tipo)!.value);
+  const comoNoFuso = Date.UTC(valor("year"), valor("month") - 1, valor("day"), valor("hour"), valor("minute"));
+
+  return new Date(2 * chuteUtc - comoNoFuso);
+}
+
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
 export const CLASSE_PRAZO: Record<UrgenciaPrazo, string> = {

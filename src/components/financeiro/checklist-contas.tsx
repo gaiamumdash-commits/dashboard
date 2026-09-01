@@ -8,6 +8,7 @@ import type { Anexo, ContaAPagar } from "@/lib/ecc/tipos";
 import { atualizarValorEVencimento, desmarcarComoPaga, marcarComoPaga } from "@/lib/ecc/financeiro";
 import { enviarAnexoContaAPagar } from "@/lib/ecc/anexos";
 import { AnexoArquivo } from "@/components/anexo-arquivo";
+import { CampoAlarme } from "@/components/campo-alarme";
 
 const ROTULO_CATEGORIA: Record<ContaAPagar["categoria"], string> = {
   consumo: "Consumo",
@@ -27,14 +28,23 @@ function formatarMoeda(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function Interruptor({ ligado, onClick }: { ligado: boolean; onClick: () => void }) {
+function Interruptor({
+  ligado,
+  onClick,
+  disabled,
+}: {
+  ligado: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={ligado}
       onClick={onClick}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+      disabled={disabled}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${
         ligado ? "bg-gaiamum-success" : "bg-gaiamum-border"
       }`}
     >
@@ -47,19 +57,42 @@ function Interruptor({ ligado, onClick }: { ligado: boolean; onClick: () => void
   );
 }
 
-function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
+function Linha({
+  conta,
+  anexos,
+  antecedenciaAlarme,
+}: {
+  conta: ContaAPagar;
+  anexos: Anexo[];
+  antecedenciaAlarme: number | null;
+}) {
   const [editandoValor, setEditandoValor] = useState(false);
   const [editandoDataPagamento, setEditandoDataPagamento] = useState(false);
-  const [, iniciarTransicao] = useTransition();
+  const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
 
+  // Otimista: sem isso, o interruptor só refletia o clique depois que
+  // `router.refresh()` trazia o dado novo do servidor de volta — sem
+  // nenhum indicador de "salvando" nesse meio tempo, parecia que o clique
+  // não tinha feito nada até a tela atualizar sozinha.
+  const [pagoOtimista, setPagoOtimista] = useState(conta.pago);
+  const [contaAnterior, setContaAnterior] = useState(conta);
+  if (conta !== contaAnterior) {
+    setContaAnterior(conta);
+    setPagoOtimista(conta.pago);
+  }
+
   function alternarPago() {
-    if (conta.pago) {
+    const eraPago = pagoOtimista;
+    setPagoOtimista(!eraPago);
+
+    if (eraPago) {
       iniciarTransicao(async () => {
         try {
           await desmarcarComoPaga(conta.id);
           router.refresh();
         } catch (err) {
+          setPagoOtimista(eraPago);
           toast.error(mensagemDeErro(err, "Falha ao desmarcar como paga."));
         }
       });
@@ -69,15 +102,16 @@ function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
           await marcarComoPaga(conta.id, hojeISO());
           router.refresh();
         } catch (err) {
+          setPagoOtimista(eraPago);
           toast.error(mensagemDeErro(err, "Falha ao marcar como paga."));
         }
       });
     }
   }
 
-  const vencida = !conta.pago && conta.data_vencimento < hojeISO();
-  const statusRotulo = conta.pago ? "Pago" : vencida ? "Vencido" : "Em aberto";
-  const statusClasse = conta.pago
+  const vencida = !pagoOtimista && conta.data_vencimento < hojeISO();
+  const statusRotulo = pagoOtimista ? "Pago" : vencida ? "Vencido" : "Em aberto";
+  const statusClasse = pagoOtimista
     ? "bg-gaiamum-success/15 text-gaiamum-success"
     : vencida
       ? "bg-gaiamum-danger/15 text-gaiamum-danger"
@@ -148,10 +182,16 @@ function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
         </form>
       )}
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between gap-3">
         <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-xs text-gaiamum-text-muted">
           {ROTULO_CATEGORIA[conta.categoria]}
         </span>
+        <CampoAlarme
+          entidadeTipo="conta_a_pagar"
+          entidadeId={conta.id}
+          antecedenciaAtual={antecedenciaAlarme}
+          caminhoRevalidar="/financeiro"
+        />
       </div>
 
       <div className="mt-3">
@@ -199,7 +239,7 @@ function Linha({ conta, anexos }: { conta: ContaAPagar; anexos: Anexo[] }) {
             />
           )}
         </div>
-        <Interruptor ligado={conta.pago} onClick={alternarPago} />
+        <Interruptor ligado={pagoOtimista} onClick={alternarPago} disabled={pendente} />
       </div>
     </div>
   );
@@ -209,10 +249,12 @@ export function ChecklistContas({
   contasFixas,
   contasAvulsas,
   anexosPorConta,
+  alarmePorConta,
 }: {
   contasFixas: ContaAPagar[];
   contasAvulsas: ContaAPagar[];
   anexosPorConta: Record<string, Anexo[]>;
+  alarmePorConta: Record<string, number>;
 }) {
   return (
     <div className="grid gap-6 sm:grid-cols-2">
@@ -226,7 +268,12 @@ export function ChecklistContas({
           </p>
         )}
         {contasFixas.map((conta) => (
-          <Linha key={conta.id} conta={conta} anexos={anexosPorConta[conta.id] ?? []} />
+          <Linha
+            key={conta.id}
+            conta={conta}
+            anexos={anexosPorConta[conta.id] ?? []}
+            antecedenciaAlarme={alarmePorConta[conta.id] ?? null}
+          />
         ))}
       </div>
 
@@ -236,7 +283,12 @@ export function ChecklistContas({
         </h2>
         {contasAvulsas.length === 0 && <p className="text-sm text-gaiamum-text-muted">Nenhuma lançada ainda.</p>}
         {contasAvulsas.map((conta) => (
-          <Linha key={conta.id} conta={conta} anexos={anexosPorConta[conta.id] ?? []} />
+          <Linha
+            key={conta.id}
+            conta={conta}
+            anexos={anexosPorConta[conta.id] ?? []}
+            antecedenciaAlarme={alarmePorConta[conta.id] ?? null}
+          />
         ))}
       </div>
     </div>

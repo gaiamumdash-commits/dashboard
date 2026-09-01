@@ -348,3 +348,62 @@ export type ResultadoAgenda =
   | { status: "nao_conectado" }
   | { status: "expirado" }
   | { status: "conectado"; googleEmail: string; eventos: EventoGoogleCalendar[] };
+
+/** Um item da Agenda unificada — pode vir do Google ou de dentro do
+ * próprio Gaiamum (conta a pagar, tarefa com prazo, evento manual/voz). */
+export type FonteItemAgenda = "google" | "conta_a_pagar" | "tarefa" | "evento_agenda";
+
+export type OrigemEventoAgenda = "manual" | "voz";
+
+export type EntidadeAlarme = "conta_a_pagar" | "tarefa" | "evento_agenda";
+
+export type Alarme = {
+  id: string;
+  tenant_id: string;
+  entidade_tipo: EntidadeAlarme;
+  entidade_id: string;
+  antecedencia_min: number;
+  criado_por: string;
+  disparado_em: string | null;
+  disparado_para_referencia: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export type NotificacaoApp = {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  titulo: string;
+  corpo: string | null;
+  link: string | null;
+  tipo: "alarme";
+  lida: boolean;
+  lida_em: string | null;
+  criado_em: string;
+};
+
+export type EventoAgenda = {
+  id: string;
+  tenant_id: string;
+  titulo: string;
+  inicio: string;
+  fim: string | null;
+  origem: OrigemEventoAgenda;
+  transcricao_bruta: string | null;
+  criado_por: string;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export type ItemAgenda = {
+  id: string;
+  fonte: FonteItemAgenda;
+  titulo: string;
+  /** ISO com hora (tarefa, evento com hora) ou só "AAAA-MM-DD" (conta a
+   * pagar, evento de dia inteiro) — mesma convenção que o Google já usa
+   * pra eventos de dia inteiro, reaproveitada pelo `painel-agenda.tsx`. */
+  quando: string;
+  link: string | null;
+  badge: string | null;
+};

@@ -42,21 +42,36 @@ export default async function PaginaFinanceiro() {
   const contasFixas = lista.filter((c) => c.conta_fixa_id !== null);
   const contasAvulsas = lista.filter((c) => c.conta_fixa_id === null);
 
-  const { data: anexosDoMes } =
+  const [{ data: anexosDoMes }, { data: alarmesDoMes }] =
     lista.length > 0
-      ? await supabase
-          .from("anexos")
-          .select("*")
-          .eq("entidade_tipo", "conta_a_pagar")
-          .in(
-            "entidade_id",
-            lista.map((c) => c.id),
-          )
-      : { data: [] as Anexo[] };
+      ? await Promise.all([
+          supabase
+            .from("anexos")
+            .select("*")
+            .eq("entidade_tipo", "conta_a_pagar")
+            .in(
+              "entidade_id",
+              lista.map((c) => c.id),
+            ),
+          supabase
+            .from("alarmes")
+            .select("entidade_id, antecedencia_min")
+            .eq("entidade_tipo", "conta_a_pagar")
+            .in(
+              "entidade_id",
+              lista.map((c) => c.id),
+            ),
+        ])
+      : [{ data: [] as Anexo[] }, { data: [] as { entidade_id: string; antecedencia_min: number }[] }];
 
   const anexosPorConta: Record<string, Anexo[]> = {};
   for (const anexo of (anexosDoMes as Anexo[] | null) ?? []) {
     (anexosPorConta[anexo.entidade_id] ??= []).push(anexo);
+  }
+
+  const alarmePorConta: Record<string, number> = {};
+  for (const alarme of alarmesDoMes ?? []) {
+    alarmePorConta[alarme.entidade_id] = alarme.antecedencia_min;
   }
 
   return (
@@ -81,7 +96,12 @@ export default async function PaginaFinanceiro() {
         </div>
 
         <div className="mt-8">
-          <ChecklistContas contasFixas={contasFixas} contasAvulsas={contasAvulsas} anexosPorConta={anexosPorConta} />
+          <ChecklistContas
+            contasFixas={contasFixas}
+            contasAvulsas={contasAvulsas}
+            anexosPorConta={anexosPorConta}
+            alarmePorConta={alarmePorConta}
+          />
         </div>
 
         <div className="mt-8 grid gap-4 lg:grid-cols-2">

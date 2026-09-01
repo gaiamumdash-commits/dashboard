@@ -74,6 +74,82 @@ function montarHtmlAtividade({
 </html>`.trim();
 }
 
+function montarHtmlAlarme({ titulo, corpo, link }: { titulo: string; corpo: string; link: string }): string {
+  return `
+<!doctype html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:0;background-color:#f5e9dc;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5e9dc;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:#011f51;padding:20px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="${URL_LOGO}" width="28" height="28" alt="" style="display:block;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <span style="color:#f5e9dc;font-size:16px;font-weight:600;">Gaiamum</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <p style="margin:0 0 4px;color:#6b7280;font-size:13px;">Lembrete</p>
+                <h1 style="margin:0 0 16px;color:#011f51;font-size:19px;font-weight:600;">${titulo}</h1>
+                <p style="margin:0 0 24px;color:#1f2937;font-size:15px;line-height:1.5;">${corpo}</p>
+                <a
+                  href="${link}"
+                  style="display:inline-block;background-color:#0069fd;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;"
+                >
+                  Ver no Gaiamum
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`.trim();
+}
+
+export async function enviarEmailAlarme({
+  destinatario,
+  titulo,
+  corpo,
+  link,
+}: {
+  destinatario: string;
+  titulo: string;
+  corpo: string;
+  link: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+
+  const resend = new Resend(apiKey);
+  const html = montarHtmlAlarme({ titulo, corpo, link: `${URL_SITE}${link}` });
+
+  const { error } = await resend.emails
+    .send({
+      from: REMETENTE_PADRAO,
+      to: destinatario,
+      subject: `Lembrete: ${titulo}`,
+      html,
+      text: `${corpo} Veja em: ${URL_SITE}${link}`,
+    })
+    .catch((erro) => ({ error: erro }));
+
+  if (error) {
+    console.error(`Falha ao enviar e-mail de alarme pra ${destinatario}:`, error);
+  }
+}
+
 export type ItemConsolidacao = {
   titulo: string;
   status: "concluido" | "atrasado" | "aberto";

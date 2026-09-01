@@ -64,17 +64,32 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
   const podeExcluirTarefa = papelAtual === "owner" || Boolean(gestorDoProjeto);
   const listaTarefas = (tarefas as Tarefa[]) ?? [];
 
-  const { data: anexosDasTarefas } =
+  const [{ data: anexosDasTarefas }, { data: alarmesDasTarefas }] =
     listaTarefas.length > 0
-      ? await supabase
-          .from("anexos")
-          .select("*")
-          .eq("entidade_tipo", "tarefa")
-          .in(
-            "entidade_id",
-            listaTarefas.map((t) => t.id),
-          )
-      : { data: [] as Anexo[] };
+      ? await Promise.all([
+          supabase
+            .from("anexos")
+            .select("*")
+            .eq("entidade_tipo", "tarefa")
+            .in(
+              "entidade_id",
+              listaTarefas.map((t) => t.id),
+            ),
+          supabase
+            .from("alarmes")
+            .select("entidade_id, antecedencia_min")
+            .eq("entidade_tipo", "tarefa")
+            .in(
+              "entidade_id",
+              listaTarefas.map((t) => t.id),
+            ),
+        ])
+      : [{ data: [] as Anexo[] }, { data: [] as { entidade_id: string; antecedencia_min: number }[] }];
+
+  const alarmePorTarefa: Record<string, number> = {};
+  for (const alarme of alarmesDasTarefas ?? []) {
+    alarmePorTarefa[alarme.entidade_id] = alarme.antecedencia_min;
+  }
 
   return (
     <div className="flex min-h-screen bg-gaiamum-bg">
@@ -121,6 +136,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
             etiquetasDoTenant={etiquetas}
             tarefaEtiquetasIniciais={(tarefaEtiquetas as TarefaEtiqueta[]) ?? []}
             anexosIniciais={(anexosDasTarefas as Anexo[] | null) ?? []}
+            alarmePorTarefa={alarmePorTarefa}
             usuarioAtualId={user?.id ?? null}
             podeExcluirTarefa={podeExcluirTarefa}
           />

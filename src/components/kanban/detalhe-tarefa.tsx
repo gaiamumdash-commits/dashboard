@@ -32,6 +32,7 @@ import { adicionarEtiquetaNaTarefa, removerEtiquetaDaTarefa } from "@/lib/ecc/et
 import { enviarAnexoTarefa } from "@/lib/ecc/anexos";
 import { AnexoArquivo } from "@/components/anexo-arquivo";
 import { AvatarIniciais } from "@/components/avatar-iniciais";
+import { CampoAlarme } from "@/components/campo-alarme";
 
 const PRIORIDADES: Prioridade[] = ["P1", "P2", "P3", "P4"];
 const CORES_ETIQUETA: CorEtiqueta[] = ["purple", "teal", "yellow", "blue", "coral", "lime"];
@@ -46,6 +47,7 @@ export function DetalheTarefa({
   etiquetasDoTenant,
   etiquetasDaTarefa,
   anexos,
+  antecedenciaAlarme,
   aoFechar,
 }: {
   tarefa: Tarefa;
@@ -57,6 +59,7 @@ export function DetalheTarefa({
   etiquetasDoTenant: Etiqueta[];
   etiquetasDaTarefa: string[];
   anexos: Anexo[];
+  antecedenciaAlarme: number | null;
   aoFechar: () => void;
 }) {
   const [descricao, setDescricao] = useState(tarefa.descricao ?? "");
@@ -365,6 +368,15 @@ export function DetalheTarefa({
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
             />
           </label>
+
+          {tarefa.data_limite && (
+            <CampoAlarme
+              entidadeTipo="tarefa"
+              entidadeId={tarefa.id}
+              antecedenciaAtual={antecedenciaAlarme}
+              caminhoRevalidar={`/projetos/${projetoId}/tarefas`}
+            />
+          )}
         </div>
 
         <div className="relative mt-4 flex flex-col gap-1.5">

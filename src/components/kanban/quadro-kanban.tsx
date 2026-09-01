@@ -29,6 +29,7 @@ export function QuadroKanban({
   etiquetasDoTenant,
   tarefaEtiquetasIniciais,
   anexosIniciais,
+  alarmePorTarefa,
   usuarioAtualId,
   podeExcluirTarefa,
 }: {
@@ -41,6 +42,7 @@ export function QuadroKanban({
   etiquetasDoTenant: Etiqueta[];
   tarefaEtiquetasIniciais: TarefaEtiqueta[];
   anexosIniciais: Anexo[];
+  alarmePorTarefa: Record<string, number>;
   usuarioAtualId: string | null;
   podeExcluirTarefa: boolean;
 }) {
@@ -403,6 +405,7 @@ export function QuadroKanban({
             .filter((te) => te.tarefa_id === tarefaAberta.id)
             .map((te) => te.etiqueta_id)}
           anexos={anexosIniciais.filter((a) => a.entidade_id === tarefaAberta.id)}
+          antecedenciaAlarme={alarmePorTarefa[tarefaAberta.id] ?? null}
           aoFechar={fecharModal}
         />
       )}
