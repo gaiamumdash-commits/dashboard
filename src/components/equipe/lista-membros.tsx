@@ -6,10 +6,12 @@ import type { MembroTenant } from "@/lib/ecc/tipos";
 import { removerMembro } from "@/lib/ecc/actions";
 
 export function ListaMembros({ membros, souOwner }: { membros: MembroTenant[]; souOwner: boolean }) {
-  const [, iniciarTransicao] = useTransition();
+  const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
 
   function remover(userId: string) {
+    if (!window.confirm("Remover esta pessoa do workspace? Ela perde acesso a tudo, não só a este quadro."))
+      return;
     iniciarTransicao(async () => {
       await removerMembro(userId);
       router.refresh();
@@ -33,7 +35,8 @@ export function ListaMembros({ membros, souOwner }: { membros: MembroTenant[]; s
               <button
                 type="button"
                 onClick={() => remover(membro.user_id)}
-                className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
+                disabled={pendente}
+                className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger disabled:opacity-60"
               >
                 Remover
               </button>

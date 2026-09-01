@@ -30,7 +30,7 @@ export function EquipeDoQuadro({
   membros: MembroDoQuadro[];
   convitesPendentes: Convite[];
 }) {
-  const [, iniciarTransicao] = useTransition();
+  const [pendente, iniciarTransicao] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const router = useRouter();
 
@@ -146,9 +146,10 @@ export function EquipeDoQuadro({
         </label>
         <button
           type="submit"
-          className="rounded-lg bg-gaiamum-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-gaiamum-primary-dark"
+          disabled={pendente}
+          className="rounded-lg bg-gaiamum-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-gaiamum-primary-dark disabled:opacity-60"
         >
-          Convidar
+          {pendente ? "Convidando..." : "Convidar"}
         </button>
       </form>
 

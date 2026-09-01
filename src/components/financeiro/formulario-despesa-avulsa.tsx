@@ -1,4 +1,5 @@
 import { criarDespesaAvulsa } from "@/lib/ecc/financeiro";
+import { BotaoFormulario } from "@/components/botao-formulario";
 
 const CATEGORIAS = [
   { valor: "consumo", rotulo: "Consumo" },
@@ -59,12 +60,7 @@ export function FormularioDespesaAvulsa() {
         </select>
       </label>
 
-      <button
-        type="submit"
-        className="rounded-lg bg-gaiamum-primary px-5 py-2 font-medium text-white transition hover:bg-gaiamum-primary-dark"
-      >
-        Lançar despesa
-      </button>
+      <BotaoFormulario label="Lançar despesa" labelPendente="Lançando..." />
     </form>
   );
 }

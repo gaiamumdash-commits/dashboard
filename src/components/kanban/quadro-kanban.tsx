@@ -77,6 +77,7 @@ export function QuadroKanban({
   }
 
   function excluir(tarefaId: string) {
+    if (!window.confirm("Apagar este cartão? Essa ação não pode ser desfeita.")) return;
     setTarefas((atual) => atual.filter((t) => t.id !== tarefaId));
     iniciarTransicao(() => deletarTarefa(tarefaId, projetoId));
   }

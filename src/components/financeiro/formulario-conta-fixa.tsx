@@ -1,4 +1,5 @@
 import { criarContaFixa } from "@/lib/ecc/financeiro";
+import { BotaoFormulario } from "@/components/botao-formulario";
 
 const CATEGORIAS = [
   { valor: "consumo", rotulo: "Consumo" },
@@ -61,12 +62,7 @@ export function FormularioContaFixa() {
         </select>
       </label>
 
-      <button
-        type="submit"
-        className="rounded-lg bg-gaiamum-primary px-5 py-2 font-medium text-white transition hover:bg-gaiamum-primary-dark"
-      >
-        Cadastrar conta fixa
-      </button>
+      <BotaoFormulario label="Cadastrar conta fixa" labelPendente="Cadastrando..." />
     </form>
   );
 }

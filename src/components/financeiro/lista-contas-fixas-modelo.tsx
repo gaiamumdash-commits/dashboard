@@ -12,7 +12,7 @@ const ROTULO_CATEGORIA: Record<ContaFixaModelo["categoria"], string> = {
 };
 
 export function ListaContasFixasModelo({ modelos }: { modelos: ContaFixaModelo[] }) {
-  const [, iniciarTransicao] = useTransition();
+  const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
 
   if (modelos.length === 0) return null;
@@ -37,13 +37,14 @@ export function ListaContasFixasModelo({ modelos }: { modelos: ContaFixaModelo[]
             </span>
             <button
               type="button"
+              disabled={pendente}
               onClick={() =>
                 iniciarTransicao(async () => {
                   await alternarAtivaContaFixa(modelo.id, !modelo.ativo);
                   router.refresh();
                 })
               }
-              className="ml-auto text-xs text-gaiamum-primary hover:underline"
+              className="ml-auto text-xs text-gaiamum-primary hover:underline disabled:opacity-60"
             >
               {modelo.ativo ? "Pausar" : "Reativar"}
             </button>

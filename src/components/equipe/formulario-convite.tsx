@@ -7,15 +7,19 @@ import type { Projeto } from "@/lib/ecc/tipos";
 export function FormularioConvite({ projetos }: { projetos: Pick<Projeto, "id" | "nome">[] }) {
   const [erro, setErro] = useState<string | null>(null);
   const [projetoId, setProjetoId] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
   return (
     <form
       action={async (formData) => {
         setErro(null);
+        setEnviando(true);
         try {
           await convidarMembro(formData);
         } catch (e) {
           setErro(e instanceof Error ? e.message : "Falha ao convidar.");
+        } finally {
+          setEnviando(false);
         }
       }}
       className="flex flex-col gap-3 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5 sm:flex-row sm:items-end sm:flex-wrap"
@@ -63,9 +67,10 @@ export function FormularioConvite({ projetos }: { projetos: Pick<Projeto, "id" |
 
       <button
         type="submit"
-        className="rounded-lg bg-gaiamum-primary px-5 py-2 font-medium text-white transition hover:bg-gaiamum-primary-dark"
+        disabled={enviando}
+        className="rounded-lg bg-gaiamum-primary px-5 py-2 font-medium text-white transition hover:bg-gaiamum-primary-dark disabled:opacity-60"
       >
-        Gerar convite
+        {enviando ? "Gerando..." : "Gerar convite"}
       </button>
 
       {projetoId !== "" && (

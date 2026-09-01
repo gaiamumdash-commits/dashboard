@@ -1,4 +1,5 @@
 import { criarProjeto } from "@/lib/ecc/actions";
+import { BotaoFormulario } from "@/components/botao-formulario";
 
 export function FormularioNovoProjeto() {
   return (
@@ -21,12 +22,7 @@ export function FormularioNovoProjeto() {
           className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none focus:border-gaiamum-primary"
         />
       </label>
-      <button
-        type="submit"
-        className="rounded-lg bg-gaiamum-primary px-5 py-2 font-medium text-white transition hover:bg-gaiamum-primary-dark"
-      >
-        Criar projeto
-      </button>
+      <BotaoFormulario label="Criar projeto" labelPendente="Criando..." />
     </form>
   );
 }
