@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import { iniciarLoginGoogle } from "@/lib/ecc/auth-google";
 
 export default function PaginaAuth() {
   return (
@@ -68,17 +69,9 @@ function FormularioAuth() {
   async function handleGoogle() {
     setErro(null);
     setCarregando(true);
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
-
-    if (error) {
-      setCarregando(false);
-      setErro(error.message);
-    }
-    // Sucesso redireciona o navegador pro Google, não há mais nada a fazer aqui.
+    // iniciarLoginGoogle() sempre redireciona (sucesso ou erro tratado lá
+    // dentro) — não há um caminho de retorno normal aqui.
+    await iniciarLoginGoogle();
   }
 
   return (
