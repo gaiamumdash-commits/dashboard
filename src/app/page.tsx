@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
+import { buscarMembershipAtual } from "@/lib/ecc/membership";
 import { primeiroDiaDoMesAtual, urgenciaDoPrazo } from "@/lib/ecc/kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConsolidacaoGlobal } from "@/components/financeiro/consolidacao-global";
@@ -10,35 +10,29 @@ import type { ColunaKanban, ContaAPagar, MetaSmart, Projeto, Tarefa } from "@/li
 const ROTULO_HORIZONTE = { medio_prazo: "Médio prazo", longo_prazo: "Longo prazo" } as const;
 
 export default async function PaginaInicial() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   if (!user) {
     redirect("/auth");
   }
 
-  const { data: membership } = await supabase
-    .from("memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .order("criado_em", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const membership = await buscarMembershipAtual();
 
   if (!membership) {
     redirect("/onboarding");
   }
 
-  const tenantId = membership.tenant_id as string;
+  const { tenantId } = membership;
+  const souOwner = membership.papel === "owner";
 
   // Quem entrou convidado só pra um quadro não vê o painel geral — cai
   // direto na visão de projetos, sem passar pelo onboarding do workspace
   // inteiro. O painel geral é, por enquanto, a visão do dono do workspace.
-  if (!(await temAcessoCompleto(tenantId))) {
+  if (membership.escopo === "projeto") {
     redirect("/projetos");
   }
+
+  const supabase = await createClient();
 
   const { count: totalMetasSmart } = await supabase
     .from("metas_smart")
@@ -49,7 +43,6 @@ export default async function PaginaInicial() {
     redirect("/onboarding");
   }
 
-  const souOwner = (await obterPapelAtual(tenantId)) === "owner";
   const mesReferencia = primeiroDiaDoMesAtual();
 
   const [{ data: projetos }, { data: colunas }, { data: tarefas }, { data: metas }, { data: contasDoMes }] =

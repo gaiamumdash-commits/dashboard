@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { buscarMembershipAtual } from "@/lib/ecc/membership";
 import type { Convite, EscopoMembership, MembroTenant, Papel } from "@/lib/ecc/tipos";
 
 export async function listarMembros(tenantId: string): Promise<MembroTenant[]> {
@@ -25,7 +26,11 @@ export async function listarConvitesPendentes(tenantId: string): Promise<Convite
 // obterPapelAtual() e temAcessoCompleto() são chamadas juntas em quase toda
 // página (geralmente dentro do mesmo Promise.all) e cada uma precisava da
 // mesma linha de membership — cache() por request evita rodar a query 2x.
-const obterMembershipAtual = cache(
+//
+// Fallback só pro caso raro de tenantId diferente da membership principal
+// (multi-tenant manual, ou o instante em que garantirWorkspace() acabou de
+// criar a 1ª membership no mesmo request — ver membership.ts).
+const buscarMembershipPorTenant = cache(
   async (tenantId: string): Promise<{ papel: Papel; escopo: EscopoMembership } | null> => {
     const supabase = await createClient();
     const user = await obterUsuarioAtual();
@@ -41,6 +46,16 @@ const obterMembershipAtual = cache(
     return (data as { papel: Papel; escopo: EscopoMembership } | null) ?? null;
   },
 );
+
+async function obterMembershipAtual(
+  tenantId: string,
+): Promise<{ papel: Papel; escopo: EscopoMembership } | null> {
+  const principal = await buscarMembershipAtual();
+  if (principal && principal.tenantId === tenantId) {
+    return { papel: principal.papel, escopo: principal.escopo };
+  }
+  return buscarMembershipPorTenant(tenantId);
+}
 
 export async function obterPapelAtual(tenantId: string): Promise<Papel | null> {
   const membership = await obterMembershipAtual(tenantId);
