@@ -1,6 +1,20 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { cache } from 'react'
+
+const HEADER_USUARIO = 'x-supabase-user'
+
+export type UsuarioAtual = { id: string; email?: string }
+
+function usuarioValido(valor: unknown): valor is UsuarioAtual {
+  return (
+    typeof valor === 'object' &&
+    valor !== null &&
+    typeof (valor as { id?: unknown }).id === 'string' &&
+    ((valor as { email?: unknown }).email === undefined ||
+      typeof (valor as { email?: unknown }).email === 'string')
+  )
+}
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -35,10 +49,36 @@ export async function createClient() {
 // chamavam isso separadamente, empilhando latência sequencial. cache() do
 // React memoiza por request, então todas essas chamadas na mesma renderização
 // viram uma volta de rede só.
-export const obterUsuarioAtual = cache(async () => {
+//
+// O proxy.ts (src/proxy.ts -> src/lib/supabase/middleware.ts) já validou a
+// sessão com esse mesmo getUser() antes da página renderizar, e deixou o
+// resultado no header x-supabase-user — ler esse header aqui evita pagar o
+// MESMO round-trip de novo (middleware e render de página são execuções
+// separadas no Next.js, o cache() acima nunca cobriu as duas juntas).
+//
+// Fallback pro getUser() real não é só defensivo: cobre header ausente,
+// malformado, ou qualquer requisição que não passou pelo proxy (ex.: um
+// matcher mais restrito no futuro, ou chamada fora do ciclo request/response
+// do Next) — nunca confia cegamente na ausência do header.
+export const obterUsuarioAtual = cache(async (): Promise<UsuarioAtual | null> => {
+  const cabecalhos = await headers()
+  const bruto = cabecalhos.get(HEADER_USUARIO)
+
+  if (bruto) {
+    try {
+      const parseado = JSON.parse(bruto)
+      if (usuarioValido(parseado)) {
+        return { id: parseado.id, email: parseado.email }
+      }
+    } catch {
+      // header malformado — não confia, cai pro fallback abaixo
+    }
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  return user
+  if (!user) return null
+  return { id: user.id, email: user.email }
 })

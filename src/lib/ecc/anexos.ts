@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import type { Anexo, EntidadeAnexo } from "@/lib/ecc/tipos";
@@ -39,9 +39,7 @@ export async function enviarAnexoContaAPagar(contaId: string, formData: FormData
     throw new Error("Arquivo maior que 15MB — linke com o Google Drive em vez de anexar aqui.");
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
   if (!user) {
     throw new Error("Usuário não autenticado.");
   }
@@ -89,9 +87,7 @@ export async function enviarAnexoTarefa(tarefaId: string, projetoId: string, for
     throw new Error("Arquivo maior que 15MB — linke com o Google Drive em vez de anexar aqui.");
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
   if (!user) {
     throw new Error("Usuário não autenticado.");
   }

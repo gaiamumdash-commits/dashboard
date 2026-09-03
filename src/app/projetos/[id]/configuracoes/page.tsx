@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import type { Convite, PapelProjeto, Projeto } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
@@ -24,9 +24,7 @@ export default async function PaginaConfiguracoesQuadro({ params }: { params: Pr
     notFound();
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   const [papelAtual, souGestor, { data: projetoMembros }, quemVe, { data: convites }] = await Promise.all([
     obterPapelAtual(tenantId),

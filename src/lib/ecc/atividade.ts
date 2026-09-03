@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { listarMembros } from "@/lib/ecc/equipe";
 import { enviarEmailAtividade } from "@/lib/ecc/notificacoes";
 import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
@@ -31,9 +31,7 @@ export async function registrarAtividade({
   notificarTambem?: string[];
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   if (!user) {
     console.error("[registrarAtividade] sem usuário autenticado, abortando");

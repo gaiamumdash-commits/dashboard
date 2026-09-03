@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { temAcessoCompleto, obterPapelAtual } from "@/lib/ecc/equipe";
 import type { Projeto } from "@/lib/ecc/tipos";
 import { FormularioNovoProjeto } from "@/components/projetos/formulario-novo-projeto";
@@ -15,10 +15,7 @@ export default async function PaginaProjetos({
   const { arquivados: verArquivados } = await searchParams;
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   const [{ data: projetos }, { count: totalMetasSmart }, acessoCompleto, papelAtual, { data: projetosGeridos }] =
     await Promise.all([

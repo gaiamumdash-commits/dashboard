@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import { adicionarEtiquetaNaTarefa } from "@/lib/ecc/etiquetas";
@@ -24,9 +24,7 @@ export async function obterOuCriarQuadroDeProducao(): Promise<string> {
   await exigirOwner(tenantId);
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
   if (!user) {
     throw new Error("Usuário não autenticado.");
   }

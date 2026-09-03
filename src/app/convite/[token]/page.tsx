@@ -1,13 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { obterUsuarioAtual } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { AceitarConviteBotao } from "@/components/equipe/aceitar-convite-botao";
 
 export default async function PaginaConvite({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuarioAtual();
 
   const service = createServiceClient();
   const { data: convite } = await service
