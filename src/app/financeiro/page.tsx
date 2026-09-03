@@ -75,7 +75,7 @@ export default async function PaginaFinanceiro() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)} souOwner />
       <main className="mx-auto max-w-6xl flex-1 px-4 py-12">
         <div className="flex items-center justify-between">

@@ -37,11 +37,16 @@ function aplicarTema(tema: Tema) {
   ouvintes.forEach((callback) => callback());
 }
 
-export function ThemeToggle() {
+/** Miolo sem posicionamento — reaproveitado pelo botão flutuante (desktop)
+ * e pelo rodapé do drawer mobile (MenuMobile), que precisa do seletor sem
+ * `fixed`/`z-50` pra não competir com o cabeçalho mobile. */
+export function SeletorTema({ className = "" }: { className?: string }) {
   const tema = useSyncExternalStore(inscrever, obterTema, obterTemaServidor);
 
   return (
-    <div className="fixed right-4 top-4 z-50 flex items-center gap-1.5 rounded-full border border-gaiamum-border bg-gaiamum-surface p-1.5">
+    <div
+      className={`flex items-center gap-1.5 rounded-full border border-gaiamum-border bg-gaiamum-surface p-1.5 ${className}`}
+    >
       {OPCOES.map((opcao) => (
         <button
           key={opcao.valor}
@@ -60,4 +65,11 @@ export function ThemeToggle() {
       ))}
     </div>
   );
+}
+
+export function ThemeToggle() {
+  // Escondido no mobile: colidiria com o cabeçalho fixo de MenuMobile
+  // (sino/hambúrguer no canto superior direito, mesma região). No mobile o
+  // seletor de tema mora dentro do drawer (ver MenuMobile).
+  return <SeletorTema className="fixed right-4 top-4 z-50 hidden sm:flex" />;
 }

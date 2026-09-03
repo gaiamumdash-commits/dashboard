@@ -15,7 +15,17 @@ function formatarQuando(iso: string): string {
 /** Sino no topo do menu lateral — contador de não lidas com polling simples
  * (sem Supabase Realtime, que não é usado em nenhum outro lugar do
  * projeto ainda). Busca a lista completa só quando o popover abre. */
-export function SinoNotificacoes({ naoLidasIniciais }: { naoLidasIniciais: number }) {
+export function SinoNotificacoes({
+  naoLidasIniciais,
+  alinhamento = "left",
+}: {
+  naoLidasIniciais: number;
+  /** No cabeçalho mobile o sino fica perto da borda direita da tela — um
+   * popover ancorado à esquerda (padrão do menu desktop, onde o sino fica no
+   * topo de uma sidebar estreita) estouraria a viewport e criaria scroll
+   * horizontal na página inteira. */
+  alinhamento?: "left" | "right";
+}) {
   const [naoLidas, setNaoLidas] = useState(naoLidasIniciais);
   const [aberto, setAberto] = useState(false);
   const [notificacoes, setNotificacoes] = useState<NotificacaoApp[] | null>(null);
@@ -69,7 +79,11 @@ export function SinoNotificacoes({ naoLidasIniciais }: { naoLidasIniciais: numbe
       </button>
 
       {aberto && (
-        <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-2 shadow-lg">
+        <div
+          className={`absolute top-full z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-gaiamum-border bg-gaiamum-surface p-2 shadow-lg ${
+            alinhamento === "right" ? "right-0" : "left-0"
+          }`}
+        >
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-xs font-semibold text-gaiamum-text-muted">Notificações</span>
             {naoLidas > 0 && (

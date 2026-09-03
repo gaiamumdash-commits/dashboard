@@ -27,7 +27,7 @@ export default async function PaginaImportarExtrato() {
   ]);
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)} souOwner />
       <main className="mx-auto max-w-4xl flex-1 px-4 py-12">
         <Link href="/financeiro" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">

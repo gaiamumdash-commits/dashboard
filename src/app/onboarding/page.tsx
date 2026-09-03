@@ -25,7 +25,7 @@ export default async function PaginaOnboarding() {
   const souOwner = (await obterPapelAtual(tenantId)) === "owner";
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={temMetasSmart} souOwner={souOwner} />
       <main className="mx-auto max-w-3xl flex-1 px-4 py-12">
         {temMetasSmart ? (

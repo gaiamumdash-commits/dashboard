@@ -92,7 +92,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral
         temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)}
         acessoCompleto={acessoCompleto}

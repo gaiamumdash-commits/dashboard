@@ -1,6 +1,7 @@
 "use server";
 
 import "server-only";
+import { cache } from "react";
 import { revalidatePath } from "next/cache";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import type { NotificacaoApp } from "@/lib/ecc/tipos";
@@ -22,7 +23,17 @@ export async function listarNotificacoesRecentes(): Promise<NotificacaoApp[]> {
   return (data as NotificacaoApp[] | null) ?? [];
 }
 
-export async function contarNaoLidas(): Promise<number> {
+// cache() por request: MenuLateral monta o sino 2x na mesma renderização
+// (aside desktop + cabeçalho mobile, um sempre escondido via CSS conforme o
+// viewport, nunca desmontado) — sem isso cada carregamento de página faria 2
+// SELECT count idênticos, mesma duplicação que buscarMembershipAtual()/
+// obterUsuarioAtual() já corrigem em membership.ts e supabase/server.ts.
+//
+// Fica de fora do export: `contarNaoLidas` continua a Server Action chamada
+// tanto pelo SSR quanto pelo polling client-side de SinoNotificacoes a cada
+// 60s — cada chamada do polling é um request novo, fora do escopo do
+// cache() de uma renderização, então continua batendo no banco normalmente.
+const contarNaoLidasCache = cache(async (): Promise<number> => {
   const user = await obterUsuarioAtual();
   if (!user) return 0;
 
@@ -34,6 +45,10 @@ export async function contarNaoLidas(): Promise<number> {
     .eq("lida", false);
 
   return count ?? 0;
+});
+
+export async function contarNaoLidas(): Promise<number> {
+  return contarNaoLidasCache();
 }
 
 export async function marcarComoLida(notificacaoId: string) {

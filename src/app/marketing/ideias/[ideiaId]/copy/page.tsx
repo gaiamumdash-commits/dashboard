@@ -38,7 +38,7 @@ export default async function PaginaCopyDaIdeia({ params }: { params: Promise<{ 
   const prompt = peca ? null : (await obterPromptDeCopy(ideiaId)).prompt;
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart souOwner />
       <main className="mx-auto max-w-2xl flex-1 px-4 py-12">
         <Link

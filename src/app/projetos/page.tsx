@@ -37,7 +37,7 @@ export default async function PaginaProjetos({
   const idsProjetosGeridos = new Set((projetosGeridos ?? []).map((p) => p.projeto_id as string));
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral
         temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)}
         acessoCompleto={acessoCompleto}

@@ -34,7 +34,7 @@ export default async function PaginaEquipe() {
   const souOwner = papelAtual === "owner";
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)} souOwner={souOwner} />
       <main className="mx-auto max-w-3xl flex-1 px-4 py-12">
         <h1 className="text-3xl font-semibold text-gaiamum-text">Equipe</h1>

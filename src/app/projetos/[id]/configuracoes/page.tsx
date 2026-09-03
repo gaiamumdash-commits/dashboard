@@ -52,7 +52,7 @@ export default async function PaginaConfiguracoesQuadro({ params }: { params: Pr
   }));
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart souOwner={souOwner} />
       <main className="mx-auto max-w-2xl flex-1 px-4 py-12">
         <Link href={`/projetos/${projetoId}/tarefas`} className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">

@@ -74,7 +74,7 @@ export default async function PaginaInicial() {
   const listaMetas = (metas as MetaSmart[] | null) ?? [];
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart souOwner={souOwner} />
       <main className="mx-auto max-w-6xl flex-1 px-4 py-12">
         <h1 className="text-3xl font-semibold text-gaiamum-text">Painel geral</h1>

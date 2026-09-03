@@ -21,7 +21,7 @@ export default async function PaginaProdutoDigital({ params }: { params: Promise
   }
 
   return (
-    <div className="flex min-h-screen bg-gaiamum-bg">
+    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart souOwner />
       <main className="mx-auto max-w-2xl flex-1 px-4 py-12">
         <Link href="/marketing/produtos" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">
