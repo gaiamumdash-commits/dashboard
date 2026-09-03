@@ -6,6 +6,22 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { iniciarLoginGoogle } from "@/lib/ecc/auth-google";
 
+/** O Supabase manda essas mensagens em inglês, sem contexto nenhum do
+ * Gaiamum — quem recebeu um convite e nunca usou o app antes não entende
+ * "Email not confirmed" nem sabe que precisa procurar um e-mail de
+ * confirmação (separado do e-mail de convite, que é o único com a marca
+ * Gaiamum). Traduzido aqui porque o erro vem direto do client do Supabase
+ * no navegador — não passa pelo redator de erro de Server Action. */
+function mensagemDeErroAuth(mensagem: string): string {
+  if (mensagem === "Email not confirmed") {
+    return "Confirme seu e-mail antes de entrar: procure a mensagem que enviamos pra sua caixa de entrada (e o spam) logo depois do cadastro, e clique no link antes de tentar entrar de novo.";
+  }
+  if (mensagem === "Invalid login credentials") {
+    return "E-mail ou senha incorretos.";
+  }
+  return mensagem;
+}
+
 export default function PaginaAuth() {
   return (
     <Suspense>
@@ -50,15 +66,38 @@ function FormularioAuth() {
 
     setCarregando(true);
 
-    const { error } =
-      modo === "login"
-        ? await supabase.auth.signInWithPassword({ email, password: senha })
-        : await supabase.auth.signUp({ email, password: senha });
+    if (modo === "login") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+      setCarregando(false);
 
+      if (error) {
+        setErro(mensagemDeErroAuth(error.message));
+        return;
+      }
+
+      router.push(redirect);
+      router.refresh();
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({ email, password: senha });
     setCarregando(false);
 
     if (error) {
-      setErro(error.message);
+      setErro(mensagemDeErroAuth(error.message));
+      return;
+    }
+
+    // Sem sessão de volta = o projeto exige confirmar o e-mail antes de
+    // liberar o login (padrão do Supabase). Sem avisar isso na hora, a
+    // pessoa cai direto na tela de login e leva um "Email not confirmed"
+    // sem entender o motivo — especialmente ruim pra quem está aceitando
+    // um convite e nunca usou o Gaiamum antes.
+    if (!data.session) {
+      setAviso(
+        "Cadastro feito! Confira seu e-mail (inclusive a caixa de spam) e clique no link de confirmação antes de entrar. Depois volte aqui e faça login normalmente.",
+      );
+      setModo("login");
       return;
     }
 
