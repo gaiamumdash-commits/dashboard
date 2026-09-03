@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { contarNaoLidas } from "@/lib/ecc/notificacoes-app";
 import { SinoNotificacoes } from "@/components/layout/sino-notificacoes";
+import { BotaoSair } from "@/components/layout/botao-sair";
 
 /** Busca a contagem de não lidas separada num componente próprio, dentro de
  * `<Suspense>` — sem isso, `MenuLateral` (renderizado em toda página do
@@ -95,6 +96,10 @@ export function MenuLateral({
           </>
         )}
       </nav>
+
+      <div className="mt-auto flex flex-col border-t border-gaiamum-border pt-3">
+        <BotaoSair />
+      </div>
     </aside>
   );
 }
