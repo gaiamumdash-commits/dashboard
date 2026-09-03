@@ -63,10 +63,7 @@ export function CartaoProjeto({
 
       {projeto.descricao && <p className="text-sm text-gaiamum-text-muted">{projeto.descricao}</p>}
 
-      <div className="mt-auto flex items-center justify-between pt-2">
-        <Link href={`/projetos/${projeto.id}/tarefas`} className="text-sm text-gaiamum-primary hover:underline">
-          Ver kanban →
-        </Link>
+      <div className="mt-auto flex items-center justify-end pt-2">
         <div className="flex items-center gap-3">
           {podeConfigurar && (
             <Link
