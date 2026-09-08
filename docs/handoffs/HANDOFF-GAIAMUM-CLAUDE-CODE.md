@@ -10,6 +10,15 @@
 
 ---
 
+## Estado confirmado (2026-09-07, sessão nova #13 — última atualização)
+
+**Resumo em uma linha**: confirmado que o `0022_timeout_cron_alarmes.sql` resolveu de vez o timeout intermitente do cron de reforço — cron de alarmes 100% estável agora. Nenhuma mudança de código nesta sessão (sessão foi majoritariamente sobre UltraQuadras); só a verificação pendente da sessão #12.
+
+- **Cron de reforço dos alarmes (`pg_cron`/`pg_net`) confirmado 100% estável**: `select status_code, content, error_msg, created from net._http_response order by created desc limit 8;` — 8/8 chamadas das últimas 2h vieram `200 {"verificados":2,"disparados":0,"falhas":[]}`, `error_msg` nulo em todas. O timeout de 15s (`0022`) resolveu o cold start que antes derrubava ~metade das chamadas. **Essa frente está fechada** — não precisa de mais investigação.
+- Próxima frente recomendada (ainda não iniciada): investigar a performance real da navegação (3-4s trocando de página, Fabio marcou como "insuportável" na sessão #11/#12) — ver "Próximos passos".
+
+---
+
 ## Estado confirmado (2026-09-03, sessão nova #12 — última atualização)
 
 **Resumo em uma linha**: a causa real do "ainda lento" que o Fabio reportou não era performance de código — a produção estava travada há 2 dias numa versão antiga. Achada, corrigida e publicada. Sessão pausada aqui por pedido do Fabio pra atender o UltraQuadras primeiro (login com Google mostrando nome/projeto errado no console — mesma correção já feita aqui).
@@ -523,6 +532,12 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-09-07 (sessão nova #13) — confirmação do timeout do cron, retomada de prioridades
+
+Sessão começou majoritariamente no UltraQuadras (fechamento total da pendência do login com Google — diagnóstico, correção, merge em `main`, validação em Produção real, desativação da chave antiga no Google Cloud). Ao voltar pro Gaiamum, primeira ação foi fechar a verificação pendente da sessão #12: pedi ao Fabio pra rodar de novo `select status_code, content, error_msg, created from net._http_response order by created desc limit 8;` no SQL Editor. Resultado: 8/8 chamadas das últimas 2h vieram `200`, `error_msg` nulo em todas — o `0022_timeout_cron_alarmes.sql` (timeout de 5s pra 15s) resolveu de vez o cold start intermitente. Cron de reforço dos alarmes fechado, sem pendência técnica.
+
+Levantei o resumo priorizado do backlog (sem código nesta parte): recomendei investigar a performance real (3-4s trocando de página, "insuportável" na avaliação do Fabio) como próxima frente, por afetar todo uso diário — à frente do redesenho do Financeiro, grade de horários da Agenda, colaboração em equipe, voz→evento e Marketing Incremento 4, todos ainda sem `EnterPlanMode`. Aguardando decisão do Fabio sobre por onde seguir.
 
 ### 2026-09-03 (sessão nova #12) — deploy travado há 2 dias (causa real do "ainda lento"), região da função corrigida, pausa pro UltraQuadras
 
