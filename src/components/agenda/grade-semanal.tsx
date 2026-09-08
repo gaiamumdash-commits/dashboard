@@ -79,40 +79,45 @@ export function GradeSemanal({ itens, chaveSemana }: { itens: ItemAgenda[]; chav
 
   return (
     <div>
-      <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-gaiamum-border pb-2">
-        <div />
-        {dias.map((dia) => (
-          <div
-            key={dia.toISOString()}
-            className={`text-center text-xs font-medium ${mesmoDia(dia, new Date()) ? "text-gaiamum-primary" : "text-gaiamum-text-muted"}`}
-          >
-            <div className="capitalize">{dia.toLocaleDateString("pt-BR", { weekday: "short" })}</div>
-            <div className="text-sm text-gaiamum-text">{dia.getDate()}</div>
+      {/* Cabeçalho fica DENTRO do container com scroll (sticky), não fora dele
+       * — como irmão fora, ele usava largura cheia enquanto o grid de baixo
+       * perdia ~16px pra barra de rolagem, desalinhando as colunas. */}
+      <div ref={containerRef} className="mt-2 max-h-[70vh] overflow-y-auto">
+        <div className="sticky top-0 z-20 bg-gaiamum-surface">
+          <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-gaiamum-border pb-2">
+            <div />
+            {dias.map((dia) => (
+              <div
+                key={dia.toISOString()}
+                className={`text-center text-xs font-medium ${mesmoDia(dia, new Date()) ? "text-gaiamum-primary" : "text-gaiamum-text-muted"}`}
+              >
+                <div className="capitalize">{dia.toLocaleDateString("pt-BR", { weekday: "short" })}</div>
+                <div className="text-sm text-gaiamum-text">{dia.getDate()}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {temDiaInteiro && (
-        <div className="grid grid-cols-[48px_repeat(7,1fr)] gap-1 border-b border-gaiamum-border py-2">
-          <div className="text-right text-[10px] text-gaiamum-text-muted">Dia</div>
-          {itensDiaInteiroPorDia.map((doDia, i) => (
-            <div key={dias[i].toISOString()} className="flex flex-col gap-1 px-1">
-              {doDia.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setItemSelecionado(item)}
-                  className={`truncate rounded border px-1.5 py-0.5 text-left text-[11px] ${CLASSE_COR_ETIQUETA[COR_FONTE_AGENDA[item.fonte]]}`}
-                >
-                  {item.titulo}
-                </button>
+          {temDiaInteiro && (
+            <div className="grid grid-cols-[48px_repeat(7,1fr)] gap-1 border-b border-gaiamum-border py-2">
+              <div className="text-right text-[10px] text-gaiamum-text-muted">Dia</div>
+              {itensDiaInteiroPorDia.map((doDia, i) => (
+                <div key={dias[i].toISOString()} className="flex flex-col gap-1 px-1">
+                  {doDia.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setItemSelecionado(item)}
+                      className={`truncate rounded border px-1.5 py-0.5 text-left text-[11px] ${CLASSE_COR_ETIQUETA[COR_FONTE_AGENDA[item.fonte]]}`}
+                    >
+                      {item.titulo}
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
 
-      <div ref={containerRef} className="mt-2 max-h-[70vh] overflow-y-auto">
         <div className="grid grid-cols-[48px_repeat(7,1fr)]">
           <div>
             {HORAS.map((h) => (
