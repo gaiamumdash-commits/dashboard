@@ -377,7 +377,7 @@ export type NotificacaoApp = {
   titulo: string;
   corpo: string | null;
   link: string | null;
-  tipo: "alarme";
+  tipo: "alarme" | "equipe";
   lida: boolean;
   lida_em: string | null;
   criado_em: string;

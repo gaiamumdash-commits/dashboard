@@ -8,6 +8,7 @@ import {
   cancelarConvite,
   convidarParaProjeto,
   definirPapelDoMembroNoProjeto,
+  reenviarConvite,
   removerMembroDoProjeto,
 } from "@/lib/ecc/actions";
 
@@ -83,6 +84,18 @@ export function EquipeDoQuadro({
     iniciarTransicao(async () => {
       await cancelarConvite(conviteId);
       router.refresh();
+    });
+  }
+
+  function reenviarConviteDoQuadro(conviteId: string) {
+    setErro(null);
+    iniciarTransicao(async () => {
+      try {
+        await reenviarConvite(conviteId);
+        router.refresh();
+      } catch (e) {
+        setErro(mensagemDeErro(e, "Falha ao reenviar convite."));
+      }
     });
   }
 
@@ -168,13 +181,24 @@ export function EquipeDoQuadro({
                 className="flex items-center justify-between rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm"
               >
                 <span className="text-gaiamum-text">{convite.email}</span>
-                <button
-                  type="button"
-                  onClick={() => cancelarConviteDoQuadro(convite.id)}
-                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-                >
-                  Cancelar
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => reenviarConviteDoQuadro(convite.id)}
+                    disabled={pendente}
+                    className="text-xs text-gaiamum-text-muted hover:text-gaiamum-primary disabled:opacity-50"
+                  >
+                    Reenviar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cancelarConviteDoQuadro(convite.id)}
+                    disabled={pendente}
+                    className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

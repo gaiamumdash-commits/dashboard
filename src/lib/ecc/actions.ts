@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { tagMetasSmart } from "@/lib/ecc/metas";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
+import { notificarEquipe } from "@/lib/ecc/notificacoes-equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import { extrairIdsMencionados } from "@/lib/ecc/mencoes";
@@ -252,6 +253,20 @@ export async function definirPapelDoMembroNoProjeto(
     throw new Error(`Falha ao definir papel no quadro: ${error.message}`);
   }
 
+  after(async () => {
+    const { data: projeto } = await supabase.from("projetos").select("nome").eq("id", projetoId).maybeSingle();
+    const nomeProjeto = projeto?.nome ?? "um quadro";
+    await notificarEquipe({
+      tenantId,
+      userId,
+      titulo:
+        papel === "gestor"
+          ? `Você virou coordenador do quadro "${nomeProjeto}"`
+          : `Você deixou de ser coordenador do quadro "${nomeProjeto}"`,
+      link: `/projetos/${projetoId}/tarefas`,
+    });
+  });
+
   revalidatePath(`/projetos/${projetoId}/configuracoes`);
 }
 
@@ -267,6 +282,7 @@ export async function removerMembroDoProjeto(projetoId: string, userId: string) 
   }
 
   const supabase = await createClient();
+  const { data: projeto } = await supabase.from("projetos").select("nome").eq("id", projetoId).maybeSingle();
   const { error } = await supabase
     .from("projeto_membros")
     .delete()
@@ -276,6 +292,15 @@ export async function removerMembroDoProjeto(projetoId: string, userId: string) 
   if (error) {
     throw new Error(`Falha ao remover do quadro: ${error.message}`);
   }
+
+  after(async () => {
+    await notificarEquipe({
+      tenantId,
+      userId,
+      titulo: `Você foi removido do quadro "${projeto?.nome ?? "um quadro"}"`,
+      link: "/projetos",
+    });
+  });
 
   revalidatePath(`/projetos/${projetoId}/configuracoes`);
 }
@@ -913,6 +938,50 @@ export async function cancelarConvite(conviteId: string) {
   revalidatePath("/equipe");
 }
 
+/** Renova o prazo (mais 7 dias) e reenvia o e-mail — mesma policy de UPDATE
+ * de `cancelarConvite` (owner do workspace, ou gestor do projeto quando o
+ * convite é de um quadro específico) já cobre quem pode chamar isso. */
+export async function reenviarConvite(conviteId: string) {
+  const supabase = await createClient();
+  const user = await obterUsuarioAtual();
+
+  if (!user) {
+    throw new Error("Usuário não autenticado.");
+  }
+
+  const novaExpiracao = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: convite, error } = await supabase
+    .from("convites")
+    .update({ expira_em: novaExpiracao })
+    .eq("id", conviteId)
+    .eq("status", "pendente")
+    .select("email, token, projeto_id")
+    .single();
+
+  if (error || !convite) {
+    throw new Error("Falha ao reenviar convite — talvez ele já tenha sido aceito ou cancelado.");
+  }
+
+  after(async () => {
+    const nomeProjeto = convite.projeto_id
+      ? ((await supabase.from("projetos").select("nome").eq("id", convite.projeto_id).maybeSingle()).data?.nome ??
+        null)
+      : null;
+    await enviarEmailConvite({
+      destinatario: convite.email,
+      emailConvidante: user.email ?? "Alguém do Gaiamum",
+      nomeProjeto,
+      token: convite.token as string,
+    });
+  });
+
+  revalidatePath("/equipe");
+  if (convite.projeto_id) {
+    revalidatePath(`/projetos/${convite.projeto_id}/configuracoes`);
+  }
+}
+
 export async function removerMembro(userId: string) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
@@ -925,6 +994,15 @@ export async function removerMembro(userId: string) {
   if (error) {
     throw new Error(`Falha ao remover membro: ${error.message}`);
   }
+
+  after(async () => {
+    await notificarEquipe({
+      tenantId,
+      userId,
+      titulo: "Você foi removido de um workspace no Gaiamum",
+      link: null,
+    });
+  });
 
   revalidatePath("/equipe");
 }

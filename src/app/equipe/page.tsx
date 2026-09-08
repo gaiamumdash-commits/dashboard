@@ -40,8 +40,8 @@ export default async function PaginaEquipe() {
       <main className="mx-auto max-w-3xl flex-1 px-4 py-12">
         <h1 className="text-3xl font-semibold text-gaiamum-text">Equipe</h1>
         <p className="mt-1 text-gaiamum-text-muted">
-          Quem tem acesso a este workspace. Convide alguém e envie o link gerado por WhatsApp ou e-mail —
-          ainda não enviamos automaticamente.
+          Quem tem acesso a este workspace. Ao convidar, enviamos o link automaticamente por e-mail — você
+          também pode copiá-lo e mandar por WhatsApp.
         </p>
 
         <div className="mt-8">
