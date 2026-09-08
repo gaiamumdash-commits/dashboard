@@ -10,6 +10,20 @@
 
 ---
 
+## Estado confirmado (2026-09-08, sessão nova #16 — última atualização)
+
+**Resumo em uma linha**: redesenho do Financeiro implementado — `/financeiro` virou página de resumo (`ConsolidacaoGlobal` + 2 blocos clicáveis) e as listas detalhadas migraram pra `/financeiro/fixas` e `/financeiro/avulsas`. Validado (`tsc`/`lint`/`build` limpos + teste real logado em build isolado porta 3055, incluindo uma mutação real com invalidação confirmada) e **aguardando aprovação do Fabio pra `git push`**.
+
+- **Decisões de escopo confirmadas com o Fabio antes de codar** (ficavam em aberto no handoff): formulários de cadastro (`FormularioContaFixa`, `FormularioDespesaAvulsa`) e a lista de modelos recorrentes (`ListaContasFixasModelo`) migraram junto pras páginas dedicadas — `/financeiro` não tem mais nenhum formulário; e o link "Importar extrato" mudou de `/financeiro` pra `/financeiro/avulsas` (extrato importado sempre vira despesa avulsa).
+- **`ChecklistContas` (2 colunas fixas+avulsas lado a lado) virou `ListaContas`** (`src/components/financeiro/lista-contas.tsx`, novo — `checklist-contas.tsx` deletado) — uma lista só, reaproveitada pelas 2 páginas novas. A função `Linha` (edição de valor/vencimento, marcar pago otimista, alarme, anexo) não mudou de lógica, só ganhou a prop `caminhoRevalidar` (antes fixa em `"/financeiro"`) pra `CampoAlarme`/`AnexoArquivo` invalidarem a página certa.
+- **`src/app/financeiro/fixas/page.tsx`** (novo): contas fixas do mês **ordenadas por vencimento** (pedido explícito do Fabio — "a data importa pra ver o que foi pago ao longo do mês"), formulário de cadastro, lista de modelos recorrentes.
+- **`src/app/financeiro/avulsas/page.tsx`** (novo): despesas avulsas do mês, formulário de lançamento, link "Importar extrato".
+- **`src/app/financeiro/page.tsx`** (simplificada): só `ConsolidacaoGlobal` (resumo) + 2 blocos clicáveis — "Contas fixas do mês" mostra o **somatório** em R$, "Despesas avulsas do mês" mostra a **contagem** — exatamente como o Fabio pediu (ícones/números, não os cards inteiros).
+- **`src/lib/ecc/financeiro.ts`**: os 6 `revalidatePath("/financeiro")` foram redistribuídos pelas rotas certas — `criarContaFixa`/`alternarAtivaContaFixa` (só mexem no modelo recorrente, a cobrança do mês só nasce quando o cron `gerar-contas-fixas` roda) revalidam só `/financeiro/fixas`; `criarDespesaAvulsa` revalida `/financeiro` + `/financeiro/avulsas`; `atualizarValorEVencimento`/`marcarComoPaga`/`desmarcarComoPaga` (podem ser fixa OU avulsa, já que `Linha` é compartilhada) revalidam as 3 rotas — mais simples e sempre correto do que descobrir de qual página veio a chamada.
+- **Nenhuma tabela financeira ganhou cache** — permanece 100% query direta, RLS de owner intacta (`exigirOwner`/`obterPapelAtual` continuam gate de cada Server Action).
+- **Validado**: `npx tsc --noEmit`, `npm run lint`, `npm run build` limpos (as 2 rotas novas aparecem no output do build). Testado em build de produção isolado (porta 3055, login real via senha temporária + Admin API, invalidada de novo no fim): `/financeiro` mostrando resumo correto (0 contas fixas, 3 despesas avulsas somando R$330 — bate com `ConsolidacaoGlobal`); `/financeiro/avulsas` com as 3 despesas reais ordenadas por vencimento; `/financeiro/fixas` vazia mas renderizando corretamente (formulário + mensagem vazia). **Testei uma mutação real**: marquei "Correios" (R$150, estava vencida) como paga em `/financeiro/avulsas`, voltei pra `/financeiro` e o resumo mudou na hora (Pago R$180→R$330, Pendente R$150→R$0, sem F5) — confirma o `revalidatePath` triplo funcionando de ponta a ponta. Revertido depois pra não sujar dado real. Console e log do servidor sem nenhum erro.
+- **Pendente**: aprovação do Fabio pra `git push` (6 arquivos: 1 modificado + 1 deletado do componente/rota principal, 2 páginas novas, `financeiro.ts` ajustado).
+
 ## Estado confirmado (2026-09-08, sessão nova #15 — última atualização)
 
 **Resumo em uma linha**: item 3 da recomendação de performance (sessão #14) implementado — mas não como `"use cache"`/Cache Components. Investigando a doc oficial, descobri que ligar `cacheComponents` é uma migração de app inteiro (toda página vira dinâmica-por-padrão, exige `<Suspense>` em qualquer cookie/header/dado não-cacheado — o app não usa Suspense em nenhuma página hoje). Apresentei o achado ao Fabio, que escolheu explicitamente um cache cirúrgico sem ligar a flag global, em vez da migração completa. Implementado, validado (`tsc`/`lint`/`build` limpos + teste real logado em build isolado porta 3055) e **aguardando aprovação do Fabio pra `git push`**.
@@ -570,6 +584,18 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-09-08 (sessão nova #16) — redesenho do Financeiro: resumo + 2 páginas dedicadas
+
+Depois do push do cache de metas SMART (sessão #15), perguntei ao Fabio qual frente do backlog priorizar — ele escolheu o redesenho do Financeiro, já registrado como item aberto (handoff, "Próximos passos" #5, com nota explícita de precisar `EnterPlanMode` antes de codar). Antes de planejar, esclareci com ele as 2 decisões de escopo que o próprio handoff deixava em aberto: formulários/lista de modelos migram junto pras páginas dedicadas (não ficam na página principal), e "Importar extrato" muda de `/financeiro` pra `/financeiro/avulsas`.
+
+Li o código atual por completo (`financeiro/page.tsx`, `checklist-contas.tsx`, `consolidacao-global.tsx`, os 2 formulários, `lista-contas-fixas-modelo.tsx`, `financeiro.ts`) antes de desenhar o plano — sem subagentes, já que o desenho era mecânico (dividir um componente, criar 2 rotas, redistribuir `revalidatePath`) e eu já tinha lido tudo diretamente. Único ponto que exigiu atenção: os 6 `revalidatePath("/financeiro")` em `financeiro.ts` precisavam ser redistribuídos com cuidado — `criarContaFixa`/`alternarAtivaContaFixa` só mexem no modelo recorrente (a cobrança real do mês só nasce quando o cron `gerar-contas-fixas` roda, então não precisam revalidar o resumo), enquanto as 3 funções que mexem em `contas_a_pagar` direto (`atualizarValorEVencimento`, `marcarComoPaga`, `desmarcarComoPaga`) precisam revalidar as 3 rotas porque a `Linha` compartilhada não sabe se a conta é fixa ou avulsa.
+
+Implementei: `lista-contas.tsx` (substitui `checklist-contas.tsx`, mesma `Linha` só que virou 1 lista em vez de 2 colunas, ganhou prop `caminhoRevalidar`), `financeiro/fixas/page.tsx` e `financeiro/avulsas/page.tsx` novos, `financeiro/page.tsx` simplificada pra só resumo + 2 blocos clicáveis (fixas mostra somatório, avulsas mostra contagem — exatamente o pedido original do Fabio), e os 6 pontos de `revalidatePath` ajustados. `tsc`/`lint`/`build` limpos.
+
+Testei em build de produção isolado (porta 3055, login real via senha temporária + Admin API, invalidada de novo no fim): as 3 páginas renderizando corretamente com dado real do tenant de teste (3 despesas avulsas somando R$330, 0 contas fixas). Fiz questão de testar uma mutação de verdade, não só o carregamento: marquei uma despesa vencida ("Correios", R$150) como paga em `/financeiro/avulsas` e voltei pra `/financeiro` sem F5 — o resumo atualizou na hora (Pago R$180→R$330, Pendente R$150→R$0), confirmando que a invalidação tripla funciona de ponta a ponta, não só no papel. Revertido depois. Console e log do servidor sem erro nenhum.
+
+Atualizei "Estado confirmado" acima com o detalhe técnico completo. Fica pendente: aprovação do Fabio pro `git push`.
 
 ### 2026-09-08 (sessão nova #15) — item 3 implementado como cache cirúrgico, não Cache Components
 

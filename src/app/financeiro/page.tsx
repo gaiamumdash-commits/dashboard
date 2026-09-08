@@ -5,13 +5,13 @@ import { createClient } from "@/lib/supabase/server";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import { contarMetasSmart } from "@/lib/ecc/metas";
 import { primeiroDiaDoMesAtual } from "@/lib/ecc/kanban";
-import type { Anexo, ContaAPagar, ContaFixaModelo } from "@/lib/ecc/tipos";
+import type { ContaAPagar } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConsolidacaoGlobal } from "@/components/financeiro/consolidacao-global";
-import { ChecklistContas } from "@/components/financeiro/checklist-contas";
-import { FormularioContaFixa } from "@/components/financeiro/formulario-conta-fixa";
-import { FormularioDespesaAvulsa } from "@/components/financeiro/formulario-despesa-avulsa";
-import { ListaContasFixasModelo } from "@/components/financeiro/lista-contas-fixas-modelo";
+
+function formatarMoeda(valor: number): string {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 export default async function PaginaFinanceiro() {
   const tenantId = await garantirWorkspace();
@@ -24,94 +24,49 @@ export default async function PaginaFinanceiro() {
   const supabase = await createClient();
   const mesReferencia = primeiroDiaDoMesAtual();
 
-  const [{ data: contasDoMes }, { data: modelos }, totalMetasSmart] = await Promise.all([
+  const [{ data: contasDoMes }, totalMetasSmart] = await Promise.all([
     supabase
       .from("contas_a_pagar")
       .select("*")
       .eq("tenant_id", tenantId)
       .eq("mes_referencia", mesReferencia)
       .order("data_vencimento", { ascending: true }),
-    supabase
-      .from("contas_fixas_modelo")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .order("criado_em", { ascending: true }),
     contarMetasSmart(tenantId),
   ]);
 
   const lista = (contasDoMes as ContaAPagar[] | null) ?? [];
   const contasFixas = lista.filter((c) => c.conta_fixa_id !== null);
   const contasAvulsas = lista.filter((c) => c.conta_fixa_id === null);
-
-  const [{ data: anexosDoMes }, { data: alarmesDoMes }] =
-    lista.length > 0
-      ? await Promise.all([
-          supabase
-            .from("anexos")
-            .select("*")
-            .eq("entidade_tipo", "conta_a_pagar")
-            .in(
-              "entidade_id",
-              lista.map((c) => c.id),
-            ),
-          supabase
-            .from("alarmes")
-            .select("entidade_id, antecedencia_min")
-            .eq("entidade_tipo", "conta_a_pagar")
-            .in(
-              "entidade_id",
-              lista.map((c) => c.id),
-            ),
-        ])
-      : [{ data: [] as Anexo[] }, { data: [] as { entidade_id: string; antecedencia_min: number }[] }];
-
-  const anexosPorConta: Record<string, Anexo[]> = {};
-  for (const anexo of (anexosDoMes as Anexo[] | null) ?? []) {
-    (anexosPorConta[anexo.entidade_id] ??= []).push(anexo);
-  }
-
-  const alarmePorConta: Record<string, number> = {};
-  for (const alarme of alarmesDoMes ?? []) {
-    alarmePorConta[alarme.entidade_id] = alarme.antecedencia_min;
-  }
+  const somaFixas = contasFixas.reduce((soma, c) => soma + c.valor, 0);
 
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)} souOwner />
       <main className="mx-auto max-w-6xl flex-1 px-4 py-12">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-gaiamum-text">Financeiro</h1>
-            <p className="mt-1 text-gaiamum-text-muted">Contas fixas, despesas avulsas e consolidação do mês.</p>
-          </div>
-          <Link
-            href="/financeiro/importar"
-            className="rounded-lg border border-gaiamum-border px-4 py-2 text-sm text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-text"
-          >
-            Importar extrato
-          </Link>
-        </div>
+        <h1 className="text-3xl font-semibold text-gaiamum-text">Financeiro</h1>
+        <p className="mt-1 text-gaiamum-text-muted">Consolidação do mês.</p>
 
         <div className="mt-8">
           <ConsolidacaoGlobal contasDoMes={lista} />
         </div>
 
-        <div className="mt-8">
-          <ChecklistContas
-            contasFixas={contasFixas}
-            contasAvulsas={contasAvulsas}
-            anexosPorConta={anexosPorConta}
-            alarmePorConta={alarmePorConta}
-          />
-        </div>
-
-        <div className="mt-8 grid gap-4 lg:grid-cols-2">
-          <FormularioContaFixa />
-          <FormularioDespesaAvulsa />
-        </div>
-
-        <div className="mt-8">
-          <ListaContasFixasModelo modelos={(modelos as ContaFixaModelo[] | null) ?? []} />
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <Link
+            href="/financeiro/fixas"
+            className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5 transition hover:border-gaiamum-primary"
+          >
+            <p className="text-xs uppercase tracking-wide text-gaiamum-text-muted">Contas fixas do mês</p>
+            <p className="mt-1 text-2xl font-semibold text-gaiamum-text">{formatarMoeda(somaFixas)}</p>
+            <p className="mt-1 text-sm text-gaiamum-text-muted">{contasFixas.length} conta(s) →</p>
+          </Link>
+          <Link
+            href="/financeiro/avulsas"
+            className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5 transition hover:border-gaiamum-primary"
+          >
+            <p className="text-xs uppercase tracking-wide text-gaiamum-text-muted">Despesas avulsas do mês</p>
+            <p className="mt-1 text-2xl font-semibold text-gaiamum-text">{contasAvulsas.length}</p>
+            <p className="mt-1 text-sm text-gaiamum-text-muted">Ver detalhes →</p>
+          </Link>
         </div>
       </main>
     </div>

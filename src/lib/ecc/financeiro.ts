@@ -57,7 +57,7 @@ export async function criarContaFixa(formData: FormData) {
     throw new Error(`Falha ao criar conta fixa: ${error.message}`);
   }
 
-  revalidatePath("/financeiro");
+  revalidatePath("/financeiro/fixas");
 }
 
 export async function alternarAtivaContaFixa(contaFixaId: string, ativo: boolean) {
@@ -71,7 +71,7 @@ export async function alternarAtivaContaFixa(contaFixaId: string, ativo: boolean
     throw new Error(`Falha ao atualizar conta fixa: ${error.message}`);
   }
 
-  revalidatePath("/financeiro");
+  revalidatePath("/financeiro/fixas");
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +107,7 @@ export async function criarDespesaAvulsa(formData: FormData) {
   }
 
   revalidatePath("/financeiro");
+  revalidatePath("/financeiro/avulsas");
 }
 
 /** Ajusta valor e/ou vencimento da cobrança do mês — útil pra contas fixas
@@ -133,6 +134,8 @@ export async function atualizarValorEVencimento(contaId: string, valor: number, 
   }
 
   revalidatePath("/financeiro");
+  revalidatePath("/financeiro/fixas");
+  revalidatePath("/financeiro/avulsas");
 }
 
 export async function marcarComoPaga(contaId: string, dataPagamento: string) {
@@ -150,6 +153,8 @@ export async function marcarComoPaga(contaId: string, dataPagamento: string) {
   }
 
   revalidatePath("/financeiro");
+  revalidatePath("/financeiro/fixas");
+  revalidatePath("/financeiro/avulsas");
 }
 
 export async function desmarcarComoPaga(contaId: string) {
@@ -167,4 +172,6 @@ export async function desmarcarComoPaga(contaId: string) {
   }
 
   revalidatePath("/financeiro");
+  revalidatePath("/financeiro/fixas");
+  revalidatePath("/financeiro/avulsas");
 }

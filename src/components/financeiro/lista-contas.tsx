@@ -61,10 +61,12 @@ function Linha({
   conta,
   anexos,
   antecedenciaAlarme,
+  caminhoRevalidar,
 }: {
   conta: ContaAPagar;
   anexos: Anexo[];
   antecedenciaAlarme: number | null;
+  caminhoRevalidar: string;
 }) {
   const [editandoValor, setEditandoValor] = useState(false);
   const [editandoDataPagamento, setEditandoDataPagamento] = useState(false);
@@ -190,7 +192,7 @@ function Linha({
           entidadeTipo="conta_a_pagar"
           entidadeId={conta.id}
           antecedenciaAtual={antecedenciaAlarme}
-          caminhoRevalidar="/financeiro"
+          caminhoRevalidar={caminhoRevalidar}
         />
       </div>
 
@@ -198,7 +200,7 @@ function Linha({
         <AnexoArquivo
           anexos={anexos}
           enviar={(formData) => enviarAnexoContaAPagar(conta.id, formData)}
-          caminhoRevalidar="/financeiro"
+          caminhoRevalidar={caminhoRevalidar}
           rotuloAnexar="Anexar comprovante"
         />
       </div>
@@ -245,52 +247,34 @@ function Linha({
   );
 }
 
-export function ChecklistContas({
-  contasFixas,
-  contasAvulsas,
+export function ListaContas({
+  contas,
   anexosPorConta,
   alarmePorConta,
+  caminhoRevalidar,
+  mensagemVazio,
 }: {
-  contasFixas: ContaAPagar[];
-  contasAvulsas: ContaAPagar[];
+  contas: ContaAPagar[];
   anexosPorConta: Record<string, Anexo[]>;
   alarmePorConta: Record<string, number>;
+  caminhoRevalidar: string;
+  mensagemVazio: string;
 }) {
-  return (
-    <div className="grid gap-6 sm:grid-cols-2">
-      <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-          Contas fixas do mês <span className="text-gaiamum-text">({contasFixas.length})</span>
-        </h2>
-        {contasFixas.length === 0 && (
-          <p className="text-sm text-gaiamum-text-muted">
-            Nenhuma ainda — cadastre uma conta fixa abaixo, ela aparece aqui a partir do próximo dia 1.
-          </p>
-        )}
-        {contasFixas.map((conta) => (
-          <Linha
-            key={conta.id}
-            conta={conta}
-            anexos={anexosPorConta[conta.id] ?? []}
-            antecedenciaAlarme={alarmePorConta[conta.id] ?? null}
-          />
-        ))}
-      </div>
+  if (contas.length === 0) {
+    return <p className="text-sm text-gaiamum-text-muted">{mensagemVazio}</p>;
+  }
 
-      <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-          Despesas avulsas do mês <span className="text-gaiamum-text">({contasAvulsas.length})</span>
-        </h2>
-        {contasAvulsas.length === 0 && <p className="text-sm text-gaiamum-text-muted">Nenhuma lançada ainda.</p>}
-        {contasAvulsas.map((conta) => (
-          <Linha
-            key={conta.id}
-            conta={conta}
-            anexos={anexosPorConta[conta.id] ?? []}
-            antecedenciaAlarme={alarmePorConta[conta.id] ?? null}
-          />
-        ))}
-      </div>
+  return (
+    <div className="flex flex-col gap-3">
+      {contas.map((conta) => (
+        <Linha
+          key={conta.id}
+          conta={conta}
+          anexos={anexosPorConta[conta.id] ?? []}
+          antecedenciaAlarme={alarmePorConta[conta.id] ?? null}
+          caminhoRevalidar={caminhoRevalidar}
+        />
+      ))}
     </div>
   );
 }
