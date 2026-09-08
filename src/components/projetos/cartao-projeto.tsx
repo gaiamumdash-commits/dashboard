@@ -66,8 +66,13 @@ export function CartaoProjeto({
       <div className="mt-auto flex items-center justify-end pt-2">
         <div className="flex items-center gap-3">
           {podeConfigurar && (
+            // prefetch desligado: cada card da lista prefetcha esse link à
+            // toa (pouquíssimo clicado, é uma engrenagem pequena), e como é
+            // rota dinâmica sem "use cache" o prefetch nem economiza nada no
+            // clique real — só carga extra no Supabase (ver handoff, sessão #14).
             <Link
               href={`/projetos/${projeto.id}/configuracoes`}
+              prefetch={false}
               className="text-xs text-gaiamum-text-muted hover:text-gaiamum-text"
               title="Configurações do quadro"
             >

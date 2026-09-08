@@ -53,8 +53,12 @@ export default async function PaginaProjetos({
               {verArquivados ? "Quadros arquivados — desarquive pra voltar a usar." : "Cada projeto isola suas próprias tarefas."}
             </p>
           </div>
+          {/* prefetch desligado: pouco clicado, e rota dinâmica sem "use
+              cache" não ganha nada com prefetch — só carga extra à toa no
+              Supabase a cada carga de /projetos (ver handoff, sessão #14). */}
           <Link
             href={verArquivados ? "/projetos" : "/projetos?arquivados=1"}
+            prefetch={false}
             className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text"
           >
             {verArquivados ? "← Ativos" : "Ver arquivados"}
