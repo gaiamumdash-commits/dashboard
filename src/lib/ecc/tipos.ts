@@ -333,6 +333,28 @@ export type PecaConteudo = {
 };
 
 // ---------------------------------------------------------------------------
+// Marketing / Página de Venda (Incremento 4, fluxo manual, 1:1 com produto)
+// ---------------------------------------------------------------------------
+
+export type PaginaVenda = {
+  id: string;
+  tenant_id: string;
+  produto_digital_id: string;
+  peca_referencia_id: string | null;
+  headline: string;
+  subheadline: string;
+  introducao: string;
+  beneficios: string;
+  oferta: string;
+  prova_social: string | null;
+  garantia: string | null;
+  cta_final: string;
+  checklist_avisos: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+// ---------------------------------------------------------------------------
 // Agenda / Google Calendar
 // ---------------------------------------------------------------------------
 

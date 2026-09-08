@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
-import { obterPerfilNegocio, obterProdutoDigital, obterAvatarComItens } from "@/lib/ecc/marketing";
+import { carregarContextoDoProduto, obterProdutoDigital } from "@/lib/ecc/marketing";
 import { validarViciosDeterministico } from "@/lib/ecc/checklist-copy";
 import { gerarPromptCopy, gerarPromptIdeias, parsearListaIdeias, parsearResultadoCopy } from "@/lib/ecc/prompt-mandala";
 import type { FaseFunil, IdeiaConteudo, PecaConteudo, TipoAnuncio } from "@/lib/ecc/tipos";
@@ -13,26 +13,6 @@ async function exigirOwner(tenantId: string) {
   if ((await obterPapelAtual(tenantId)) !== "owner") {
     throw new Error("Só o dono do workspace usa a Mandala de Anúncios.");
   }
-}
-
-async function carregarContextoDoProduto(produtoId: string) {
-  const tenantId = await garantirWorkspace();
-  const produto = await obterProdutoDigital(produtoId);
-  if (!produto || produto.tenant_id !== tenantId) {
-    throw new Error("Produto digital não encontrado.");
-  }
-
-  const perfil = await obterPerfilNegocio(tenantId);
-  if (!perfil) {
-    throw new Error("Preencha o Perfil do Negócio antes de gerar conteúdo.");
-  }
-
-  const avatarComItens = await obterAvatarComItens(produtoId);
-  if (!avatarComItens || avatarComItens.itens.length === 0) {
-    throw new Error("Preencha o Avatar do Cliente Ideal antes de gerar conteúdo.");
-  }
-
-  return { tenantId, produto, perfil, avatarComItens };
 }
 
 export async function obterPromptDeIdeias(produtoId: string, tipo: TipoAnuncio): Promise<string> {

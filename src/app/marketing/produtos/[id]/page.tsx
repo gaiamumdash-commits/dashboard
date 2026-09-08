@@ -42,6 +42,12 @@ export default async function PaginaProdutoDigital({ params }: { params: Promise
             >
               Gerar ideias de conteúdo →
             </Link>
+            <Link
+              href={`/marketing/produtos/${produto.id}/pagina-venda`}
+              className="rounded-lg border border-gaiamum-border px-4 py-2 text-sm text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-text"
+            >
+              Página de venda →
+            </Link>
           </div>
         </div>
 

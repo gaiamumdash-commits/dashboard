@@ -19,7 +19,9 @@ const DESCRICAO_TIPO_ANUNCIO: Record<TipoAnuncio, string> = {
     "conecta um assunto cultural em alta agora (filme, série, notícia, meme, polêmica) com o nicho do produto, de um jeito que faça sentido pro público — se não souber o que está em alta agora, pesquise antes de gerar os títulos.",
 };
 
-function blocoContextoIdeias(
+/** Bloco de contexto do negócio/produto/avatar reaproveitado por todos os
+ * prompts de geração manual (Mandala de Anúncios e Página de Venda). */
+export function blocoContextoNegocio(
   perfil: PerfilNegocio,
   produto: ProdutoDigital,
   itensAvatar: AvatarItem[],
@@ -61,7 +63,7 @@ export function gerarPromptIdeias(
 ): string {
   return `Você vai me ajudar a criar ganchos de anúncio pro meu produto digital.
 
-${blocoContextoIdeias(perfil, produto, itensAvatar, dorUnificada, gatilhoCompra)}
+${blocoContextoNegocio(perfil, produto, itensAvatar, dorUnificada, gatilhoCompra)}
 Tipo de anúncio escolhido — ${ROTULO_TIPO_ANUNCIO[tipo]}: ${DESCRICAO_TIPO_ANUNCIO[tipo]}
 
 Gere 12 ganchos (títulos curtos) numerados de 1 a 12, seguindo estas regras em todos eles:
@@ -128,7 +130,7 @@ export function gerarPromptCopy(
 ): string {
   return `Você vai me ajudar a desenvolver a copy completa de um anúncio a partir de um gancho que eu já escolhi.
 
-${blocoContextoIdeias(perfil, produto, itensAvatar, dorUnificada, gatilhoCompra)}
+${blocoContextoNegocio(perfil, produto, itensAvatar, dorUnificada, gatilhoCompra)}
 Gancho escolhido (não mude, use exatamente este): "${ideia.titulo_gancho}"
 
 Desenvolva em dois parágrafos (4 a 6 linhas cada, sem esticar):

@@ -264,3 +264,28 @@ export async function salvarAvatarCliente(produtoId: string, formData: FormData)
   revalidatePath(`/marketing/produtos/${produtoId}/avatar`);
   revalidatePath(`/marketing/produtos/${produtoId}`);
 }
+
+// ---------------------------------------------------------------------------
+// Contexto compartilhado (Mandala de Anúncios e Página de Venda usam o
+// mesmo pré-requisito: perfil + avatar preenchidos antes de gerar conteúdo)
+// ---------------------------------------------------------------------------
+
+export async function carregarContextoDoProduto(produtoId: string) {
+  const tenantId = await garantirWorkspace();
+  const produto = await obterProdutoDigital(produtoId);
+  if (!produto || produto.tenant_id !== tenantId) {
+    throw new Error("Produto digital não encontrado.");
+  }
+
+  const perfil = await obterPerfilNegocio(tenantId);
+  if (!perfil) {
+    throw new Error("Preencha o Perfil do Negócio antes de gerar conteúdo.");
+  }
+
+  const avatarComItens = await obterAvatarComItens(produtoId);
+  if (!avatarComItens || avatarComItens.itens.length === 0) {
+    throw new Error("Preencha o Avatar do Cliente Ideal antes de gerar conteúdo.");
+  }
+
+  return { tenantId, produto, perfil, avatarComItens };
+}
