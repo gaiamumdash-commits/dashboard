@@ -71,7 +71,7 @@ export function paraDatetimeLocal(isoUtc: string): string {
 // UTC por padrão (Vercel/Node) — sem isso, `new Date().getMonth()` ou
 // `.toLocaleString()` sem `timeZone` ficam até 3h adiantados em relação ao
 // horário real de quem está usando o app.
-const FUSO_BRASIL = "America/Sao_Paulo";
+export const FUSO_BRASIL = "America/Sao_Paulo";
 
 /** "YYYY-MM-01" do mês atual, sempre no fuso de Brasília — independe do
  * fuso em que o processo do servidor está rodando. */

@@ -3,15 +3,16 @@ import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import { contarMetasSmart } from "@/lib/ecc/metas";
 import { listarAgendaUnificada } from "@/lib/ecc/agenda";
+import { limitesDaSemana } from "@/lib/ecc/semana";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { PainelAgenda } from "@/components/agenda/painel-agenda";
 
 export default async function PaginaAgenda({
   searchParams,
 }: {
-  searchParams: Promise<{ erro?: string }>;
+  searchParams: Promise<{ erro?: string; semana?: string }>;
 }) {
-  const { erro } = await searchParams;
+  const { erro, semana } = await searchParams;
   const tenantId = await garantirWorkspace();
 
   if (!(await temAcessoCompleto(tenantId))) {
@@ -23,7 +24,8 @@ export default async function PaginaAgenda({
     contarMetasSmart(tenantId),
   ]);
   const souOwner = papelAtual === "owner";
-  const { google, itens } = await listarAgendaUnificada(tenantId, souOwner);
+  const { chave: chaveSemana, inicio, fimExclusivo } = limitesDaSemana(semana);
+  const { google, itens } = await listarAgendaUnificada(tenantId, souOwner, inicio, fimExclusivo);
 
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
@@ -35,7 +37,7 @@ export default async function PaginaAgenda({
         </p>
 
         <div className="mt-8">
-          <PainelAgenda google={google} itens={itens} erro={erro} />
+          <PainelAgenda google={google} itens={itens} erro={erro} chaveSemana={chaveSemana} />
         </div>
       </main>
     </div>

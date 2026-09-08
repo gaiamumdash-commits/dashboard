@@ -2,32 +2,14 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { ItemAgenda, ResultadoAgenda } from "@/lib/ecc/tipos";
 import { criarEventoGoogleCalendar, desconectarGoogleCalendar, iniciarConexaoGoogleCalendar } from "@/lib/ecc/google-calendar";
 import { excluirEventoAgenda } from "@/lib/ecc/eventos-agenda";
 import { FormularioEventoAgenda } from "@/components/agenda/formulario-evento-agenda";
-
-// Eventos de dia inteiro vêm do Google como "2026-09-02" (só data, sem
-// hora) — o JS interpreta isso como meia-noite UTC, não local, o que
-// adianta/atrasa o dia em fusos negativos (Brasil). Forçar hora local
-// explícita evita isso — mesmo padrão já usado em checklist-contas.tsx.
-const APENAS_DATA = /^\d{4}-\d{2}-\d{2}$/;
-
-function paraDataLocal(iso: string): Date {
-  return APENAS_DATA.test(iso) ? new Date(`${iso}T00:00:00`) : new Date(iso);
-}
-
-function formatarHora(iso: string): string {
-  if (!iso) return "";
-  if (APENAS_DATA.test(iso)) return "Dia inteiro";
-  const data = new Date(iso);
-  if (Number.isNaN(data.getTime())) return "";
-  return data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-}
-
-function mesmoDia(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
+import { GradeSemanal } from "@/components/agenda/grade-semanal";
+import { RÓTULO_FONTE, formatarHora, mesmoDia, paraDataLocal } from "@/lib/ecc/agenda-apresentacao";
+import { chaveSemanaAtual, semanaAnterior, semanaSeguinte } from "@/lib/ecc/semana";
 
 /** "Hoje" / "Amanhã" / "terça-feira, 2 de setembro" — mesma lógica de
  * rótulo relativo que o Google Calendar usa na visão "Agenda". */
@@ -67,13 +49,6 @@ function agruparPorDia(itens: ItemAgenda[]): GrupoDoDia[] {
   return grupos;
 }
 
-const RÓTULO_FONTE: Record<ItemAgenda["fonte"], string> = {
-  google: "Google",
-  conta_a_pagar: "Financeiro",
-  tarefa: "Kanban",
-  evento_agenda: "Agenda",
-};
-
 const MENSAGEM_POR_ERRO: Record<string, string> = {
   conexao: "A conexão com o Google falhou ou expirou no meio do caminho — tenta de novo.",
   sem_refresh_token: "O Google não devolveu a permissão esperada — tenta desconectar no Google e conectar de novo.",
@@ -84,10 +59,12 @@ export function PainelAgenda({
   google,
   itens,
   erro,
+  chaveSemana,
 }: {
   google: ResultadoAgenda;
   itens: ItemAgenda[];
   erro?: string;
+  chaveSemana: string;
 }) {
   const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
@@ -204,7 +181,39 @@ export function PainelAgenda({
       )}
 
       <div className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6">
-        <h2 className="text-sm font-medium text-gaiamum-text-muted">Próximos compromissos</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-gaiamum-text-muted">
+            <span className="sm:hidden">Próximos compromissos</span>
+            <span className="hidden sm:inline">Semana</span>
+          </h2>
+          <div className="hidden items-center gap-2 sm:flex">
+            <Link
+              href={`/agenda?semana=${semanaAnterior(chaveSemana)}`}
+              scroll={false}
+              className="rounded-lg border border-gaiamum-border px-2 py-1 text-sm text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+              aria-label="Semana anterior"
+            >
+              ‹
+            </Link>
+            <Link
+              href={chaveSemana === chaveSemanaAtual() ? "#" : "/agenda"}
+              scroll={false}
+              className="rounded-lg border border-gaiamum-border px-3 py-1 text-xs font-medium text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+            >
+              Hoje
+            </Link>
+            <Link
+              href={`/agenda?semana=${semanaSeguinte(chaveSemana)}`}
+              scroll={false}
+              className="rounded-lg border border-gaiamum-border px-2 py-1 text-sm text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+              aria-label="Próxima semana"
+            >
+              ›
+            </Link>
+          </div>
+        </div>
+
+        <div className="sm:hidden">
         {itens.length === 0 ? (
           <p className="mt-3 text-sm text-gaiamum-text-muted">Nada por aqui nos próximos dias.</p>
         ) : (
@@ -276,6 +285,11 @@ export function PainelAgenda({
             ))}
           </div>
         )}
+        </div>
+
+        <div className="hidden sm:block">
+          <GradeSemanal itens={itens} chaveSemana={chaveSemana} />
+        </div>
       </div>
 
       <FormularioEventoAgenda />

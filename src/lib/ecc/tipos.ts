@@ -404,6 +404,10 @@ export type ItemAgenda = {
    * pagar, evento de dia inteiro) — mesma convenção que o Google já usa
    * pra eventos de dia inteiro, reaproveitada pelo `painel-agenda.tsx`. */
   quando: string;
+  /** Fim do bloco, ISO com hora — só populado por `google` e `evento_agenda`
+   * quando existe hora real de término. `null` pra `conta_a_pagar` (sempre
+   * dia inteiro) e pra `tarefa` (o prazo é um ponto, não um intervalo). */
+  fim: string | null;
   link: string | null;
   badge: string | null;
 };

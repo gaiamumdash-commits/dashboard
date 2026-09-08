@@ -20,6 +20,7 @@ export async function criarEventoAgendaManual(formData: FormData) {
 
   const titulo = String(formData.get("titulo") ?? "").trim();
   const inicio = String(formData.get("inicio") ?? "");
+  const fim = String(formData.get("fim") ?? "");
   const fuso = String(formData.get("fuso") ?? "America/Sao_Paulo");
   const origem = formData.get("origem") === "voz" ? "voz" : "manual";
   const transcricaoBruta = formData.get("transcricao_bruta")
@@ -31,13 +32,20 @@ export async function criarEventoAgendaManual(formData: FormData) {
     throw new Error("Preencha título e data/hora do compromisso.");
   }
 
+  const inicioUtc = paraUtcDoFuso(inicio, fuso);
+  const fimUtc = fim ? paraUtcDoFuso(fim, fuso) : null;
+  if (fimUtc && fimUtc <= inicioUtc) {
+    throw new Error("O fim precisa ser depois do início.");
+  }
+
   const supabase = await createClient();
   const { data: evento, error } = await supabase
     .from("eventos_agenda")
     .insert({
       tenant_id: tenantId,
       titulo,
-      inicio: paraUtcDoFuso(inicio, fuso).toISOString(),
+      inicio: inicioUtc.toISOString(),
+      fim: fimUtc ? fimUtc.toISOString() : null,
       origem,
       transcricao_bruta: transcricaoBruta,
       criado_por: user.id,

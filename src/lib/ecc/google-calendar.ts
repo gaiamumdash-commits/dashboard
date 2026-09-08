@@ -118,7 +118,7 @@ function eErroDeTokenInvalido(erro: unknown): boolean {
   return mensagem.includes("invalid_grant");
 }
 
-export async function listarEventosGoogleCalendar(): Promise<ResultadoAgenda> {
+export async function listarEventosGoogleCalendar(inicio: Date, fimExclusivo: Date): Promise<ResultadoAgenda> {
   const conexao = await obterClienteConectado();
   if (!conexao) return { status: "nao_conectado" };
 
@@ -127,10 +127,13 @@ export async function listarEventosGoogleCalendar(): Promise<ResultadoAgenda> {
   try {
     const { data } = await calendar.events.list({
       calendarId: "primary",
-      timeMin: new Date().toISOString(),
+      timeMin: inicio.toISOString(),
+      timeMax: fimExclusivo.toISOString(),
       singleEvents: true,
       orderBy: "startTime",
-      maxResults: 20,
+      // Era limite de "próximos eventos" (20); agora é teto por semana, não
+      // corte de lista — folga generosa pra não truncar semana cheia.
+      maxResults: 250,
     });
 
     const eventos: EventoGoogleCalendar[] = (data.items ?? []).map((evento) => ({

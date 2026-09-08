@@ -64,7 +64,7 @@ export function FormularioEventoAgenda() {
         />
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-            Quando
+            Início
             <input
               type="datetime-local"
               name="inicio"
@@ -73,21 +73,29 @@ export function FormularioEventoAgenda() {
             />
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-            Avisar
-            <select
-              name="antecedencia_min"
-              defaultValue=""
+            Fim (opcional)
+            <input
+              type="datetime-local"
+              name="fim"
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
-            >
-              <option value="">Sem alarme</option>
-              <option value="15">15 minutos antes</option>
-              <option value="60">1 hora antes</option>
-              <option value="180">3 horas antes</option>
-              <option value="1440">1 dia antes</option>
-              <option value="4320">3 dias antes</option>
-            </select>
+            />
           </label>
         </div>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+          Avisar
+          <select
+            name="antecedencia_min"
+            defaultValue=""
+            className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
+          >
+            <option value="">Sem alarme</option>
+            <option value="15">15 minutos antes</option>
+            <option value="60">1 hora antes</option>
+            <option value="180">3 horas antes</option>
+            <option value="1440">1 dia antes</option>
+            <option value="4320">3 dias antes</option>
+          </select>
+        </label>
         <BotaoFormulario label="Criar compromisso" labelPendente="Criando..." className="self-start rounded-lg bg-gaiamum-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60" />
         {erro && <p className="text-sm text-gaiamum-danger">{erro}</p>}
       </form>
