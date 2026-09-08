@@ -1,11 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
+import { tagMetasSmart } from "@/lib/ecc/metas";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
@@ -67,6 +68,8 @@ export async function criarMetasSmart(formData: FormData) {
   if (error) {
     throw new Error(`Falha ao salvar metas SMART: ${error.message}`);
   }
+
+  updateTag(tagMetasSmart(tenantId));
 
   const { data: tenant } = await supabase.from("tenants").select("nome").eq("id", tenantId).single();
   const nomeWorkspace = tenant?.nome ?? "Gaiamum";

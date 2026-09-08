@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
-import { createClient } from "@/lib/supabase/server";
+import { contarMetasSmart } from "@/lib/ecc/metas";
 import { FormularioSmart } from "@/components/onboarding/formulario-smart";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
@@ -14,14 +14,9 @@ export default async function PaginaOnboarding() {
     redirect("/projetos");
   }
 
-  const supabase = await createClient();
+  const totalMetasSmart = await contarMetasSmart(tenantId);
 
-  const { count } = await supabase
-    .from("metas_smart")
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId);
-
-  const temMetasSmart = Boolean(count && count > 0);
+  const temMetasSmart = Boolean(totalMetasSmart);
   const souOwner = (await obterPapelAtual(tenantId)) === "owner";
 
   return (

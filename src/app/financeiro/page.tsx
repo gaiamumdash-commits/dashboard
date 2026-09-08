@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
+import { contarMetasSmart } from "@/lib/ecc/metas";
 import { primeiroDiaDoMesAtual } from "@/lib/ecc/kanban";
 import type { Anexo, ContaAPagar, ContaFixaModelo } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
@@ -23,7 +24,7 @@ export default async function PaginaFinanceiro() {
   const supabase = await createClient();
   const mesReferencia = primeiroDiaDoMesAtual();
 
-  const [{ data: contasDoMes }, { data: modelos }, { count: totalMetasSmart }] = await Promise.all([
+  const [{ data: contasDoMes }, { data: modelos }, totalMetasSmart] = await Promise.all([
     supabase
       .from("contas_a_pagar")
       .select("*")
@@ -35,7 +36,7 @@ export default async function PaginaFinanceiro() {
       .select("*")
       .eq("tenant_id", tenantId)
       .order("criado_em", { ascending: true }),
-    supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    contarMetasSmart(tenantId),
   ]);
 
   const lista = (contasDoMes as ContaAPagar[] | null) ?? [];

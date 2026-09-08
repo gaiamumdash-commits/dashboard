@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { listarMembros, listarConvitesPendentes, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
+import { contarMetasSmart } from "@/lib/ecc/metas";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { FormularioConvite } from "@/components/equipe/formulario-convite";
 import { ListaConvites } from "@/components/equipe/lista-convites";
@@ -19,12 +20,12 @@ export default async function PaginaEquipe() {
 
   const supabase = await createClient();
 
-  const [membros, convites, papelAtual, { count: totalMetasSmart }, { data: projetos }, cabecalhos] =
+  const [membros, convites, papelAtual, totalMetasSmart, { data: projetos }, cabecalhos] =
     await Promise.all([
       listarMembros(tenantId),
       listarConvitesPendentes(tenantId),
       obterPapelAtual(tenantId),
-      supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+      contarMetasSmart(tenantId),
       supabase.from("projetos").select("id, nome").eq("tenant_id", tenantId).order("nome"),
       headers(),
     ]);

@@ -5,6 +5,7 @@ import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { listarMembrosComAcessoAoProjeto, obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import type { Anexo, ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
+import { contarMetasSmart } from "@/lib/ecc/metas";
 import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
 import { BotaoFreeze } from "@/components/kanban/botao-freeze";
@@ -20,7 +21,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
     { data: projeto },
     { data: colunas },
     { data: tarefas },
-    { count: totalMetasSmart },
+    totalMetasSmart,
     { data: tarefaMembros },
     { data: checklistItens },
     { data: tarefaEtiquetas },
@@ -38,7 +39,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
       .order("concluido", { ascending: true })
       .order("ordem", { ascending: true }),
     supabase.from("tarefas").select("*").eq("projeto_id", projetoId).order("criado_em", { ascending: true }),
-    supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    contarMetasSmart(tenantId),
     supabase.from("tarefa_membros").select("*").eq("tenant_id", tenantId),
     supabase.from("tarefa_checklist_itens").select("*").eq("tenant_id", tenantId).order("ordem"),
     supabase.from("tarefa_etiquetas").select("*").eq("tenant_id", tenantId),

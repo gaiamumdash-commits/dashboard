@@ -2,6 +2,7 @@ import Link from "next/link";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { temAcessoCompleto, obterPapelAtual } from "@/lib/ecc/equipe";
+import { contarMetasSmart } from "@/lib/ecc/metas";
 import type { Projeto } from "@/lib/ecc/tipos";
 import { FormularioNovoProjeto } from "@/components/projetos/formulario-novo-projeto";
 import { CartaoProjeto } from "@/components/projetos/cartao-projeto";
@@ -17,7 +18,7 @@ export default async function PaginaProjetos({
   const supabase = await createClient();
   const user = await obterUsuarioAtual();
 
-  const [{ data: projetos }, { count: totalMetasSmart }, acessoCompleto, papelAtual, { data: projetosGeridos }] =
+  const [{ data: projetos }, totalMetasSmart, acessoCompleto, papelAtual, { data: projetosGeridos }] =
     await Promise.all([
       supabase
         .from("projetos")
@@ -25,7 +26,7 @@ export default async function PaginaProjetos({
         .eq("tenant_id", tenantId)
         .eq("arquivado", Boolean(verArquivados))
         .order("criado_em", { ascending: false }),
-      supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+      contarMetasSmart(tenantId),
       temAcessoCompleto(tenantId),
       obterPapelAtual(tenantId),
       user

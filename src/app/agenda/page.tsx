@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
-import { createClient } from "@/lib/supabase/server";
 import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
+import { contarMetasSmart } from "@/lib/ecc/metas";
 import { listarAgendaUnificada } from "@/lib/ecc/agenda";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { PainelAgenda } from "@/components/agenda/painel-agenda";
@@ -18,11 +18,9 @@ export default async function PaginaAgenda({
     redirect("/projetos");
   }
 
-  const supabase = await createClient();
-
-  const [papelAtual, { count: totalMetasSmart }] = await Promise.all([
+  const [papelAtual, totalMetasSmart] = await Promise.all([
     obterPapelAtual(tenantId),
-    supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    contarMetasSmart(tenantId),
   ]);
   const souOwner = papelAtual === "owner";
   const { google, itens } = await listarAgendaUnificada(tenantId, souOwner);

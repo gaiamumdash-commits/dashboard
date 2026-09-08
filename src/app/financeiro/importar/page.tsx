@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
+import { contarMetasSmart } from "@/lib/ecc/metas";
 import type { RegraCategoria } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ImportarExtrato } from "@/components/financeiro/importar-extrato";
@@ -17,13 +18,13 @@ export default async function PaginaImportarExtrato() {
 
   const supabase = await createClient();
 
-  const [{ data: regras }, { count: totalMetasSmart }] = await Promise.all([
+  const [{ data: regras }, totalMetasSmart] = await Promise.all([
     supabase
       .from("contas_categoria_regras")
       .select("*")
       .eq("tenant_id", tenantId)
       .order("criado_em", { ascending: true }),
-    supabase.from("metas_smart").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    contarMetasSmart(tenantId),
   ]);
 
   return (

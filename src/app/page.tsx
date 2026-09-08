@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { buscarMembershipAtual } from "@/lib/ecc/membership";
+import { contarMetasSmart } from "@/lib/ecc/metas";
 import { primeiroDiaDoMesAtual, urgenciaDoPrazo } from "@/lib/ecc/kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConsolidacaoGlobal } from "@/components/financeiro/consolidacao-global";
@@ -34,12 +35,9 @@ export default async function PaginaInicial() {
 
   const supabase = await createClient();
 
-  const { count: totalMetasSmart } = await supabase
-    .from("metas_smart")
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId);
+  const totalMetasSmart = await contarMetasSmart(tenantId);
 
-  if (!totalMetasSmart || totalMetasSmart === 0) {
+  if (!totalMetasSmart) {
     redirect("/onboarding");
   }
 
