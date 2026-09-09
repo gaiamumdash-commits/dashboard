@@ -20,7 +20,7 @@
 - **Marco**: checkbox "🚩 Destacar como marco" dentro do modal de detalhe da tarefa (`detalhe-tarefa.tsx`, ao lado de Coluna/Prioridade), e badge "🚩 Marco" no cartão do kanban (`cartao-tarefa.tsx`) quando `is_marco = true`. Sem tela de "linha do tempo de marcos" — fora de escopo desta etapa, fica só o flag + destaque visual.
 - **`resultado_esperado`**: campo de texto livre em `/projetos/[id]/configuracoes` (`configuracoes-quadro.tsx`), mesmo molde do bloco "Nome do quadro" já existente.
 - **Validado**: `tsc`/`lint`/`build` limpos. Testado de ponta a ponta em build de produção isolado (porta 3055, login real via troca de senha temporária + Admin API, senha invalidada de novo no fim) — criado um projeto de teste dedicado (`TESTE Etapa 1 (apagar)`), testado criar/editar decisão, criar indicador + edição inline do valor atual (barra de progresso recalculando certo, 25%→60%), marcar/desmarcar tarefa como marco (badge aparecendo no cartão, persistindo após reload), editar `resultado_esperado` (persistindo após reload) — tudo logado como owner (`gaiamumdash@gmail.com`). Projeto de teste inteiro excluído ao final (cascade limpou tarefas/decisões/indicadores de teste junto). **Fabio confirmou nesta sessão que o app ainda está em MVP, sem uso real — todo dado de teste é sintético, sem risco de tocar dado de cliente real.**
-- **Pronto pra publicar — aguardando aprovação do Fabio pro `git push`** (código validado e testado, só falta o commit ir pro remoto). Ver Checkpoint desta sessão, logo abaixo.
+- **Publicado e confirmado em produção.** Commit `046f34b`, push aprovado pelo Fabio. Deploy automático da Vercel confirmado via GitHub Deployments API (`deployments/6340899596/statuses`: `state: "success"`, "Deployment has completed"). **Achado operacional pro próximo uso desse checador**: filtrar `deployments?sha=<hash-curto>` retorna vazio — a API exige o SHA completo (40 caracteres), não o short hash de 7; listar sem filtro de `sha` e casar pelo campo `sha` retornado é o caminho confiável.
 - **Próxima frente combinada com o Fabio (sessão #23): Etapa 2 — Visão 360° + score determinístico (Alinhamento Gaiamum)**, ainda sem IA (a decisão de ativar Gemini free tier só entra na Etapa 3). Prompt de recomeço pronto no fim deste checkpoint.
 
 ## Estado confirmado (2026-09-08, sessão nova #23 — última atualização)
@@ -705,7 +705,9 @@ Migration aplicada pelo Fabio no SQL Editor do Supabase (CLI local segue com tok
 
 `tsc`/`lint`/`build` limpos. Não testei explicitamente o bloqueio de RLS pra um usuário não-owner nesta sessão (ficou implícito pelo padrão idêntico já validado em `financeiro.ts`/`roteiros_vsl` — mesma policy `for all` com `current_papel(tenant_id) = 'owner'` — em vez de repetir um teste com segunda conta real); se quiser essa confirmação explícita antes de considerar a etapa 100% fechada, é rápido de rodar com a conta `gaiamumdash+convite@gmail.com`.
 
-**Próximo passo:** Fabio aprovar o commit e o `git push`; depois disso, confirmar o deploy e só então seguir pra Etapa 2 (Visão 360° + score determinístico).
+Commit `046f34b` aprovado e publicado pelo Fabio; deploy automático da Vercel confirmado via GitHub Deployments API (`deployments/6340899596/statuses`: `state: "success"`). **Frente fechada.** Achado operacional a registrar pra próxima vez que checar deploy assim: filtrar `deployments?sha=<hash-curto>` retorna vazio (a API exige o SHA completo de 40 caracteres) — listar sem filtro e casar pelo campo `sha` do retorno é o caminho confiável; usei isso pra destravar um Monitor que ficou preso em loop de "aguardando" por esse motivo.
+
+**Próximo passo:** Etapa 2 — Visão 360° + score determinístico (Alinhamento Gaiamum), ainda sem IA.
 
 ### 2026-09-08 (sessão nova #23) — análise estratégica dos prompts Contexto Vivo + Experience Lab
 
