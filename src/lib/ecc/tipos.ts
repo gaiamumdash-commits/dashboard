@@ -355,6 +355,35 @@ export type PaginaVenda = {
 };
 
 // ---------------------------------------------------------------------------
+// Marketing / Roteiro de VSL (Incremento 5, fluxo manual, 1:1 com produto)
+// ---------------------------------------------------------------------------
+
+export type RoteiroVsl = {
+  id: string;
+  tenant_id: string;
+  produto_digital_id: string;
+  peca_referencia_id: string | null;
+  pagina_venda_referencia_id: string | null;
+  tempo_gancho: string | null;
+  gancho: string;
+  tempo_identificacao_dor: string | null;
+  identificacao_dor: string;
+  tempo_agitacao: string | null;
+  agitacao: string;
+  tempo_virada: string | null;
+  virada: string;
+  tempo_prova: string | null;
+  prova: string | null;
+  tempo_oferta: string | null;
+  oferta: string;
+  tempo_cta_final: string | null;
+  cta_final: string;
+  checklist_avisos: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+// ---------------------------------------------------------------------------
 // Agenda / Google Calendar
 // ---------------------------------------------------------------------------
 

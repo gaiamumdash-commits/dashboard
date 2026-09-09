@@ -48,6 +48,12 @@ export default async function PaginaProdutoDigital({ params }: { params: Promise
             >
               Página de venda →
             </Link>
+            <Link
+              href={`/marketing/produtos/${produto.id}/vsl`}
+              className="rounded-lg border border-gaiamum-border px-4 py-2 text-sm text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-text"
+            >
+              Roteiro de VSL →
+            </Link>
           </div>
         </div>
 
