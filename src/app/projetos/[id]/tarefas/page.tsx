@@ -118,6 +118,12 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
               {papelAtual === "owner" && (
                 <>
                   <Link
+                    href={`/projetos/${projetoId}/visao-360`}
+                    className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+                  >
+                    🧭 Visão 360°
+                  </Link>
+                  <Link
                     href={`/projetos/${projetoId}/decisoes`}
                     className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
                   >
