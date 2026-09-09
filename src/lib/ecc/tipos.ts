@@ -20,6 +20,7 @@ export type Projeto = {
   tenant_id: string;
   nome: string;
   descricao: string | null;
+  resultado_esperado: string | null;
   status: StatusProjeto;
   meta_smart_id: string | null;
   cor_fundo: CorEtiqueta;
@@ -37,11 +38,43 @@ export type Tarefa = {
   descricao: string | null;
   coluna_id: string;
   prioridade: Prioridade;
+  is_marco: boolean;
   data_inicio: string | null;
   data_limite: string | null;
   tempo_estimado_min: number | null;
   tempo_realizado_min: number | null;
   criado_em: string;
+};
+
+// ---------------------------------------------------------------------------
+// Contexto Vivo / Visão 360° — Decisões e Indicadores (Etapa 1, sem IA)
+// ---------------------------------------------------------------------------
+
+export type Decisao = {
+  id: string;
+  tenant_id: string;
+  projeto_id: string;
+  meta_smart_id: string | null;
+  titulo: string;
+  decisao: string;
+  motivo: string;
+  impacto_esperado: string;
+  autor: string;
+  data: string;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export type Indicador = {
+  id: string;
+  tenant_id: string;
+  projeto_id: string;
+  nome: string;
+  valor_atual: number;
+  meta: number;
+  unidade: string;
+  criado_em: string;
+  atualizado_em: string;
 };
 
 /** Coluna do kanban — livre por projeto, exceto a de `concluido: true`,

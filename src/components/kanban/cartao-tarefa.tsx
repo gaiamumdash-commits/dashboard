@@ -131,6 +131,11 @@ export function CartaoTarefa({
           <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
             {tarefa.prioridade}
           </span>
+          {tarefa.is_marco && (
+            <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
+              🚩 Marco
+            </span>
+          )}
           {etiquetasDaTarefa.map((te) => {
             const etiqueta = etiquetasDoTenant.find((e) => e.id === te.etiqueta_id);
             if (!etiqueta) return null;

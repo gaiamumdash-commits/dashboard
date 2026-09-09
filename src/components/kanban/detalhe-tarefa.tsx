@@ -19,6 +19,7 @@ import { aplicarMencao, calcularBuscaMencao, dividirTextoPorMencoes } from "@/li
 import {
   adicionarChecklistItem,
   alternarChecklistItem,
+  alternarMarcoTarefa,
   alternarMembroTarefa,
   atualizarDatasTarefa,
   atualizarDescricaoTarefa,
@@ -259,6 +260,13 @@ export function DetalheTarefa({
     });
   }
 
+  function alternarMarco(isMarco: boolean) {
+    iniciarTransicao(async () => {
+      await alternarMarcoTarefa(tarefa.id, projetoId, isMarco);
+      router.refresh();
+    });
+  }
+
   function moverPara(novaColunaId: string) {
     if (colunasDoProjeto.find((c) => c.id === novaColunaId)?.concluido) {
       tocarSomConcluido();
@@ -347,6 +355,19 @@ export function DetalheTarefa({
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+            Marco
+            <span className="flex items-center gap-1.5 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5">
+              <input
+                type="checkbox"
+                checked={tarefa.is_marco}
+                onChange={(e) => alternarMarco(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <span className="text-sm text-gaiamum-text">🚩 Destacar como marco</span>
+            </span>
           </label>
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">

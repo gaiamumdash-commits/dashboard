@@ -114,14 +114,34 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
             )}
           </div>
           {podeExcluirTarefa && (
-            <div className="flex shrink-0 items-start gap-2">
-              <BotaoFreeze projetoId={projetoId} />
-              <Link
-                href={`/projetos/${projetoId}/configuracoes`}
-                className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-              >
-                ⚙ Configurações
-              </Link>
+            <div className="flex shrink-0 flex-wrap items-start gap-2">
+              {papelAtual === "owner" && (
+                <>
+                  <Link
+                    href={`/projetos/${projetoId}/decisoes`}
+                    className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+                  >
+                    📋 Decisões
+                  </Link>
+                  <Link
+                    href={`/projetos/${projetoId}/indicadores`}
+                    className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+                  >
+                    📊 Indicadores
+                  </Link>
+                </>
+              )}
+              {podeExcluirTarefa && (
+                <>
+                  <BotaoFreeze projetoId={projetoId} />
+                  <Link
+                    href={`/projetos/${projetoId}/configuracoes`}
+                    className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
+                  >
+                    ⚙ Configurações
+                  </Link>
+                </>
+              )}
             </div>
           )}
         </div>

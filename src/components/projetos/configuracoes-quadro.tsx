@@ -3,13 +3,19 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CorEtiqueta, Projeto } from "@/lib/ecc/tipos";
-import { alternarArquivadoProjeto, mudarCorProjeto, renomearProjeto } from "@/lib/ecc/actions";
+import {
+  alternarArquivadoProjeto,
+  atualizarResultadoEsperadoProjeto,
+  mudarCorProjeto,
+  renomearProjeto,
+} from "@/lib/ecc/actions";
 import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
 
 const CORES: CorEtiqueta[] = ["purple", "teal", "yellow", "blue", "coral", "lime"];
 
 export function ConfiguracoesQuadro({ projeto }: { projeto: Projeto }) {
   const [salvandoNome, iniciarTransicaoNome] = useTransition();
+  const [salvandoResultado, iniciarTransicaoResultado] = useTransition();
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
 
@@ -29,6 +35,13 @@ export function ConfiguracoesQuadro({ projeto }: { projeto: Projeto }) {
   function salvarNome(formData: FormData) {
     iniciarTransicaoNome(async () => {
       await renomearProjeto(projeto.id, formData);
+      router.refresh();
+    });
+  }
+
+  function salvarResultadoEsperado(formData: FormData) {
+    iniciarTransicaoResultado(async () => {
+      await atualizarResultadoEsperadoProjeto(projeto.id, formData);
       router.refresh();
     });
   }
@@ -60,6 +73,25 @@ export function ConfiguracoesQuadro({ projeto }: { projeto: Projeto }) {
             {salvandoNome ? "Salvando…" : "Salvar"}
           </button>
         </div>
+      </form>
+
+      <form action={salvarResultadoEsperado} className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium text-gaiamum-text-muted">Resultado esperado</label>
+        <textarea
+          key={projeto.resultado_esperado}
+          name="resultado_esperado"
+          rows={3}
+          defaultValue={projeto.resultado_esperado ?? ""}
+          placeholder="O que esse projeto deve entregar, em poucas frases…"
+          className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+        />
+        <button
+          type="submit"
+          disabled={salvandoResultado}
+          className="self-start rounded-lg border border-gaiamum-border px-3 py-2 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text disabled:opacity-50"
+        >
+          {salvandoResultado ? "Salvando…" : "Salvar"}
+        </button>
       </form>
 
       <div className="flex flex-col gap-1.5">

@@ -207,6 +207,25 @@ export async function mudarCorProjeto(projetoId: string, cor: CorEtiqueta) {
   revalidatePath(`/projetos/${projetoId}/configuracoes`);
 }
 
+export async function atualizarResultadoEsperadoProjeto(projetoId: string, formData: FormData) {
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
+  const supabase = await createClient();
+  const resultadoEsperado = (formData.get("resultado_esperado") as string | null)?.trim() || null;
+
+  const { error } = await supabase
+    .from("projetos")
+    .update({ resultado_esperado: resultadoEsperado })
+    .eq("id", projetoId);
+
+  if (error) {
+    throw new Error(`Falha ao salvar resultado esperado: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+  revalidatePath(`/projetos/${projetoId}/configuracoes`);
+}
+
 export async function alternarArquivadoProjeto(projetoId: string, arquivado: boolean) {
   const tenantId = await garantirWorkspace();
   await exigirGestorOuOwner(tenantId, projetoId);
@@ -447,6 +466,19 @@ export async function atualizarPrioridadeTarefa(tarefaId: string, projetoId: str
 
   if (error) {
     throw new Error(`Falha ao salvar prioridade: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+export async function alternarMarcoTarefa(tarefaId: string, projetoId: string, isMarco: boolean) {
+  await garantirWorkspace();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("tarefas").update({ is_marco: isMarco }).eq("id", tarefaId);
+
+  if (error) {
+    throw new Error(`Falha ao marcar/desmarcar marco: ${error.message}`);
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);

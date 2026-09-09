@@ -121,6 +121,7 @@ export function QuadroKanban({
       descricao: null,
       coluna_id: colunaId,
       prioridade: "P3",
+      is_marco: false,
       data_inicio: null,
       data_limite: null,
       tempo_estimado_min: null,
