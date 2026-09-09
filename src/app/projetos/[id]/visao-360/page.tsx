@@ -6,10 +6,11 @@ import { obterPapelAtual } from "@/lib/ecc/equipe";
 import type { ColunaKanban, MetaSmart, Projeto, Tarefa } from "@/lib/ecc/tipos";
 import { listarDecisoesDoProjeto } from "@/lib/ecc/decisoes";
 import { listarIndicadoresDoProjeto } from "@/lib/ecc/indicadores";
-import { calcularAlinhamentoGaiamum } from "@/lib/ecc/visao-360";
+import { alinhamentoTemDadosReais, calcularAlinhamentoGaiamum } from "@/lib/ecc/visao-360";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { BarraProgresso } from "@/components/ui/barra-progresso";
 import { AlinhamentoGaiamumBloco } from "@/components/projetos/alinhamento-gaiamum";
+import { ExplicacaoAlinhamentoBloco } from "@/components/projetos/explicacao-alinhamento";
 
 export default async function PaginaVisao360({ params }: { params: Promise<{ id: string }> }) {
   const { id: projetoId } = await params;
@@ -94,6 +95,8 @@ export default async function PaginaVisao360({ params }: { params: Promise<{ id:
         </section>
 
         <AlinhamentoGaiamumBloco alinhamento={alinhamento} />
+
+        <ExplicacaoAlinhamentoBloco projetoId={projetoId} temDados={alinhamentoTemDadosReais(alinhamento)} />
 
         <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
           <h2 className="text-lg font-semibold text-gaiamum-text">Progresso do quadro</h2>

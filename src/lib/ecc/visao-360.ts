@@ -101,3 +101,12 @@ export function calcularAlinhamentoGaiamum({
 
   return { score, fatores };
 }
+
+/** Verdadeiro se algum fator além da meta SMART tiver dado, ou se houver
+ * meta SMART vinculada — a meta SMART sozinha é sempre computável (0 ou
+ * 100), então o score nunca é `null` de fato, mesmo num projeto vazio.
+ * Decide quando vale a pena gastar uma chamada de IA pra interpretar o
+ * score (achado real de teste manual, 2026-09-09). */
+export function alinhamentoTemDadosReais(alinhamento: AlinhamentoGaiamum): boolean {
+  return alinhamento.fatores.some((f) => (f.chave === "meta_smart" ? f.valor === 100 : f.valor !== null));
+}
