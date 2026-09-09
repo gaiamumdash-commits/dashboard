@@ -1,11 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { obterUsuarioAtual } from "@/lib/supabase/server";
 import { contarNaoLidas } from "@/lib/ecc/notificacoes-app";
+import { listarPatentesDoUsuario, patenteMaisAlta } from "@/lib/ecc/lab/patentes";
 import { SinoNotificacoes } from "@/components/layout/sino-notificacoes";
 import { BotaoSair } from "@/components/layout/botao-sair";
 import { LinksNavegacao } from "@/components/layout/links-navegacao";
 import { MenuMobile } from "@/components/layout/menu-mobile";
+import { EmblemaPatente } from "@/components/lab/emblema-patente";
 
 /** Busca a contagem de não lidas separada num componente próprio, dentro de
  * `<Suspense>` — sem isso, `MenuLateral` (renderizado em toda página do
@@ -16,6 +19,18 @@ import { MenuMobile } from "@/components/layout/menu-mobile";
 async function SinoComContagem({ alinhamento }: { alinhamento?: "left" | "right" }) {
   const naoLidas = await contarNaoLidas();
   return <SinoNotificacoes naoLidasIniciais={naoLidas} alinhamento={alinhamento} />;
+}
+
+/** Mesmo padrão do sino acima: busca própria dentro de `<Suspense>`, sem
+ * bloquear o resto do menu. `null` (sem selo nenhum) até a pessoa conquistar
+ * a primeira patente no Gaiamum Lab. */
+async function PatenteComEmblema() {
+  const user = await obterUsuarioAtual();
+  if (!user) return null;
+  const patentes = await listarPatentesDoUsuario(user.id);
+  const atual = patenteMaisAlta(patentes);
+  if (!atual) return null;
+  return <EmblemaPatente codigo={atual} />;
 }
 
 export function MenuLateral({
@@ -37,6 +52,12 @@ export function MenuLateral({
           </Link>
           <Suspense fallback={<SinoNotificacoes naoLidasIniciais={0} />}>
             <SinoComContagem />
+          </Suspense>
+        </div>
+
+        <div className="mb-4 px-2">
+          <Suspense fallback={null}>
+            <PatenteComEmblema />
           </Suspense>
         </div>
 

@@ -1,11 +1,12 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import { listarIndicadoresDoProjeto } from "@/lib/ecc/indicadores";
 import { alinhamentoTemDadosReais, calcularAlinhamentoGaiamum } from "@/lib/ecc/visao-360";
 import { gerarTextoComGemini, mensagemDeErroGemini } from "@/lib/ecc/gemini";
+import { concederPatente } from "@/lib/ecc/lab/patentes";
 import type { ColunaKanban, Projeto, Tarefa } from "@/lib/ecc/tipos";
 
 async function exigirOwner(tenantId: string) {
@@ -88,6 +89,23 @@ export async function gerarExplicacaoAlinhamento(projetoId: string): Promise<Res
 
     const prompt = montarPrompt(projetoTipado, alinhamento);
     const texto = await gerarTextoComGemini(prompt);
+
+    // Patente Master: primeira análise de IA real gerada com sucesso. Sem
+    // checagem extra "isso não é o projeto do Café Mangue": `tenantId` acima
+    // vem de garantirWorkspace() (sempre a membership mais antiga do
+    // usuário) — o tenant do Lab é garantidamente mais novo, então o
+    // `.eq("tenant_id", tenantId)` na busca do projeto acima nunca encontra
+    // o Café Mangue por essa function (ver mesmo raciocínio em
+    // projetos/[id]/visao-360/page.tsx).
+    const user = await obterUsuarioAtual();
+    if (user) {
+      try {
+        await concederPatente(user.id, "master", { projetoId });
+      } catch {
+        // nunca quebra a explicação em si por causa disso
+      }
+    }
+
     return { texto, erro: null };
   } catch (erro) {
     return { texto: null, erro: mensagemDeErroGemini(erro) };

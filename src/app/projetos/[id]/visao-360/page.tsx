@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import type { ColunaKanban, MetaSmart, Projeto, Tarefa } from "@/lib/ecc/tipos";
 import { listarDecisoesDoProjeto } from "@/lib/ecc/decisoes";
 import { listarIndicadoresDoProjeto } from "@/lib/ecc/indicadores";
 import { alinhamentoTemDadosReais, calcularAlinhamentoGaiamum } from "@/lib/ecc/visao-360";
+import { concederPatente } from "@/lib/ecc/lab/patentes";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { BarraProgresso } from "@/components/ui/barra-progresso";
 import { AlinhamentoGaiamumBloco } from "@/components/projetos/alinhamento-gaiamum";
@@ -63,6 +64,26 @@ export default async function PaginaVisao360({ params }: { params: Promise<{ id:
   });
 
   const decisoesRecentes = decisoes.slice(0, 5);
+
+  // Patente Estrategista: primeira vez que o Alinhamento de um projeto REAL
+  // do usuário deixa de estar vazio. Sem checagem extra "isso não é o
+  // projeto do Café Mangue": `tenantId` acima vem de garantirWorkspace(),
+  // que resolve sempre a membership mais antiga do usuário — o tenant do
+  // Lab é garantidamente mais novo (garantirTenantLab() sempre chama
+  // garantirWorkspace() antes de criar o tenant do Lab), então essa página
+  // nunca renderiza dados do Café Mangue: um projetoId do Lab não bate com
+  // `.eq("tenant_id", tenantId)` na busca acima, e cai em notFound() antes
+  // de chegar aqui.
+  if (alinhamentoTemDadosReais(alinhamento)) {
+    const user = await obterUsuarioAtual();
+    if (user) {
+      try {
+        await concederPatente(user.id, "estrategista", { projetoId });
+      } catch {
+        // nunca quebra o render da página por causa disso
+      }
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">

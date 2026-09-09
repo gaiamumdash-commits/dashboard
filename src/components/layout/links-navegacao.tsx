@@ -61,6 +61,13 @@ export function LinksNavegacao({
           >
             Agenda
           </Link>
+          <Link
+            href="/lab"
+            onClick={aoClicarLink}
+            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
+          >
+            🎮 Gaiamum Lab
+          </Link>
         </>
       )}
       {souOwner && (
