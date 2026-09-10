@@ -6,7 +6,7 @@ import type { Horizonte, Prioridade } from "@/lib/ecc/tipos";
  * concluídas, 1 tarefa atrasada, indicadores abaixo da meta em graus
  * diferentes, meta SMART vinculada. */
 
-export const NOME_PROJETO_CAFE_MANGUE = "Café Mangue";
+export const NOME_PROJETO_CAFE_MANGUE = "Café do Mangue";
 
 export const PROJETO_CAFE_MANGUE = {
   resultadoEsperado:
@@ -23,8 +23,8 @@ export const META_SMART_CAFE_MANGUE: {
   time_bound: string;
 } = {
   horizonte: "medio_prazo",
-  visao_macro: "Aumentar o faturamento mensal do Café Mangue em 25% com um canal de delivery ativo.",
-  specific: "Lançar um serviço de delivery próprio (não terceirizado) para os produtos do Café Mangue.",
+  visao_macro: "Aumentar o faturamento mensal do Café do Mangue em 25% com um canal de delivery ativo.",
+  specific: "Lançar um serviço de delivery próprio (não terceirizado) para os produtos do Café do Mangue.",
   measurable: "50 pedidos de delivery por semana, com nota média de avaliação acima de 4,5.",
   attainable:
     "A cafeteria já tem cozinha com capacidade ociosa no meio da tarde e uma base de clientes fiéis pra validar o serviço.",
@@ -72,7 +72,7 @@ export const DECISOES_CAFE_MANGUE: { titulo: string; decisao: string; motivo: st
     titulo: "Delivery próprio em vez de marketplace terceirizado",
     decisao:
       "Priorizar um app de pedidos próprio, mesmo sendo mais lento pra lançar, em vez de entrar num marketplace de delivery terceirizado.",
-    motivo: "A taxa dos marketplaces (até 30% por pedido) inviabilizaria a margem do cardápio do Café Mangue.",
+    motivo: "A taxa dos marketplaces (até 30% por pedido) inviabilizaria a margem do cardápio do Café do Mangue.",
     impacto_esperado: "Margem melhor por pedido, ao custo de um lançamento mais lento e mais trabalho de divulgação própria.",
   },
 ];
@@ -81,12 +81,12 @@ export const DECISOES_CAFE_MANGUE: { titulo: string; decisao: string; motivo: st
  * própria (ver estatistica-ficticia.tsx), claramente contextualizadas como
  * parte da narrativa do case, nunca confundíveis com dado real do Gaiamum. */
 export const ESTATISTICAS_FICTICIAS_CAFE_MANGUE: string[] = [
-  "No case do Café Mangue, quem resolve a tarefa atrasada antes de continuar costuma destravar o teste piloto até 2x mais rápido.",
-  "Cafeterias fictícias que vinculam uma meta SMART ao projeto, como o Café Mangue fez, chegam à Visão 360° com um fator a menos pra se preocupar.",
+  "No case do Café do Mangue, quem resolve a tarefa atrasada antes de continuar costuma destravar o teste piloto até 2x mais rápido.",
+  "Cafeterias fictícias que vinculam uma meta SMART ao projeto, como o Café do Mangue fez, chegam à Visão 360° com um fator a menos pra se preocupar.",
 ];
 
 /** Texto fixo simulando como seria a explicação de IA do Alinhamento
  * Gaiamum — nunca chama o Gemini de verdade dentro do Lab. Escrito em termos
  * qualitativos (não cita o score numérico exato), pra continuar coerente
  * mesmo que o score calculado ao vivo varie um pouco. */
-export const EXPLICACAO_SIMULADA_CAFE_MANGUE = `O Café Mangue está com uma base estratégica boa — a meta SMART dá clareza de rumo — mas a execução ainda está no começo: só 1 das 6 tarefas do quadro foi concluída, e os dois indicadores de tração (pedidos e clientes cadastrados) estão bem abaixo da meta. O ponto de atenção real é a única tarefa atrasada, "Testar embalagens térmicas" — ela trava o teste piloto com clientes fiéis, que depende dela pra rodar. Prioridade prática: destravar essa tarefa primeiro, porque é ela que libera o resto da fila e começa a puxar os indicadores de pedidos e clientes pra cima.`;
+export const EXPLICACAO_SIMULADA_CAFE_MANGUE = `O Café do Mangue está com uma base estratégica boa — a meta SMART dá clareza de rumo — mas a execução ainda está no começo: só 1 das 6 tarefas do quadro foi concluída, e os dois indicadores de tração (pedidos e clientes cadastrados) estão bem abaixo da meta. O ponto de atenção real é a única tarefa atrasada, "Testar embalagens térmicas" — ela trava o teste piloto com clientes fiéis, que depende dela pra rodar. Prioridade prática: destravar essa tarefa primeiro, porque é ela que libera o resto da fila e começa a puxar os indicadores de pedidos e clientes pra cima.`;

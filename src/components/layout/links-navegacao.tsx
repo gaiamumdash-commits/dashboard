@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 /** Sem "use client" nem "use server": roda no servidor quando importado por
  * MenuLateral (aside desktop), e entra no bundle do cliente quando importado
@@ -8,12 +9,18 @@ export function LinksNavegacao({
   acessoCompleto = true,
   souOwner = false,
   aoClicarLink,
+  extra,
 }: {
   temMetasSmart: boolean;
   acessoCompleto?: boolean;
   souOwner?: boolean;
   /** Fecha o drawer mobile ao navegar; undefined no desktop (sem drawer). */
   aoClicarLink?: () => void;
+  /** Slot pra links condicionais que não cabem nos papéis já existentes (ex.:
+   * gate por conta específica) — JSX já resolvido (geralmente um `<Suspense>`
+   * vindo de MenuLateral), nunca uma função, pra não forçar este componente
+   * nem MenuMobile a virar async. */
+  extra?: ReactNode;
 }) {
   return (
     <nav className="flex flex-col gap-1">
@@ -88,6 +95,7 @@ export function LinksNavegacao({
           </Link>
         </>
       )}
+      {extra}
     </nav>
   );
 }

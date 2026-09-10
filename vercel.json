@@ -2,6 +2,7 @@
   "regions": ["gru1"],
   "crons": [
     { "path": "/api/cron/gerar-contas-fixas", "schedule": "0 6 1 * *" },
-    { "path": "/api/cron/disparar-alarmes", "schedule": "0 6 * * *" }
+    { "path": "/api/cron/disparar-alarmes", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/reengajamento-lab", "schedule": "0 12 * * *" }
   ]
 }

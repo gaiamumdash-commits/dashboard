@@ -11,7 +11,7 @@ export function BotaoRefazerLab() {
   const router = useRouter();
 
   function refazer() {
-    if (!window.confirm("Refazer o Café Mangue do zero? Isso reseta o quadro e o roteiro — suas patentes já conquistadas continuam valendo.")) {
+    if (!window.confirm("Refazer o Café do Mangue do zero? Isso reseta o quadro e o roteiro — suas patentes já conquistadas continuam valendo.")) {
       return;
     }
     iniciarTransicao(async () => {

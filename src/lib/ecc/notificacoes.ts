@@ -150,6 +150,97 @@ export async function enviarEmailAlarme({
   }
 }
 
+function montarHtmlReengajamentoLab({ nome }: { nome: string }): string {
+  const urlLogoCafeDoMangue = `${URL_SITE}/brand/logo-cafe-do-mangue.png`;
+  return `
+<!doctype html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:0;background-color:#f5e9dc;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5e9dc;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:#011f51;padding:20px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="${URL_LOGO}" width="28" height="28" alt="" style="display:block;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <span style="color:#f5e9dc;font-size:16px;font-weight:600;">Gaiamum</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="${urlLogoCafeDoMangue}" width="40" height="40" alt="Café do Mangue" style="display:block;border-radius:8px;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <h1 style="margin:0;color:#011f51;font-size:19px;font-weight:600;">O Café do Mangue tá te esperando</h1>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 16px;color:#1f2937;font-size:15px;line-height:1.5;">Oi, ${nome}!</p>
+                <p style="margin:0 0 16px;color:#1f2937;font-size:15px;line-height:1.5;">
+                  Notícia lá do Café do Mangue: as embalagens térmicas continuam em cima da mesa, sem
+                  ninguém pra testar se seguram o calor até a entrega. O teste piloto com os
+                  clientes fiéis tá parado esperando exatamente essa tarefa — e, sinceramente,
+                  essa cafeteria fictícia não tem mais ninguém a quem recorrer além de você.
+                </p>
+                <p style="margin:0 0 24px;color:#1f2937;font-size:15px;line-height:1.5;">
+                  Você parou bem no meio da missão. Relaxa: seu progresso continua guardado
+                  exatinho onde você deixou, nada se perde. Mas se tiver uns minutinhos livres,
+                  o Mangue agradece — e você sai de lá com a patente de Explorador no bolso.
+                </p>
+                <a
+                  href="${URL_SITE}/lab"
+                  style="display:inline-block;background-color:#0069fd;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;"
+                >
+                  Voltar pro Café do Mangue →
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px;border-top:1px solid #e5e7eb;">
+                <p style="margin:0;color:#9ca3af;font-size:12px;">Até já, Equipe Gaiamum.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`.trim();
+}
+
+export async function enviarEmailReengajamentoLab({ destinatario, nome }: { destinatario: string; nome: string }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+
+  const resend = new Resend(apiKey);
+  const html = montarHtmlReengajamentoLab({ nome });
+
+  const { error } = await resend.emails
+    .send({
+      from: REMETENTE_PADRAO,
+      to: destinatario,
+      subject: "O Café do Mangue tá te esperando (e o café tá esfriando) ☕",
+      html,
+      text: `Oi, ${nome}! Você parou no meio do case do Café do Mangue no Gaiamum Lab — seu progresso continua guardado, nada se perde. Volte quando quiser: ${URL_SITE}/lab`,
+    })
+    .catch((erro) => ({ error: erro }));
+
+  if (error) {
+    console.error(`Falha ao enviar e-mail de reengajamento do Lab pra ${destinatario}:`, error);
+  }
+}
+
 export type ItemConsolidacao = {
   titulo: string;
   status: "concluido" | "atrasado" | "aberto";

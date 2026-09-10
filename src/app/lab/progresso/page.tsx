@@ -9,7 +9,7 @@ import { MenuLateral } from "@/components/layout/menu-lateral";
 import { BotaoRefazerLab } from "@/components/lab/botao-refazer-lab";
 
 const COMO_CONQUISTAR: Record<CodigoPatente, string> = {
-  explorador: "Conclua o estudo de caso do Café Mangue no Gaiamum Lab.",
+  explorador: "Conclua o estudo de caso do Café do Mangue no Gaiamum Lab.",
   estrategista: "Num projeto REAL seu, preencha dados suficientes pra Visão 360° gerar um score (meta SMART, tarefas, ou indicadores).",
   master: "Num projeto REAL seu, gere a primeira explicação de IA do Alinhamento Gaiamum com sucesso.",
 };

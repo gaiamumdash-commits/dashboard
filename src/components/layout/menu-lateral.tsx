@@ -4,6 +4,7 @@ import Image from "next/image";
 import { obterUsuarioAtual } from "@/lib/supabase/server";
 import { contarNaoLidas } from "@/lib/ecc/notificacoes-app";
 import { listarPatentesDoUsuario, patenteMaisAlta } from "@/lib/ecc/lab/patentes";
+import { souDonoDoSaas } from "@/lib/ecc/dono-saas";
 import { SinoNotificacoes } from "@/components/layout/sino-notificacoes";
 import { BotaoSair } from "@/components/layout/botao-sair";
 import { LinksNavegacao } from "@/components/layout/links-navegacao";
@@ -31,6 +32,21 @@ async function PatenteComEmblema() {
   const atual = patenteMaisAlta(patentes);
   if (!atual) return null;
   return <EmblemaPatente codigo={atual} />;
+}
+
+/** Mesmo padrão do sino/patente: busca própria dentro de `<Suspense>` — item
+ * de menu restrito só à conta pessoal do dono do SaaS (não confundir com
+ * `souOwner`, que é "dono deste workspace", concedido a qualquer cliente). */
+async function LinkAnaliticaDoSaas() {
+  if (!(await souDonoDoSaas())) return null;
+  return (
+    <Link
+      href="/admin/analitica-lab"
+      className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
+    >
+      📊 Analítica do Lab
+    </Link>
+  );
 }
 
 export function MenuLateral({
@@ -61,7 +77,16 @@ export function MenuLateral({
           </Suspense>
         </div>
 
-        <LinksNavegacao temMetasSmart={temMetasSmart} acessoCompleto={acessoCompleto} souOwner={souOwner} />
+        <LinksNavegacao
+          temMetasSmart={temMetasSmart}
+          acessoCompleto={acessoCompleto}
+          souOwner={souOwner}
+          extra={
+            <Suspense fallback={null}>
+              <LinkAnaliticaDoSaas />
+            </Suspense>
+          }
+        />
 
         <div className="mt-auto flex flex-col border-t border-gaiamum-border pt-3">
           <BotaoSair />
@@ -75,6 +100,11 @@ export function MenuLateral({
         sino={
           <Suspense fallback={<SinoNotificacoes naoLidasIniciais={0} alinhamento="right" />}>
             <SinoComContagem alinhamento="right" />
+          </Suspense>
+        }
+        linkExtra={
+          <Suspense fallback={null}>
+            <LinkAnaliticaDoSaas />
           </Suspense>
         }
       />

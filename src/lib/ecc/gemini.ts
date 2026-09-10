@@ -19,7 +19,7 @@ function obterClient(): GoogleGenAI {
 }
 
 /** Implementação concreta de `ProvedorIA` usando a API do Gemini. */
-export const gerarTextoComGemini: ProvedorIA["gerarTexto"] = async (prompt: string): Promise<string> => {
+export const gerarTextoComGemini: ProvedorIA["gerarTexto"] = async (prompt: string) => {
   const ai = obterClient();
   const response = await ai.models.generateContent({
     model: MODELO_GEMINI_PADRAO,
@@ -30,7 +30,16 @@ export const gerarTextoComGemini: ProvedorIA["gerarTexto"] = async (prompt: stri
     throw new Error("O Gemini não devolveu nenhum texto.");
   }
 
-  return response.text;
+  return {
+    texto: response.text,
+    provedor: "gemini",
+    modelo: MODELO_GEMINI_PADRAO,
+    uso: {
+      promptTokens: response.usageMetadata?.promptTokenCount,
+      candidatesTokens: response.usageMetadata?.candidatesTokenCount,
+      totalTokens: response.usageMetadata?.totalTokenCount,
+    },
+  };
 };
 
 /** Mensagem amigável pro usuário a partir de uma exceção do SDK — cadeia

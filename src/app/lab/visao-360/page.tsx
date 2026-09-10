@@ -65,7 +65,7 @@ export default async function PaginaVisao360Lab() {
       <main className="mx-auto flex max-w-3xl flex-1 flex-col gap-6 px-4 py-10">
         <div>
           <Link href="/lab/quadro" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">
-            ← Quadro do Café Mangue
+            ← Quadro do Café do Mangue
           </Link>
           <h1 className="mt-2 text-3xl font-semibold text-gaiamum-text">Visão 360°</h1>
           <p className="mt-2 text-gaiamum-text-muted">

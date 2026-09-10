@@ -9,6 +9,7 @@ import { passosConcluidos } from "@/lib/ecc/lab/progresso";
 import { iniciarLab } from "@/lib/ecc/lab/actions";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { BotaoRefazerLab } from "@/components/lab/botao-refazer-lab";
+import { LogoCafeDoMangue } from "@/components/lab/logo-cafe-do-mangue";
 
 export default async function PaginaLab() {
   const tenantId = await garantirWorkspace();
@@ -42,18 +43,21 @@ export default async function PaginaLab() {
     ? "Você chegou a Estrategista Master de verdade, aplicando isso no seu próprio negócio — o Lab já fez o papel dele."
     : temEstrategista
       ? "Você já é Estrategista de verdade num projeto seu — falta só gerar a primeira explicação de IA do Alinhamento pra virar Estrategista Master."
-      : "Você concluiu o Café Mangue e entendeu o núcleo do Gaiamum. As próximas patentes — Estrategista e Estrategista Master — só se conquistam de verdade, aplicando isso num projeto real seu.";
+      : "Você concluiu o Café do Mangue e entendeu o núcleo do Gaiamum. As próximas patentes — Estrategista e Estrategista Master — só se conquistam de verdade, aplicando isso num projeto real seu.";
 
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={Boolean(totalMetasSmart)} souOwner={papelAtual === "owner"} />
       <main className="mx-auto flex max-w-2xl flex-1 flex-col gap-6 px-4 py-12">
         <div>
-          <h1 className="text-3xl font-semibold text-gaiamum-text">🎮 Gaiamum Lab</h1>
+          <div className="flex items-center gap-2">
+            <LogoCafeDoMangue size={40} />
+            <h1 className="text-3xl font-semibold text-gaiamum-text">🎮 Gaiamum Lab</h1>
+          </div>
           <p className="mt-2 text-gaiamum-text-muted">
             Um estudo de caso fictício pra aprender o Gaiamum na prática: você vai assumir o Café
-            Mangue, uma cafeteria que precisa lançar o delivery, e usar o quadro e a Visão 360° de
-            verdade — só que com dados de mentirinha, sem nenhum risco pro seu negócio real.
+            do Mangue, uma cafeteria que precisa lançar o delivery, e usar o quadro e a Visão 360°
+            de verdade — só que com dados de mentirinha, sem nenhum risco pro seu negócio real.
           </p>
         </div>
 

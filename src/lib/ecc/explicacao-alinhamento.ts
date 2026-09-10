@@ -5,8 +5,9 @@ import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import { listarIndicadoresDoProjeto } from "@/lib/ecc/indicadores";
 import { alinhamentoTemDadosReais, calcularAlinhamentoGaiamum } from "@/lib/ecc/visao-360";
-import { gerarTextoComGemini, mensagemDeErroGemini } from "@/lib/ecc/gemini";
+import { gerarTextoComGemini, mensagemDeErroGemini, MODELO_GEMINI_PADRAO } from "@/lib/ecc/gemini";
 import { concederPatente } from "@/lib/ecc/lab/patentes";
+import { registrarConsumoIA } from "@/lib/ecc/ia-consumo";
 import type { ColunaKanban, Projeto, Tarefa } from "@/lib/ecc/tipos";
 
 async function exigirOwner(tenantId: string) {
@@ -87,17 +88,56 @@ export async function gerarExplicacaoAlinhamento(projetoId: string): Promise<Res
       return { texto: null, erro: "Ainda não há dados suficientes no projeto para gerar uma explicação." };
     }
 
+    // Buscado antes da chamada ao Gemini (não só depois, como antes) pra
+    // ficar disponível tanto no log de consumo de sucesso quanto no de
+    // falha, além de continuar servindo pra concederPatente logo abaixo.
+    const user = await obterUsuarioAtual();
+
     const prompt = montarPrompt(projetoTipado, alinhamento);
-    const texto = await gerarTextoComGemini(prompt);
+
+    let resultado;
+    try {
+      resultado = await gerarTextoComGemini(prompt);
+    } catch (erroIA) {
+      try {
+        await registrarConsumoIA({
+          tenantId,
+          userId: user?.id ?? null,
+          projetoId,
+          provedor: "gemini",
+          modelo: MODELO_GEMINI_PADRAO,
+          sucesso: false,
+          erro: mensagemDeErroGemini(erroIA),
+        });
+      } catch {
+        // nunca quebra a explicação em si por causa do log
+      }
+      throw erroIA;
+    }
+
+    try {
+      await registrarConsumoIA({
+        tenantId,
+        userId: user?.id ?? null,
+        projetoId,
+        provedor: resultado.provedor,
+        modelo: resultado.modelo,
+        sucesso: true,
+        promptTokens: resultado.uso?.promptTokens ?? null,
+        candidatesTokens: resultado.uso?.candidatesTokens ?? null,
+        totalTokens: resultado.uso?.totalTokens ?? null,
+      });
+    } catch {
+      // nunca quebra a explicação em si por causa do log
+    }
 
     // Patente Master: primeira análise de IA real gerada com sucesso. Sem
-    // checagem extra "isso não é o projeto do Café Mangue": `tenantId` acima
-    // vem de garantirWorkspace() (sempre a membership mais antiga do
+    // checagem extra "isso não é o projeto do Café do Mangue": `tenantId`
+    // acima vem de garantirWorkspace() (sempre a membership mais antiga do
     // usuário) — o tenant do Lab é garantidamente mais novo, então o
     // `.eq("tenant_id", tenantId)` na busca do projeto acima nunca encontra
-    // o Café Mangue por essa function (ver mesmo raciocínio em
+    // o Café do Mangue por essa function (ver mesmo raciocínio em
     // projetos/[id]/visao-360/page.tsx).
-    const user = await obterUsuarioAtual();
     if (user) {
       try {
         await concederPatente(user.id, "master", { projetoId });
@@ -106,7 +146,7 @@ export async function gerarExplicacaoAlinhamento(projetoId: string): Promise<Res
       }
     }
 
-    return { texto, erro: null };
+    return { texto: resultado.texto, erro: null };
   } catch (erro) {
     return { texto: null, erro: mensagemDeErroGemini(erro) };
   }

@@ -1,17 +1,19 @@
 import type { Horizonte } from "@/lib/ecc/tipos";
 
+/** Só "médio prazo" é coletado no onboarding — decisão do Fabio (2026-09-09):
+ * pedir rigor SMART (mensurável, com prazo) pra um horizonte de 3-5+ anos não
+ * é realista pro ritmo de mudança de mercado de hoje, e a maioria não
+ * preenchia mesmo (confirmado: só 1 meta real com horizonte 'longo_prazo' em
+ * produção antes desta mudança). `Horizonte` continua aceitando
+ * 'longo_prazo' no tipo/schema — metas antigas com esse valor continuam
+ * existindo e sendo exibidas normalmente (ver ROTULO_HORIZONTE em
+ * app/page.tsx), só não é mais oferecido no formulário de criação. */
 export const HORIZONTES: { valor: Horizonte; titulo: string; ajuda: string; placeholder: string }[] = [
   {
     valor: "medio_prazo",
     titulo: "Médio prazo (1 a 3 anos)",
     ajuda: "Onde seu negócio precisa estar pra você considerar os próximos 1 a 3 anos um sucesso.",
     placeholder: "Ex.: consolidar o Gaiamum como a ferramenta de gestão principal de 50 pequenos negócios pagantes.",
-  },
-  {
-    valor: "longo_prazo",
-    titulo: "Longo prazo (3 a 5+ anos)",
-    ajuda: "A visão maior: o que esse negócio se torna se der tudo certo no longo prazo.",
-    placeholder: "Ex.: ser a plataforma de referência em gestão pra pequenos negócios no Brasil.",
   },
 ];
 

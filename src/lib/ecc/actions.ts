@@ -10,6 +10,7 @@ import { tagMetasSmart } from "@/lib/ecc/metas";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { notificarEquipe } from "@/lib/ecc/notificacoes-equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
+import { HORIZONTES } from "@/lib/ecc/smart";
 import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
 import { extrairIdsMencionados } from "@/lib/ecc/mencoes";
 import { formatarDataHoraBrasil } from "@/lib/ecc/kanban";
@@ -49,7 +50,9 @@ export async function criarMetasSmart(formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
-  const horizontes: Horizonte[] = ["medio_prazo", "longo_prazo"];
+  // Fonte única com a UI (HORIZONTES, smart.ts) — evita os dois listarem
+  // horizontes diferentes e o form quebrar por campo ausente.
+  const horizontes: Horizonte[] = HORIZONTES.map((h) => h.valor);
   const linhas = horizontes.map((horizonte) => ({
     tenant_id: tenantId,
     horizonte,
