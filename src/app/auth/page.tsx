@@ -22,6 +22,17 @@ function mensagemDeErroAuth(mensagem: string): string {
   return mensagem;
 }
 
+/** Enumeração de usuário no cadastro: se "Confirm email"/"Confirm phone"
+ * não estiverem AMBOS ligados no projeto Supabase, `signUp()` devolve um
+ * erro explícito pra e-mail já cadastrado e confirmado (em vez do "usuário
+ * ofuscado" que o Supabase usa quando os dois estão ligados) — expondo pra
+ * quem tenta cadastrar se aquele e-mail já tem conta no Gaiamum. Checa
+ * `error.code` (estável entre versões) com fallback na mensagem, pra nunca
+ * depender de como o Auth do projeto está configurado hoje no painel. */
+function contaJaExisteNoCadastro(error: { code?: string; message: string }): boolean {
+  return error.code === "user_already_exists" || error.message === "User already registered";
+}
+
 export default function PaginaAuth() {
   return (
     <Suspense>
@@ -84,6 +95,15 @@ function FormularioAuth() {
     setCarregando(false);
 
     if (error) {
+      if (contaJaExisteNoCadastro(error)) {
+        // Mesma resposta (visual e textual) de um cadastro novo bem-sucedido
+        // — nunca revela por aqui se o e-mail já tinha conta.
+        setAviso(
+          "Cadastro feito! Confira seu e-mail (inclusive a caixa de spam) e clique no link de confirmação antes de entrar. Depois volte aqui e faça login normalmente.",
+        );
+        setModo("login");
+        return;
+      }
       setErro(mensagemDeErroAuth(error.message));
       return;
     }
