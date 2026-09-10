@@ -25,8 +25,8 @@
   5. **Rate-limit em `convidarMembro`**: cap de 20 convites/hora por tenant, contando linhas de `convites` recentes — sem tabela nova. Validado por leitura de código + confirmado que a query de contagem não quebra o fluxo normal (o convite de teste acima passou por ela sem erro); não estressado até o 21º convite (custo real de e-mail via Resend desproporcional ao risco de uma contagem simples).
 - **Migration `0030` traz 2 mudanças**: o trigger `BEFORE UPDATE` travando colunas sensíveis de `convites` (testado ao vivo via service role: UPDATE de `papel` bloqueado, UPDATE de `status` continua liberado) + a policy de INSERT restaurada pro gestor (achado 4 acima, testado ao vivo com sessão real).
 - **`tsc --noEmit`/lint/build limpos.** Testes feitos com sessão real (temp password na conta do Fabio, filtrando por e-mail exato — nunca `users[0]`) e com usuários descartáveis criados/apagados via Admin API. Limpeza completa: senha temporária invalidada, scripts pontuais apagados, servidor de teste (porta 3055) derrubado, artefatos do Playwright que foram parar no repo do UltraQuadras por engano (mesmo achado recorrente de sessões anteriores) apagados de lá.
-- **Pendente de aprovação**: commit e push (Fabio ainda não aprovou nesta sessão).
-- **Próximo passo**: com a frente 1 fechada, seguir pra frente 2 (Integração cross-módulo — Kanban/Decisões → Agenda → Financeiro) na ordem já definida na sessão #31, ou o que o Fabio trouxer.
+- **Publicado**: Fabio aprovou o commit e o push, commit `c01fd99` (`main`, 3 arquivos: `actions.ts`, migration `0030` nova, este handoff). Deploy confirmado via GitHub commit status API (`commits/c01fd99/status`, `state: "success"`, "Deployment has completed"). **Frente 1 fechada de verdade.**
+- **Próximo passo**: seguir pra frente 2 (Integração cross-módulo — Kanban/Decisões → Agenda → Financeiro) na ordem já definida na sessão #31, ou o que o Fabio trouxer.
 
 ---
 
