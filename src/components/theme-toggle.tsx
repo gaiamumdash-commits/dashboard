@@ -37,6 +37,13 @@ function aplicarTema(tema: Tema) {
   ouvintes.forEach((callback) => callback());
 }
 
+/** Tema atual, reativo — reaproveitado por qualquer componente que precise
+ * adaptar sua própria aparência ao tema do app (ex.: o editor de página
+ * livre, que tem um prop `theme` próprio "light"/"dark"). */
+export function useTemaAtual(): Tema {
+  return useSyncExternalStore(inscrever, obterTema, obterTemaServidor);
+}
+
 /** Miolo sem posicionamento — reaproveitado pelo botão flutuante (desktop)
  * e pelo rodapé do drawer mobile (MenuMobile), que precisa do seletor sem
  * `fixed`/`z-50` pra não competir com o cabeçalho mobile. */

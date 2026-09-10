@@ -65,6 +65,18 @@ export type Decisao = {
   atualizado_em: string;
 };
 
+export type PaginaLivre = {
+  id: string;
+  tenant_id: string;
+  projeto_id: string;
+  titulo: string;
+  // array de blocos do BlockNote (jsonb); narrow pra Block[] só onde @blocknote/core é importado
+  conteudo: unknown;
+  criado_por: string;
+  criado_em: string;
+  atualizado_em: string;
+};
+
 export type Indicador = {
   id: string;
   tenant_id: string;
