@@ -11,7 +11,12 @@ import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { notificarEquipe } from "@/lib/ecc/notificacoes-equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { HORIZONTES } from "@/lib/ecc/smart";
-import { eSouGestorDoProjeto, listarMembrosComAcessoAoProjeto, obterPapelAtual } from "@/lib/ecc/equipe";
+import {
+  eSouGestorDoProjeto,
+  listarMembros,
+  listarMembrosComAcessoAoProjeto,
+  obterPapelAtual,
+} from "@/lib/ecc/equipe";
 import { extrairIdsMencionados } from "@/lib/ecc/mencoes";
 import { formatarDataHoraBrasil } from "@/lib/ecc/kanban";
 import { exportarMetaSmartMarkdown } from "@/lib/ecc-export/metas";
@@ -915,6 +920,35 @@ export async function enviarConsolidacaoProjeto(projetoId: string): Promise<{ en
 // Colaboração em equipe — convites, membros, permissões
 // ---------------------------------------------------------------------------
 
+const LIMITE_CONVITES_POR_HORA = 20;
+
+/** Convite pode ser de workspace (só owner) ou de um projeto específico
+ * (gestor daquele projeto também mexe) — usado por `cancelarConvite` e
+ * `reenviarConvite`, que recebem só o id do convite, não o contexto de quem
+ * está chamando. Defesa em profundidade: a RLS já bloqueia isso, mas até
+ * agora essas duas funções dependiam só dela. */
+async function exigirDonoDoConvite(tenantId: string, conviteId: string) {
+  const supabase = await createClient();
+  const { data: convite } = await supabase
+    .from("convites")
+    .select("projeto_id")
+    .eq("id", conviteId)
+    .maybeSingle();
+
+  if (!convite) {
+    throw new Error("Convite não encontrado.");
+  }
+
+  const user = await obterUsuarioAtual();
+  const souOwner = (await obterPapelAtual(tenantId)) === "owner";
+  const souGestor =
+    Boolean(convite.projeto_id) && Boolean(user) && (await eSouGestorDoProjeto(convite.projeto_id, user!.id));
+
+  if (!souOwner && !souGestor) {
+    throw new Error("Só o dono do workspace (ou o gestor do quadro, se o convite for de um projeto) mexe nesse convite.");
+  }
+}
+
 export async function convidarMembro(formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
@@ -922,6 +956,21 @@ export async function convidarMembro(formData: FormData) {
 
   if (!user) {
     throw new Error("Usuário não autenticado.");
+  }
+
+  if ((await obterPapelAtual(tenantId)) !== "owner") {
+    throw new Error("Só o dono do workspace convida membros por aqui.");
+  }
+
+  const umaHoraAtras = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await supabase
+    .from("convites")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .gte("criado_em", umaHoraAtras);
+
+  if ((count ?? 0) >= LIMITE_CONVITES_POR_HORA) {
+    throw new Error("Muitos convites enviados na última hora — espere um pouco antes de convidar mais gente.");
   }
 
   const email = campoObrigatorio(formData, "email").toLowerCase();
@@ -963,6 +1012,8 @@ export async function convidarMembro(formData: FormData) {
 }
 
 export async function cancelarConvite(conviteId: string) {
+  const tenantId = await garantirWorkspace();
+  await exigirDonoDoConvite(tenantId, conviteId);
   const supabase = await createClient();
   const { error } = await supabase.from("convites").update({ status: "cancelado" }).eq("id", conviteId);
 
@@ -975,8 +1026,11 @@ export async function cancelarConvite(conviteId: string) {
 
 /** Renova o prazo (mais 7 dias) e reenvia o e-mail — mesma policy de UPDATE
  * de `cancelarConvite` (owner do workspace, ou gestor do projeto quando o
- * convite é de um quadro específico) já cobre quem pode chamar isso. */
+ * convite é de um quadro específico) já cobre quem pode chamar isso; o guard
+ * de código abaixo é defesa em profundidade, não muda quem já podia chamar. */
 export async function reenviarConvite(conviteId: string) {
+  const tenantId = await garantirWorkspace();
+  await exigirDonoDoConvite(tenantId, conviteId);
   const supabase = await createClient();
   const user = await obterUsuarioAtual();
 
@@ -1019,6 +1073,21 @@ export async function reenviarConvite(conviteId: string) {
 
 export async function removerMembro(userId: string) {
   const tenantId = await garantirWorkspace();
+
+  if ((await obterPapelAtual(tenantId)) !== "owner") {
+    throw new Error("Só o dono do workspace remove membros.");
+  }
+
+  const membros = await listarMembros(tenantId);
+  const membroAlvo = membros.find((m) => m.user_id === userId);
+
+  if (membroAlvo?.papel === "owner") {
+    const totalOwners = membros.filter((m) => m.papel === "owner").length;
+    if (totalOwners <= 1) {
+      throw new Error("Não é possível remover o único dono do workspace.");
+    }
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("memberships")
@@ -1061,16 +1130,18 @@ export async function aceitarConvite(token: string) {
     .eq("status", "pendente")
     .maybeSingle();
 
-  if (erroConvite || !convite) {
-    throw new Error("Convite inválido ou já utilizado.");
-  }
+  // Mensagem única pros 3 casos (inexistente/já usado, expirado, e-mail
+  // errado) — evita que alguém com um token específico consiga diferenciar
+  // essas causas por fora (oráculo fraco de enumeração, já que o token é
+  // um uuid v4, mas sem custo nenhum fechar mesmo assim).
+  const conviteValido =
+    convite &&
+    !erroConvite &&
+    new Date(convite.expira_em) >= new Date() &&
+    convite.email.toLowerCase() === (user.email ?? "").toLowerCase();
 
-  if (new Date(convite.expira_em) < new Date()) {
-    throw new Error("Este convite expirou.");
-  }
-
-  if (convite.email.toLowerCase() !== (user.email ?? "").toLowerCase()) {
-    throw new Error("Este convite foi feito para outro e-mail.");
+  if (!conviteValido) {
+    throw new Error("Convite inválido ou expirado.");
   }
 
   await vincularUsuarioAoConvite(convite as Convite, user.id);
