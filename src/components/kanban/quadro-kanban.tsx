@@ -54,6 +54,13 @@ export function QuadroKanban({
   const [colunaEditandoId, setColunaEditandoId] = useState<string | null>(null);
   const [colunaArrastadaId, setColunaArrastadaId] = useState<string | null>(null);
   const [criandoColuna, setCriandoColuna] = useState(false);
+  // Arrasto de cartão por toque (celular/tablet) — implementação paralela ao
+  // `draggable` nativo acima, que só reage a mouse. Ver comentário em
+  // CartaoTarefa.tsx pra detalhe da técnica (segurar ~300ms confirma
+  // arrasto). `x`/`y` seguem o dedo pro "fantasma" abaixo; a coluna-alvo é
+  // recalculada a cada movimento via `elementFromPoint`.
+  const [arrastoToque, setArrastoToque] = useState<{ tarefaId: string; titulo: string; x: number; y: number } | null>(null);
+  const [colunaAlvoToqueId, setColunaAlvoToqueId] = useState<string | null>(null);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
   const inputNovaColunaRef = useRef<HTMLInputElement>(null);
@@ -209,6 +216,33 @@ export function QuadroKanban({
     });
   }
 
+  function iniciarArrastoToque(tarefaId: string, titulo: string, x: number, y: number) {
+    setArrastoToque({ tarefaId, titulo, x, y });
+  }
+
+  function moverArrastoToque(x: number, y: number) {
+    setArrastoToque((atual) => (atual ? { ...atual, x, y } : atual));
+    const elemento = document.elementFromPoint(x, y);
+    const colunaEl = elemento?.closest<HTMLElement>("[data-coluna-id]");
+    setColunaAlvoToqueId(colunaEl?.dataset.colunaId ?? null);
+  }
+
+  function soltarArrastoToque(x: number, y: number) {
+    // Recalcula a coluna-alvo na hora, em vez de reaproveitar
+    // `colunaAlvoToqueId` do estado: um arrasto rápido pode disparar
+    // touchend antes do React re-renderizar o último touchmove (setState
+    // fora de handler sintético é batched/assíncrono), o que deixaria essa
+    // decisão lendo uma coluna-alvo desatualizada. `arrastoToque.tarefaId`
+    // não tem esse risco — só é definido uma vez, no início do arrasto.
+    if (arrastoToque) {
+      const elemento = document.elementFromPoint(x, y);
+      const colunaId = elemento?.closest<HTMLElement>("[data-coluna-id]")?.dataset.colunaId;
+      if (colunaId) moverPara(arrastoToque.tarefaId, colunaId);
+    }
+    setArrastoToque(null);
+    setColunaAlvoToqueId(null);
+  }
+
   function apagarColuna(colunaId: string) {
     if (!window.confirm("Apagar esta coluna?")) return;
     const colunaRemovida = colunas.find((c) => c.id === colunaId);
@@ -238,6 +272,7 @@ export function QuadroKanban({
     return (
       <div
         key={coluna.id}
+        data-coluna-id={coluna.id}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           const colunaArrastada = e.dataTransfer.getData("text/coluna-id");
@@ -250,7 +285,7 @@ export function QuadroKanban({
         }}
         className={`flex min-h-[16rem] w-64 shrink-0 flex-col gap-2.5 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3 transition ${
           colunaArrastadaId === coluna.id ? "opacity-50" : ""
-        }`}
+        } ${colunaAlvoToqueId === coluna.id ? "ring-2 ring-gaiamum-primary" : ""}`}
       >
         <div className="flex items-center justify-between gap-2">
           {colunaEditandoId === coluna.id ? (
@@ -316,6 +351,10 @@ export function QuadroKanban({
               podeExcluir={podeExcluirTarefa}
               onAbrir={() => setTarefaAbertaId(tarefa.id)}
               onExcluir={() => excluir(tarefa.id)}
+              aoIniciarArrastoToque={(x, y) => iniciarArrastoToque(tarefa.id, tarefa.titulo, x, y)}
+              aoMoverToque={moverArrastoToque}
+              aoSoltarToque={soltarArrastoToque}
+              emArrastoToque={arrastoToque?.tarefaId === tarefa.id}
             />
           );
         })}
@@ -388,6 +427,15 @@ export function QuadroKanban({
       {tarefas.length > 0 && (
         <div className="mt-6 max-w-md">
           <BarraProgresso percentual={percentualConcluido} rotulo={`Cartões concluídos (${tarefasConcluidas}/${tarefas.length})`} />
+        </div>
+      )}
+
+      {arrastoToque && (
+        <div
+          style={{ position: "fixed", left: arrastoToque.x + 14, top: arrastoToque.y + 14, pointerEvents: "none", zIndex: 60 }}
+          className="max-w-[14rem] truncate rounded-lg border border-gaiamum-primary bg-gaiamum-surface-raised px-3 py-1.5 text-sm font-medium text-gaiamum-text shadow-lg"
+        >
+          {arrastoToque.titulo}
         </div>
       )}
 

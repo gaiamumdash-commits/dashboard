@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import type {
@@ -21,7 +21,18 @@ import { AvatarIniciais } from "@/components/avatar-iniciais";
  * campo de texto), o de baixo abre o cartão por dentro. Mover de coluna é
  * só por arrasto (o cartão inteiro é arrastável, os dois andares se movem
  * juntos por serem uma coisa só) — sem atalho de clique, pedido do Fabio
- * pra manter só a dinâmica de arrastar. */
+ * pra manter só a dinâmica de arrastar (a única exceção é o seletor de
+ * coluna dentro do modal de detalhe, que já existia antes desta mudança).
+ *
+ * O `draggable`/`onDragStart` nativo abaixo só funciona com mouse — toque
+ * não dispara esses eventos. Suporte a toque é uma implementação paralela
+ * (não reaproveita a API nativa, que não tem equivalente touch): pressionar
+ * e segurar ~300ms confirma que é arrasto (em vez de rolagem ou toque
+ * normal), a posição do dedo sobe pro `QuadroKanban` via os 3 callbacks
+ * abaixo, que desenham o "fantasma" do cartão e decidem a coluna-alvo por
+ * `elementFromPoint`. Ouvintes nativos (não os props sintéticos do React)
+ * porque só um `addEventListener` com `{ passive: false }` garante que
+ * `preventDefault()` no `touchmove` realmente trava a rolagem da página. */
 export function CartaoTarefa({
   tarefa,
   coluna,
@@ -36,6 +47,10 @@ export function CartaoTarefa({
   podeExcluir,
   onAbrir,
   onExcluir,
+  aoIniciarArrastoToque,
+  aoMoverToque,
+  aoSoltarToque,
+  emArrastoToque,
 }: {
   tarefa: Tarefa;
   coluna: ColunaKanban;
@@ -50,10 +65,89 @@ export function CartaoTarefa({
   podeExcluir: boolean;
   onAbrir: () => void;
   onExcluir: () => void;
+  aoIniciarArrastoToque: (x: number, y: number) => void;
+  aoMoverToque: (x: number, y: number) => void;
+  aoSoltarToque: (x: number, y: number) => void;
+  emArrastoToque: boolean;
 }) {
   const [editandoTitulo, setEditandoTitulo] = useState(false);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
+
+  const cardRef = useRef<HTMLDivElement>(null);
+  // Sempre aponta pros callbacks mais recentes sem forçar o efeito abaixo a
+  // reanexar os ouvintes a cada render (as funções recebidas via prop
+  // nascem de novo a cada vez, já que são closures fechadas sobre `tarefa`).
+  const callbacksRef = useRef({ aoIniciarArrastoToque, aoMoverToque, aoSoltarToque });
+  useEffect(() => {
+    callbacksRef.current = { aoIniciarArrastoToque, aoMoverToque, aoSoltarToque };
+  });
+
+  useEffect(() => {
+    const elemento = cardRef.current;
+    if (!elemento) return;
+
+    const estado = { x: 0, y: 0, timer: null as number | null, arrastando: false };
+    const LIMIAR_ESPERA_MS = 300;
+    const LIMIAR_MOVIMENTO_PX = 10;
+
+    function onTouchStart(e: TouchEvent) {
+      // Dentro do campo de renomear (input aberto): deixa o comportamento
+      // nativo de toque em texto (posicionar cursor, selecionar) em paz.
+      if ((e.target as HTMLElement).closest("input")) return;
+      const toque = e.touches[0];
+      estado.x = toque.clientX;
+      estado.y = toque.clientY;
+      estado.arrastando = false;
+      estado.timer = window.setTimeout(() => {
+        estado.arrastando = true;
+        navigator.vibrate?.(15);
+        callbacksRef.current.aoIniciarArrastoToque(toque.clientX, toque.clientY);
+      }, LIMIAR_ESPERA_MS);
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      const toque = e.touches[0];
+      if (!estado.arrastando) {
+        // Ainda esperando confirmar o "segurar": se o dedo já andou demais,
+        // é rolagem normal — cancela o timer e deixa o navegador rolar.
+        if (
+          estado.timer !== null &&
+          (Math.abs(toque.clientX - estado.x) > LIMIAR_MOVIMENTO_PX || Math.abs(toque.clientY - estado.y) > LIMIAR_MOVIMENTO_PX)
+        ) {
+          window.clearTimeout(estado.timer);
+          estado.timer = null;
+        }
+        return;
+      }
+      // Arrasto já confirmado: trava a rolagem da página pro gesto inteiro.
+      e.preventDefault();
+      callbacksRef.current.aoMoverToque(toque.clientX, toque.clientY);
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      if (estado.timer !== null) window.clearTimeout(estado.timer);
+      if (estado.arrastando) {
+        const toque = e.changedTouches[0];
+        callbacksRef.current.aoSoltarToque(toque.clientX, toque.clientY);
+      }
+      estado.arrastando = false;
+      estado.timer = null;
+    }
+
+    elemento.addEventListener("touchstart", onTouchStart, { passive: true });
+    elemento.addEventListener("touchmove", onTouchMove, { passive: false });
+    elemento.addEventListener("touchend", onTouchEnd, { passive: true });
+    elemento.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
+    return () => {
+      elemento.removeEventListener("touchstart", onTouchStart);
+      elemento.removeEventListener("touchmove", onTouchMove);
+      elemento.removeEventListener("touchend", onTouchEnd);
+      elemento.removeEventListener("touchcancel", onTouchEnd);
+      if (estado.timer !== null) window.clearTimeout(estado.timer);
+    };
+  }, []);
 
   const urgencia = urgenciaDoPrazo(tarefa, coluna.concluido);
   const concluidos = checklistDaTarefa.filter((c) => c.concluido).length;
@@ -69,11 +163,12 @@ export function CartaoTarefa({
 
   return (
     <div
+      ref={cardRef}
       draggable
       onDragStart={(e) => e.dataTransfer.setData("text/tarefa-id", tarefa.id)}
       className={`cursor-grab overflow-hidden rounded-xl border-2 bg-gaiamum-surface-raised shadow-sm transition hover:shadow-md active:cursor-grabbing ${
         souResponsavel ? "border-gaiamum-border-forte border-l-4 border-l-gaiamum-primary" : "border-gaiamum-border-forte"
-      }`}
+      } ${emArrastoToque ? "opacity-40" : ""}`}
     >
       {/* Traço de urgência — só em P1, pedido do Fabio pra chamar mais
           atenção nos cartões mais urgentes. bg-gaiamum-danger é fixo
