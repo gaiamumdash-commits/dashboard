@@ -6,6 +6,8 @@ import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { ColunaKanban, Tarefa } from "@/lib/ecc/tipos";
 import { CLASSE_PRAZO, urgenciaDoPrazo } from "@/lib/ecc/kanban";
 import { moverTarefaLab } from "@/lib/ecc/lab/actions";
+import type { MissaoQuadroCafeMangue } from "@/lib/ecc/lab/conteudo-cafe-mangue";
+import { ListaMissoesLab } from "@/components/lab/lista-missoes-lab";
 
 /** Versão simplificada e só-do-Lab do quadro Kanban — sem criar/apagar
  * cartão ou coluna, sem checklist/membros/etiquetas (o Café Mangue é
@@ -18,9 +20,11 @@ import { moverTarefaLab } from "@/lib/ecc/lab/actions";
 export function QuadroLab({
   colunasIniciais,
   tarefasIniciais,
+  missoes,
 }: {
   colunasIniciais: ColunaKanban[];
   tarefasIniciais: Tarefa[];
+  missoes: MissaoQuadroCafeMangue[];
 }) {
   const [tarefas, setTarefas] = useState(tarefasIniciais);
   const [, iniciarTransicao] = useTransition();
@@ -46,8 +50,10 @@ export function QuadroLab({
   });
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
-      {colunasOrdenadas.map((coluna) => {
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <ListaMissoesLab missoes={missoes} tarefas={tarefas} colunas={colunasIniciais} />
+      <div className="flex flex-1 gap-3 overflow-x-auto pb-2">
+        {colunasOrdenadas.map((coluna) => {
         const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id);
 
         return (
@@ -91,7 +97,8 @@ export function QuadroLab({
             })}
           </div>
         );
-      })}
+        })}
+      </div>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { MenuLateral } from "@/components/layout/menu-lateral";
 import { QuadroLab } from "@/components/lab/quadro-lab";
 import { EstatisticaFicticia } from "@/components/lab/estatistica-ficticia";
 import { LogoCafeDoMangue } from "@/components/lab/logo-cafe-do-mangue";
-import { ESTATISTICAS_FICTICIAS_CAFE_MANGUE } from "@/lib/ecc/lab/conteudo-cafe-mangue";
+import { ESTATISTICAS_FICTICIAS_CAFE_MANGUE, MISSOES_QUADRO_CAFE_MANGUE } from "@/lib/ecc/lab/conteudo-cafe-mangue";
 
 export default async function PaginaQuadroLab() {
   const tenantId = await garantirWorkspace();
@@ -57,14 +57,13 @@ export default async function PaginaQuadroLab() {
             <LogoCafeDoMangue size={36} />
             <h1 className="text-3xl font-semibold text-gaiamum-text">Café do Mangue</h1>
           </div>
-          <p className="mt-2 text-gaiamum-text-muted">
-            Este é o quadro real do Café do Mangue — arraste os cartões entre as colunas pra ver como
-            funciona. &ldquo;Testar embalagens térmicas&rdquo; está atrasada e travando o teste
-            piloto: repare como isso vai aparecer na Visão 360° no próximo passo.
-          </p>
         </div>
 
-        <QuadroLab colunasIniciais={(colunas as ColunaKanban[]) ?? []} tarefasIniciais={(tarefas as Tarefa[]) ?? []} />
+        <QuadroLab
+          colunasIniciais={(colunas as ColunaKanban[]) ?? []}
+          tarefasIniciais={(tarefas as Tarefa[]) ?? []}
+          missoes={MISSOES_QUADRO_CAFE_MANGUE}
+        />
 
         <EstatisticaFicticia texto={ESTATISTICAS_FICTICIAS_CAFE_MANGUE[0]} />
 

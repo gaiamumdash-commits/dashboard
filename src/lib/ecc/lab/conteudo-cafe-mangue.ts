@@ -61,6 +61,35 @@ export const TAREFAS_CAFE_MANGUE: {
   },
 ];
 
+/** Critério de conclusão de uma missão do quadro — resolvido por TÍTULO de
+ * tarefa / NOME de coluna, nunca por ID (mesmo padrão do resto do módulo:
+ * IDs são UUIDs gerados no seed e mudam a cada "refazer o case"). Nada aqui
+ * é persistido — sempre derivado do estado atual das tarefas (ver missoes.ts). */
+export type CriterioMissaoQuadro =
+  | { tipo: "mover_tarefa"; tarefaTitulo: string; colunaDiferenteDe: string }
+  | { tipo: "dependente"; dependeDeMissaoId: string };
+
+export type MissaoQuadroCafeMangue = {
+  id: string;
+  texto: string;
+  criterio: CriterioMissaoQuadro;
+};
+
+/** Decomposição do mesmo parágrafo que antes ficava acima do QuadroLab numa
+ * lista de missões — mesmo texto, sem conteúdo novo. A missão 2 depende da 1. */
+export const MISSOES_QUADRO_CAFE_MANGUE: MissaoQuadroCafeMangue[] = [
+  {
+    id: "mover-embalagens",
+    texto: "Mova a tarefa “Testar embalagens térmicas” para fora de “A Fazer”.",
+    criterio: { tipo: "mover_tarefa", tarefaTitulo: "Testar embalagens térmicas", colunaDiferenteDe: "A Fazer" },
+  },
+  {
+    id: "reparar-teste-piloto",
+    texto: "Repare: isso destrava “Rodar teste piloto com clientes fiéis”.",
+    criterio: { tipo: "dependente", dependeDeMissaoId: "mover-embalagens" },
+  },
+];
+
 export const INDICADORES_CAFE_MANGUE: { nome: string; valor_atual: number; meta: number; unidade: string }[] = [
   { nome: "Pedidos de delivery por semana", valor_atual: 18, meta: 50, unidade: "pedidos" },
   { nome: "Novos clientes cadastrados no app", valor_atual: 40, meta: 100, unidade: "clientes" },
