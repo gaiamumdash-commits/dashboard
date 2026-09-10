@@ -435,7 +435,7 @@ export type ResultadoAgenda =
 
 /** Um item da Agenda unificada — pode vir do Google ou de dentro do
  * próprio Gaiamum (conta a pagar, tarefa com prazo, evento manual/voz). */
-export type FonteItemAgenda = "google" | "conta_a_pagar" | "tarefa" | "evento_agenda";
+export type FonteItemAgenda = "google" | "conta_a_pagar" | "tarefa" | "evento_agenda" | "decisao";
 
 export type OrigemEventoAgenda = "manual" | "voz";
 

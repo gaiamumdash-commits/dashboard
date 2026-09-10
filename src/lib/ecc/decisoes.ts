@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
+import { paraUtcDoFuso } from "@/lib/ecc/kanban";
 import type { Decisao } from "@/lib/ecc/tipos";
 
 function campoObrigatorio(formData: FormData, nome: string): string {
@@ -50,7 +51,12 @@ export async function criarDecisao(projetoId: string, formData: FormData) {
   const motivo = campoObrigatorio(formData, "motivo");
   const impactoEsperado = campoObrigatorio(formData, "impacto_esperado");
   const metaSmartId = (formData.get("meta_smart_id") as string | null) || null;
-  const data = (formData.get("data") as string | null) || new Date().toISOString().slice(0, 10);
+  // Mesmo princípio de fuso já usado em `criarEventoAgendaManual`: nunca
+  // resolver no servidor, sempre repassar o valor cru do <input
+  // type="datetime-local"> + fuso do navegador (campo hidden `fuso`).
+  const fuso = (formData.get("fuso") as string | null) || "America/Sao_Paulo";
+  const dataLocal = formData.get("data") as string | null;
+  const data = dataLocal ? paraUtcDoFuso(dataLocal, fuso).toISOString() : new Date().toISOString();
 
   const { error } = await supabase.from("decisoes").insert({
     tenant_id: tenantId,
@@ -81,7 +87,9 @@ export async function editarDecisao(decisaoId: string, projetoId: string, formDa
   const motivo = campoObrigatorio(formData, "motivo");
   const impactoEsperado = campoObrigatorio(formData, "impacto_esperado");
   const metaSmartId = (formData.get("meta_smart_id") as string | null) || null;
-  const data = campoObrigatorio(formData, "data");
+  const fuso = (formData.get("fuso") as string | null) || "America/Sao_Paulo";
+  const dataLocal = campoObrigatorio(formData, "data");
+  const data = paraUtcDoFuso(dataLocal, fuso).toISOString();
 
   const { error } = await supabase
     .from("decisoes")

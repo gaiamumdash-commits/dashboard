@@ -39,8 +39,13 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
   // undefined = ainda carregando; null = sem alarme configurado.
   const [alarme, setAlarme] = useState<number | null | undefined>(undefined);
 
+  // Alarme só existe pra entidades cobertas por `EntidadeAlarme` — google é
+  // gerenciado pelo próprio Google, decisão não tem alarme (fora de escopo
+  // desta rodada; `alarmes.entidade_tipo` no banco não aceita "decisao").
+  const suportaAlarme = item.fonte !== "google" && item.fonte !== "decisao";
+
   useEffect(() => {
-    if (item.fonte === "google") return;
+    if (!suportaAlarme) return;
     let cancelado = false;
     obterAlarme(item.fonte as EntidadeAlarme, item.id).then((resultado) => {
       if (!cancelado) setAlarme(resultado?.antecedencia_min ?? null);
@@ -52,7 +57,7 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
     // `DetalheItemAgenda` novo por item, com `key={item.id}`), então este
     // efeito só roda uma vez por abertura — sem precisar resetar o estado
     // manualmente antes do fetch.
-  }, [item]);
+  }, [item, suportaAlarme]);
 
   function excluir() {
     iniciarTransicao(async () => {
@@ -86,7 +91,7 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
 
         {item.badge && <p className="mt-2 text-sm text-gaiamum-text">{item.badge}</p>}
 
-        {item.fonte !== "google" && (
+        {suportaAlarme && (
           <div className="mt-4">
             {alarme === undefined ? (
               <p className="text-xs text-gaiamum-text-muted">Carregando alarme…</p>

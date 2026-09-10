@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Decisao, MetaSmart } from "@/lib/ecc/tipos";
 import { criarDecisao, editarDecisao, excluirDecisao } from "@/lib/ecc/decisoes";
+import { paraDatetimeLocal } from "@/lib/ecc/kanban";
 import { Dialog } from "@/components/ui/dialog";
 
 export function ListaDecisoes({
@@ -72,7 +73,13 @@ export function ListaDecisoes({
                 <div>
                   <h3 className="text-base font-semibold text-gaiamum-text">{decisao.titulo}</h3>
                   <p className="text-xs text-gaiamum-text-muted">
-                    {new Date(`${decisao.data}T00:00:00`).toLocaleDateString("pt-BR")}
+                    {new Date(decisao.data).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                     {meta && ` · vinculada a "${meta.specific}"`}
                   </p>
                 </div>
@@ -120,6 +127,11 @@ export function ListaDecisoes({
           acoesExtras={salvando ? <span className="text-xs text-gaiamum-text-muted">Salvando…</span> : null}
         >
           <form action={salvar} className="mt-4 flex flex-col gap-3">
+            {/* Mesmo princípio de fuso já usado em criarEventoAgendaManual:
+                nunca resolver no servidor, sempre repassar o fuso do
+                navegador. */}
+            <input type="hidden" name="fuso" value={Intl.DateTimeFormat().resolvedOptions().timeZone} />
+
             <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
               Título
               <input
@@ -165,12 +177,12 @@ export function ListaDecisoes({
 
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-                Data
+                Data e hora
                 <input
-                  type="date"
+                  type="datetime-local"
                   name="data"
                   required
-                  defaultValue={emEdicao?.data ?? new Date().toISOString().slice(0, 10)}
+                  defaultValue={paraDatetimeLocal(emEdicao?.data ?? new Date().toISOString())}
                   className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
                 />
               </label>

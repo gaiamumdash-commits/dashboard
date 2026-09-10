@@ -33,7 +33,7 @@ export default async function PaginaAgenda({
       <main className="mx-auto max-w-2xl flex-1 px-4 py-12">
         <h1 className="text-3xl font-semibold text-gaiamum-text">Agenda</h1>
         <p className="mt-1 text-gaiamum-text-muted">
-          Contas a pagar, tarefas com prazo e seus eventos do Google, num só lugar.
+          Contas a pagar, tarefas com prazo, decisões e seus eventos do Google, num só lugar.
         </p>
 
         <div className="mt-8">
