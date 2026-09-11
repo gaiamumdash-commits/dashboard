@@ -10,7 +10,23 @@
 
 ---
 
-## Estado confirmado (2026-09-11, sessão nova #36 — última atualização)
+## Estado confirmado (2026-09-11, sessão nova #37 — última atualização)
+
+**Resumo em uma linha**: investigação completa do estado atual do Gaiamum Lab (pausado desde a sessão #31) + decisão de escopo de retomada fechada com o Fabio via `AskUserQuestion`. **Nenhuma linha de código escrita nesta sessão** (pedido explícito).
+
+- **Mapeamento do Lab como está hoje** (1 Explore agent, leitura integral de todos os arquivos de `src/app/lab/`, `src/components/lab/`, `src/lib/ecc/lab/` + schema): fluxo linear `/lab` (hub) → `/lab/quadro` (Kanban fictício "Café do Mangue", drag-and-drop **real**) → `/lab/visao-360` (score/Marcos/Indicadores/Decisões, **somente leitura**) → conclusão (patente "explorador") → `/lab/progresso`. Case sem personagem/narrador — narrativa contada só por campos de formulário (1 meta SMART, 1 decisão, 3 indicadores, 6 tarefas). Única interação real do Lab inteiro é arrastar cards do Kanban; todo o resto é leitura/derivado.
+- **Confirmado por grep, zero cobertura das 4 frentes publicadas**: nenhuma menção a Financeiro, Equipe/colaboração multi-usuário, Agenda ou Página livre em qualquer arquivo do Lab — o case ensina hoje só uma fatia pequena e desatualizada do produto real, confirmando o motivo da pausa da sessão #31.
+- **3 achados técnicos que importam pro desenho das próximas fases**: (1) `lab_passos.modulo`/`.passo` têm `CHECK` constraint **fechado** no banco (só `'nucleo'` e 2 passos hoje) — qualquer módulo/passo novo exige migration, não é "de graça" como um comentário antigo do código sugeria; (2) `QuadroLab` é um componente deliberadamente duplicado do Kanban real (tenant do Lab é isolado) — evoluções de UI do produto real não se propagam automaticamente pro case; (3) bug pequeno de qualidade achado: o texto fixo `EXPLICACAO_SIMULADA_CAFE_MANGUE` afirma como fato que a tarefa "Testar embalagens térmicas" está atrasada e travando o piloto — se o usuário já resolveu a missão do Kanban antes de chegar na Visão 360°, o texto fica objetivamente errado (não corrigido ainda, registrado pra quando mexer nessa tela). Achado menor: `/onboarding` (metas SMART reais) e `/lab` são fluxos desconexos hoje, sem link entre os dois.
+- **3 decisões de escopo fechadas com o Fabio via `AskUserQuestion` (minha recomendação como sócio, todas aceitas)**:
+  1. **Ordem da retomada**: a próxima fase a planejar é a **Fase A2** (já estava pendente desde a sessão #31, nunca cancelada) — tornar Decisões/Indicadores/Visão 360° interativos de verdade (hoje só leitura), fechando "a parte do Notion" que o próprio Fabio identificou como faltante naquela sessão. Escolhida sobre integração cross-módulo (maior escopo, exige trazer Agenda+Financeiro fictícios pro Lab) e sobre a abertura narrativa/Fase B (não fecha lacuna de módulo, só tom).
+  2. **Página livre e Agenda por voz** não viram fases próprias — entram como **missão pontual dentro de fases maiores** (ex.: cross-módulo), sem planejamento dedicado.
+  3. **Colaboração em equipe no Lab** vira **tela ilustrativa** (convite/atribuição mostrado de forma read-only ou simulada dentro do case), não multi-usuário real — evita ter que redesenhar o schema do Lab, que hoje é single-user (`lab_tenants`/`lab_passos`/`patentes_usuario` chaveados por `user_id`, não por tenant).
+- **Sequência resultante, não tudo decidido ainda**: (1) Fase A2 — Decisões/Indicadores/Visão 360° interativos; (2) Integração cross-módulo (Agenda+Financeiro fictícios no case, demonstrando "tudo interligado" ao vivo), com Página livre e Agenda por voz entrando como missão dentro dela ou da A2; (3) Fase B (abertura narrativa) e (4) tela ilustrativa de equipe ficam sem posição fixa ainda — a ordem entre B/C/D não foi decidida nesta sessão, só que A2 vem primeiro.
+- **Próximo passo**: planejar a Fase A2 em detalhe via `EnterPlanMode` (mesmo padrão de sempre) — decidir com o Fabio quais interações exatas entram (criar/editar decisão e indicador dentro do Lab? quais campos? novo passo em `lab_passos` exige migration, já mapeado acima) antes de codar.
+
+---
+
+## Estado confirmado (2026-09-11, sessão nova #36)
 
 **Resumo em uma linha**: Fabio testou a gravação de voz no iPhone físico (Safari/iOS, pendência deixada pela sessão #35) com fala real — **funcionou, transcrição saiu com sentido, formulário preencheu certo**. **Frente 4 (Agenda por voz) fechada de verdade, e com ela as 4 frentes da sessão #31 estão todas fechadas.**
 
