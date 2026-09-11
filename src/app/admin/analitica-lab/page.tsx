@@ -5,6 +5,7 @@ import { obterPapelAtual } from "@/lib/ecc/equipe";
 import { contarMetasSmart } from "@/lib/ecc/metas";
 import {
   obterFunilLab,
+  obterFunilOfertaLab,
   obterDistribuicaoPatentes,
   listarUsuariosEmRiscoDeEvasao,
   obterLogConsumoIA,
@@ -23,10 +24,11 @@ export default async function PaginaAnaliticaLab() {
 
   const tenantId = await garantirWorkspace();
 
-  const [totalMetasSmart, papelAtual, funil, patentes, emRisco, logIA] = await Promise.all([
+  const [totalMetasSmart, papelAtual, funil, funilOferta, patentes, emRisco, logIA] = await Promise.all([
     contarMetasSmart(tenantId),
     obterPapelAtual(tenantId),
     obterFunilLab(),
+    obterFunilOfertaLab(),
     obterDistribuicaoPatentes(),
     listarUsuariosEmRiscoDeEvasao(),
     obterLogConsumoIA(),
@@ -62,6 +64,16 @@ export default async function PaginaAnaliticaLab() {
               );
             })}
           </div>
+        </section>
+
+        {/* Oferta pré-onboarding do Lab */}
+        <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
+          <h2 className="text-lg font-semibold text-gaiamum-text">Oferta pré-onboarding do Lab</h2>
+          <p className="mt-1 text-sm text-gaiamum-text-muted">
+            {funilOferta.viram} viram a tela · {funilOferta.escolheramLab} escolheram o Lab ·{" "}
+            {funilOferta.escolheramPular} foram direto pro app · {funilOferta.viramSemDecidir} viram e não
+            decidiram ainda.
+          </p>
         </section>
 
         {/* Patentes */}

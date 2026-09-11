@@ -22,12 +22,14 @@ export function MenuMobile({
   acessoCompleto = true,
   souOwner = false,
   sino,
+  linkLab,
   linkExtra,
 }: {
   temMetasSmart: boolean;
   acessoCompleto?: boolean;
   souOwner?: boolean;
   sino: ReactNode;
+  linkLab?: ReactNode;
   linkExtra?: ReactNode;
 }) {
   const [aberto, setAberto] = useState(false);
@@ -64,6 +66,7 @@ export function MenuMobile({
               acessoCompleto={acessoCompleto}
               souOwner={souOwner}
               aoClicarLink={() => setAberto(false)}
+              linkLab={linkLab}
               extra={linkExtra}
             />
             <div className="mt-2 flex items-center justify-between border-t border-gaiamum-border pt-3">

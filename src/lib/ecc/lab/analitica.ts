@@ -105,6 +105,35 @@ export async function obterDistribuicaoPatentes(): Promise<DistribuicaoPatentes>
   };
 }
 
+export type FunilOfertaLab = {
+  viram: number;
+  escolheramLab: number;
+  escolheramPular: number;
+  viramSemDecidir: number;
+};
+
+/** Funil da tela de escolha pré-onboarding ("Fazer o Lab" vs "Ir direto pro
+ * app", ver src/lib/ecc/lab/oferta.ts) — diferente do funil acima, que mede
+ * progresso DENTRO do case. Lê direto de `tenants` (migration
+ * 0036_oferta_lab_pre_onboarding.sql), sem tabela de eventos nova. */
+export async function obterFunilOfertaLab(): Promise<FunilOfertaLab> {
+  const service = createServiceClient();
+
+  const { data } = await service
+    .from("tenants")
+    .select("oferta_lab_decisao")
+    .not("oferta_lab_vista_em", "is", null);
+
+  const linhas = (data as { oferta_lab_decisao: "lab" | "pular" | null }[] | null) ?? [];
+
+  return {
+    viram: linhas.length,
+    escolheramLab: linhas.filter((l) => l.oferta_lab_decisao === "lab").length,
+    escolheramPular: linhas.filter((l) => l.oferta_lab_decisao === "pular").length,
+    viramSemDecidir: linhas.filter((l) => l.oferta_lab_decisao === null).length,
+  };
+}
+
 export type UsuarioEmRisco = {
   userId: string;
   tenantId: string;

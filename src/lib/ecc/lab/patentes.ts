@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -38,7 +39,10 @@ export async function concederPatente(
   }
 }
 
-export async function listarPatentesDoUsuario(userId: string): Promise<PatenteUsuario[]> {
+/** cache() por request: PatenteComEmblema e LinkLabCondicional (ambos em
+ * menu-lateral.tsx) chamam isso na mesma renderização — sem cache() seria
+ * 2 buscas idênticas em toda página do sistema. */
+export const listarPatentesDoUsuario = cache(async (userId: string): Promise<PatenteUsuario[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("patentes_usuario")
@@ -50,7 +54,7 @@ export async function listarPatentesDoUsuario(userId: string): Promise<PatenteUs
   }
 
   return (data as PatenteUsuario[] | null) ?? [];
-}
+});
 
 /** A patente mais alta já conquistada, ou `null` se nenhuma ainda — usada
  * pro selo no menu lateral e pra tela de progresso. */

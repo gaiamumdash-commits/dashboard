@@ -9,6 +9,7 @@ export function LinksNavegacao({
   acessoCompleto = true,
   souOwner = false,
   aoClicarLink,
+  linkLab,
   extra,
 }: {
   temMetasSmart: boolean;
@@ -16,6 +17,13 @@ export function LinksNavegacao({
   souOwner?: boolean;
   /** Fecha o drawer mobile ao navegar; undefined no desktop (sem drawer). */
   aoClicarLink?: () => void;
+  /** Link do Gaiamum Lab, resolvido fora daqui (depende da patente do
+   * usuário — dado que este componente não pode ser async, ver MenuMobile).
+   * Renderizado na posição fixa em que o link estático vivia antes, pra não
+   * deslocar visualmente com o slot `extra` (que fica depois de Marketing/
+   * Financeiro). Nunca esconde: o rótulo/selo é quem muda, ver
+   * LinkLabCondicional em menu-lateral.tsx. */
+  linkLab?: ReactNode;
   /** Slot pra links condicionais que não cabem nos papéis já existentes (ex.:
    * gate por conta específica) — JSX já resolvido (geralmente um `<Suspense>`
    * vindo de MenuLateral), nunca uma função, pra não forçar este componente
@@ -68,12 +76,13 @@ export function LinksNavegacao({
           >
             Agenda
           </Link>
+          {linkLab}
           <Link
-            href="/lab"
+            href="/configuracoes"
             onClick={aoClicarLink}
             className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
           >
-            🎮 Gaiamum Lab
+            ⚙️ Configurações
           </Link>
         </>
       )}

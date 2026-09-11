@@ -34,6 +34,31 @@ async function PatenteComEmblema() {
   return <EmblemaPatente codigo={atual} />;
 }
 
+/** Mesmo padrão do sino/patente: busca própria dentro de `<Suspense>`. Nunca
+ * esconde o link do Lab — antes de concluir, convite a explorar; depois de
+ * conquistar a patente 'explorador', só troca o rótulo/selo pra sinalizar
+ * que virou material de consulta, não pendência (pedido explícito do Fabio:
+ * o Lab é referência viva de gestão, não um tutorial descartável). */
+async function LinkLabCondicional() {
+  const user = await obterUsuarioAtual();
+  if (!user) return null;
+  const patentes = await listarPatentesDoUsuario(user.id);
+  const concluido = patentes.some((p) => p.codigo === "explorador");
+  return (
+    <Link
+      href="/lab"
+      className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
+    >
+      <span>{concluido ? "🎮 Lab · Rever o guia" : "🎮 Gaiamum Lab"}</span>
+      {concluido && (
+        <span className="rounded-full bg-gaiamum-success/15 px-2 py-0.5 text-xs font-semibold text-gaiamum-success">
+          ✓
+        </span>
+      )}
+    </Link>
+  );
+}
+
 /** Mesmo padrão do sino/patente: busca própria dentro de `<Suspense>` — item
  * de menu restrito só à conta pessoal do dono do SaaS (não confundir com
  * `souOwner`, que é "dono deste workspace", concedido a qualquer cliente). */
@@ -81,6 +106,11 @@ export function MenuLateral({
           temMetasSmart={temMetasSmart}
           acessoCompleto={acessoCompleto}
           souOwner={souOwner}
+          linkLab={
+            <Suspense fallback={null}>
+              <LinkLabCondicional />
+            </Suspense>
+          }
           extra={
             <Suspense fallback={null}>
               <LinkAnaliticaDoSaas />
@@ -100,6 +130,11 @@ export function MenuLateral({
         sino={
           <Suspense fallback={<SinoNotificacoes naoLidasIniciais={0} alinhamento="right" />}>
             <SinoComContagem alinhamento="right" />
+          </Suspense>
+        }
+        linkLab={
+          <Suspense fallback={null}>
+            <LinkLabCondicional />
           </Suspense>
         }
         linkExtra={

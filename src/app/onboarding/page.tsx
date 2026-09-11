@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import { contarMetasSmart } from "@/lib/ecc/metas";
+import { deveOferecerLab } from "@/lib/ecc/lab/oferta";
 import { FormularioSmart } from "@/components/onboarding/formulario-smart";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
@@ -12,6 +13,12 @@ export default async function PaginaOnboarding() {
   // Quem entrou convidado só pra um quadro não vê Metas SMART.
   if (!(await temAcessoCompleto(tenantId))) {
     redirect("/projetos");
+  }
+
+  // Owner de workspace que ainda não decidiu sobre o Lab vê a oferta antes
+  // de qualquer coisa — mesmo instante de maior disposição pro tutorial.
+  if (await deveOferecerLab(tenantId)) {
+    redirect("/onboarding/lab-ou-direto");
   }
 
   const totalMetasSmart = await contarMetasSmart(tenantId);
