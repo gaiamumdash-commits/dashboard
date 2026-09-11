@@ -1,17 +1,21 @@
-import type { MissaoVisao360CafeMangue } from "@/lib/ecc/lab/conteudo-cafe-mangue";
+import type { MissaoLab } from "@/lib/ecc/lab/conteudo-cafe-mangue";
 import type { PassoLab } from "@/lib/ecc/lab/progresso";
 
-/** Checklist das missões da Fase A2 (Decisões/Indicadores da Visão 360° do
- * Lab) — mesmo idioma visual de lista-missoes-lab.tsx (✓/○, line-through
- * quando concluído). Diferente daquele componente, o critério aqui não é
- * derivado do estado atual dos dados: é a presença do passo em
- * passosConcluidos (lab_passos), gravado pela própria Server Action no
- * sucesso da ação — ver decisoes-indicadores.ts. Puramente apresentacional. */
-export function ListaMissoesVisao360Lab({
+/** Checklist de missões de uma etapa do Lab (Visão 360°, Financeiro, ...) —
+ * mesmo idioma visual do checklist do quadro (lista-missoes-lab.tsx: ✓/○,
+ * line-through quando concluído), mas critério de conclusão diferente: aqui
+ * não deriva do estado atual dos dados, é a presença do passo em
+ * passosConcluidos (lab_passos), gravado pela própria Server Action
+ * Lab-aware no sucesso da ação. Generalizado na Sub-entrega 1 da integração
+ * cross-módulo (antes só ListaMissoesVisao360Lab, restrito à Fase A2) porque
+ * o componente é puramente apresentacional — reaproveitado agora em
+ * /lab/visao-360 e /lab/financeiro. Nome deliberadamente diferente de
+ * ListaMissoesLab (quadro) pra não colidir com o componente já existente. */
+export function ListaMissoesEtapaLab({
   missoes,
   passosConcluidos,
 }: {
-  missoes: MissaoVisao360CafeMangue[];
+  missoes: MissaoLab[];
   passosConcluidos: Set<PassoLab>;
 }) {
   return (

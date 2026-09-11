@@ -2,10 +2,18 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export type PassoLab = "explorar_quadro" | "concluir" | "criar_decisao" | "atualizar_indicador";
+export type PassoLab =
+  | "explorar_quadro"
+  | "concluir"
+  | "criar_decisao"
+  | "atualizar_indicador"
+  | "marcar_valor_estimado"
+  | "gerar_conta_a_pagar"
+  | "marcar_conta_paga";
 
 export const MODULO_NUCLEO = "nucleo";
 export const MODULO_DECISOES_INDICADORES = "decisoes_indicadores";
+export const MODULO_FINANCEIRO = "financeiro";
 
 export async function passosConcluidos(userId: string, modulo: string = MODULO_NUCLEO): Promise<Set<PassoLab>> {
   const supabase = await createClient();

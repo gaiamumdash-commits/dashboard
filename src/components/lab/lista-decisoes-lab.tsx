@@ -10,9 +10,10 @@ import { paraDatetimeLocal } from "@/lib/ecc/kanban";
 import { Dialog } from "@/components/ui/dialog";
 
 /** Versão só-do-Lab de ListaDecisoes (components/projetos/lista-decisoes.tsx)
- * — mesmos campos, exceto valor_estimado e a ponte GerarContaAPagar (fora de
- * escopo da Fase A2, fica pra fase de integração cross-módulo). Usa as
- * Server Actions Lab-aware (decisoes-indicadores.ts), que resolvem tenant via
+ * — mesmos campos, incluindo valor_estimado (Sub-entrega 1 do cross-módulo).
+ * A ponte GerarContaAPagarLab continua fora daqui: aparece inline em
+ * /lab/financeiro/page.tsx, não dentro desta lista. Usa as Server Actions
+ * Lab-aware (decisoes-indicadores.ts), que resolvem tenant via
  * garantirTenantLab(). Trata erro com toast (padrão de quadro-lab.tsx) —
  * diferente do componente real, que deixa a rejeição estourar sem catch. */
 export function ListaDecisoesLab({
@@ -199,6 +200,18 @@ export function ListaDecisoesLab({
                   name="data"
                   required
                   defaultValue={paraDatetimeLocal(emEdicao?.data ?? new Date().toISOString())}
+                  className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+                💰 Valor estimado (opcional)
+                <input
+                  type="number"
+                  name="valor_estimado"
+                  step="0.01"
+                  min="0"
+                  defaultValue={emEdicao?.valor_estimado ?? ""}
                   className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
                 />
               </label>

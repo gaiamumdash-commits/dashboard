@@ -14,6 +14,7 @@ import {
   EXPLICACAO_SIMULADA_CAFE_MANGUE,
   ESTATISTICAS_FICTICIAS_CAFE_MANGUE,
   MISSOES_VISAO_360_CAFE_MANGUE,
+  PORQUE_DECISOES_INDICADORES,
 } from "@/lib/ecc/lab/conteudo-cafe-mangue";
 import { passosConcluidos, MODULO_DECISOES_INDICADORES } from "@/lib/ecc/lab/progresso";
 import type { ColunaKanban, MetaSmart, Projeto, Tarefa } from "@/lib/ecc/tipos";
@@ -23,7 +24,8 @@ import { ExplicacaoSimulada } from "@/components/lab/explicacao-simulada";
 import { EstatisticaFicticia } from "@/components/lab/estatistica-ficticia";
 import { ListaDecisoesLab } from "@/components/lab/lista-decisoes-lab";
 import { ListaIndicadoresLab } from "@/components/lab/lista-indicadores-lab";
-import { ListaMissoesVisao360Lab } from "@/components/lab/lista-missoes-visao-360-lab";
+import { ListaMissoesEtapaLab } from "@/components/lab/lista-missoes-etapa-lab";
+import { PorQueIssoExiste } from "@/components/lab/por-que-isso-existe";
 
 export default async function PaginaVisao360Lab() {
   const tenantId = await garantirWorkspace();
@@ -89,7 +91,7 @@ export default async function PaginaVisao360Lab() {
 
         <ExplicacaoSimulada texto={EXPLICACAO_SIMULADA_CAFE_MANGUE} />
 
-        <ListaMissoesVisao360Lab missoes={MISSOES_VISAO_360_CAFE_MANGUE} passosConcluidos={passosDecisoesIndicadores} />
+        <ListaMissoesEtapaLab missoes={MISSOES_VISAO_360_CAFE_MANGUE} passosConcluidos={passosDecisoesIndicadores} />
 
         <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
           <h2 className="text-lg font-semibold text-gaiamum-text">🚩 Marcos</h2>
@@ -109,6 +111,8 @@ export default async function PaginaVisao360Lab() {
           </ul>
         </section>
 
+        <PorQueIssoExiste texto={PORQUE_DECISOES_INDICADORES} />
+
         <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
           <h2 className="text-lg font-semibold text-gaiamum-text">📊 Indicadores</h2>
           <div className="mt-3">
@@ -121,6 +125,12 @@ export default async function PaginaVisao360Lab() {
           <div className="mt-3">
             <ListaDecisoesLab projetoId={projetoId} decisoesIniciais={decisoes} metasSmart={listaMetasSmart} />
           </div>
+          <Link
+            href="/lab/financeiro"
+            className="mt-4 inline-block text-sm text-gaiamum-primary hover:underline"
+          >
+            💰 Ver Financeiro do Café do Mangue →
+          </Link>
         </section>
 
         <EstatisticaFicticia texto={ESTATISTICAS_FICTICIAS_CAFE_MANGUE[1]} />

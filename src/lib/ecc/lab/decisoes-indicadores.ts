@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirTenantLab } from "@/lib/ecc/lab/tenant";
 import { paraUtcDoFuso } from "@/lib/ecc/kanban";
-import { marcarPassoConcluido, MODULO_DECISOES_INDICADORES } from "@/lib/ecc/lab/progresso";
+import { marcarPassoConcluido, MODULO_DECISOES_INDICADORES, MODULO_FINANCEIRO } from "@/lib/ecc/lab/progresso";
 
 /** CRUD de Decisão e Indicador dentro do Gaiamum Lab — espelha
  * src/lib/ecc/decisoes.ts e indicadores.ts (mesma validação, mesmo padrão de
@@ -47,6 +47,8 @@ export async function criarDecisaoLab(projetoId: string, formData: FormData): Pr
   const fuso = (formData.get("fuso") as string | null) || "America/Sao_Paulo";
   const dataLocal = formData.get("data") as string | null;
   const data = dataLocal ? paraUtcDoFuso(dataLocal, fuso).toISOString() : new Date().toISOString();
+  const valorEstimadoBruto = formData.get("valor_estimado") as string | null;
+  const valorEstimado = valorEstimadoBruto ? Number(valorEstimadoBruto) : null;
 
   const { error } = await supabase.from("decisoes").insert({
     tenant_id: tenantIdLab,
@@ -58,6 +60,7 @@ export async function criarDecisaoLab(projetoId: string, formData: FormData): Pr
     impacto_esperado: impactoEsperado,
     autor: user.id,
     data,
+    valor_estimado: valorEstimado,
   });
 
   if (error) {
@@ -65,7 +68,11 @@ export async function criarDecisaoLab(projetoId: string, formData: FormData): Pr
   }
 
   await marcarPassoConcluido(user.id, "criar_decisao", MODULO_DECISOES_INDICADORES);
+  if (valorEstimado !== null) {
+    await marcarPassoConcluido(user.id, "marcar_valor_estimado", MODULO_FINANCEIRO);
+  }
   revalidatePath("/lab/visao-360");
+  revalidatePath("/lab/financeiro");
 }
 
 export async function editarDecisaoLab(decisaoId: string, projetoId: string, formData: FormData): Promise<void> {
