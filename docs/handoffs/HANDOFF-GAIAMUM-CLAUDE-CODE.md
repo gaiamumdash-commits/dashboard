@@ -10,7 +10,17 @@
 
 ---
 
-## Estado confirmado (2026-09-11, sessão nova #35 — última atualização)
+## Estado confirmado (2026-09-11, sessão nova #36 — última atualização)
+
+**Resumo em uma linha**: Fabio testou a gravação de voz no iPhone físico (Safari/iOS, pendência deixada pela sessão #35) com fala real — **funcionou, transcrição saiu com sentido, formulário preencheu certo**. **Frente 4 (Agenda por voz) fechada de verdade, e com ela as 4 frentes da sessão #31 estão todas fechadas.**
+
+- **Teste real confirmado pelo Fabio**: no primeiro toque ele achou que não tinha acontecido nada ao parar a gravação ("não aparece nada, nem transcrição nenhuma") — investigação do código (`gravador-voz-agenda.tsx`/`transcricao-audio.ts`) não achou bug: o mais provável é só o tempo de resposta do Gemini (o botão fica em "Transcrevendo..." nesse meio tempo, sem indicador mais chamativo de carregamento). Fabio confirmou logo em seguida que apareceu e "deu certo" — transcrição fez sentido e preencheu o formulário direito. Nenhuma mudança de código feita; se isso se repetir como reclamação recorrente, vale considerar um indicador de carregamento mais visível (spinner) no botão "Transcrevendo...", registrado aqui como possível polimento futuro, não pedido.
+- **Confirmado com Fabio nesta sessão**: página livre (Notion) continua ligada só ao **projeto**, não ao cartão/tarefa individual — ele levantou a dúvida, foi esclarecido que é decisão de escopo já fechada na sessão #34, e ele confirmou não construir esse vínculo.
+- **Próximo passo, decidido pelo Fabio**: com as 4 frentes fechadas, retomar a construção do **Gaiamum Lab** (pausado desde a sessão #31) — ver [[projeto_gaiamum_contexto_vivo_experience_lab]] na memória e a seção "Estado confirmado" da sessão #31 mais abaixo (princípio mestre: cada funcionalidade do case precisa vir com o porquê de negócio, não só o como mecânico). Fabio reforçou nesta sessão, com suas próprias palavras, exatamente esse princípio: o Lab precisa deixar claro não só como mexer, mas por que usar cada função e qual o diferencial/vantagem real de operar com o Gaiamum. Nada planejado ainda — próxima sessão deve investigar o estado atual do Lab (pode ter ficado desatualizado com as 4 frentes novas: colaboração em equipe, integração cross-módulo, página livre, agenda por voz) antes de desenhar a retomada.
+
+---
+
+## Estado confirmado (2026-09-11, sessão #35)
 
 **Resumo em uma linha**: "Agenda por voz" (Frente 4 da sequência da sessão #31) ganhou suporte a Safari/iOS via gravação de áudio + transcrição no servidor (Gemini) — implementado, testado tecnicamente de ponta a ponta em build de produção isolado (com um áudio sintético, não fala real), **aguardando aprovação do Fabio pro commit/push e teste real num iPhone físico**.
 
@@ -911,6 +921,14 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-09-11 (sessão nova #36) — Agenda por voz validada em iPhone real, 4 frentes fechadas, Lab liberado pra retomar
+
+Fabio testou a gravação de voz no Safari do iPhone com fala real (pendência deixada pela sessão #35): funcionou, transcrição fez sentido, formulário preencheu certo. No primeiro toque ele reportou "não aparece nada" ao parar a gravação — investiguei `gravador-voz-agenda.tsx`/`transcricao-audio.ts` procurando bug real antes de responder, não achei nada de errado no código; mais provável ter sido só o tempo de resposta do Gemini sem indicador de carregamento chamativo o bastante. Confirmou logo depois que funcionou, sem precisar de nenhuma mudança de código.
+
+Fabio também confirmou não construir vínculo entre página livre e cartão/tarefa — mantém a decisão de escopo já fechada na sessão #34 (página livre é por projeto).
+
+Com isso, as 4 frentes decididas na sessão #31 (colaboração em equipe, integração cross-módulo, página livre, agenda por voz) estão todas fechadas. Fabio decidiu retomar o Gaiamum Lab (pausado desde a sessão #31) e reforçou o princípio que já estava registrado como "princípio mestre" daquela sessão: o Lab precisa ensinar não só como mexer em cada função, mas por que usá-la e qual o diferencial/vantagem real do Gaiamum numa operação. Nada planejado nem codado nesta sessão — próximo passo é investigar o estado atual do Lab (pode estar desatualizado com as 4 frentes novas) antes de desenhar a retomada.
 
 ### 2026-09-09 (sessão nova #25) — Etapa 2 do Contexto Vivo/Visão 360°: aba Visão 360° + score Alinhamento Gaiamum
 
