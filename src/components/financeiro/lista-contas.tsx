@@ -184,10 +184,17 @@ function Linha({
         </form>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-xs text-gaiamum-text-muted">
-          {ROTULO_CATEGORIA[conta.categoria]}
-        </span>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-xs text-gaiamum-text-muted">
+            {ROTULO_CATEGORIA[conta.categoria]}
+          </span>
+          {(conta.tarefa_id || conta.decisao_id) && (
+            <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-xs text-gaiamum-text-muted">
+              🔗 {conta.tarefa_id ? "gerada de um cartão" : "gerada de uma decisão"}
+            </span>
+          )}
+        </div>
         <CampoAlarme
           entidadeTipo="conta_a_pagar"
           entidadeId={conta.id}

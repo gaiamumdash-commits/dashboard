@@ -57,6 +57,8 @@ export async function criarDecisao(projetoId: string, formData: FormData) {
   const fuso = (formData.get("fuso") as string | null) || "America/Sao_Paulo";
   const dataLocal = formData.get("data") as string | null;
   const data = dataLocal ? paraUtcDoFuso(dataLocal, fuso).toISOString() : new Date().toISOString();
+  const valorEstimadoBruto = formData.get("valor_estimado") as string | null;
+  const valorEstimado = valorEstimadoBruto ? Number(valorEstimadoBruto) : null;
 
   const { error } = await supabase.from("decisoes").insert({
     tenant_id: tenantId,
@@ -68,6 +70,7 @@ export async function criarDecisao(projetoId: string, formData: FormData) {
     impacto_esperado: impactoEsperado,
     autor: user.id,
     data,
+    valor_estimado: valorEstimado,
   });
 
   if (error) {
@@ -90,6 +93,8 @@ export async function editarDecisao(decisaoId: string, projetoId: string, formDa
   const fuso = (formData.get("fuso") as string | null) || "America/Sao_Paulo";
   const dataLocal = campoObrigatorio(formData, "data");
   const data = paraUtcDoFuso(dataLocal, fuso).toISOString();
+  const valorEstimadoBruto = formData.get("valor_estimado") as string | null;
+  const valorEstimado = valorEstimadoBruto ? Number(valorEstimadoBruto) : null;
 
   const { error } = await supabase
     .from("decisoes")
@@ -100,6 +105,7 @@ export async function editarDecisao(decisaoId: string, projetoId: string, formDa
       motivo,
       impacto_esperado: impactoEsperado,
       data,
+      valor_estimado: valorEstimado,
       atualizado_em: new Date().toISOString(),
     })
     .eq("id", decisaoId);

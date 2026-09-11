@@ -47,6 +47,8 @@ export type Tarefa = {
   // GTD (David Allen), lado acionável: preenchido = o cartão está esperando
   // outra pessoa/evento pra andar (ex.: "resposta do fornecedor X").
   aguardando_de: string | null;
+  // Ponte pro Financeiro: estimativa informativa, não é o lançamento em si.
+  valor_estimado: number | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -66,6 +68,8 @@ export type Decisao = {
   data: string;
   criado_em: string;
   atualizado_em: string;
+  // Ponte pro Financeiro: estimativa informativa, não é o lançamento em si.
+  valor_estimado: number | null;
 };
 
 export type PaginaLivre = {
@@ -129,6 +133,10 @@ export type ContaAPagar = {
   data_pagamento: string | null;
   pago: boolean;
   criado_em: string;
+  // Proveniência: preenchido quando a conta foi gerada a partir de um
+  // cartão/decisão (ver "Gerar conta a pagar" em detalhe-tarefa/lista-decisoes).
+  tarefa_id: string | null;
+  decisao_id: string | null;
 };
 
 export type EntidadeAnexo = "conta_a_pagar" | "tarefa";

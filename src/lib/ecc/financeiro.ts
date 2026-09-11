@@ -110,6 +110,87 @@ export async function criarDespesaAvulsa(formData: FormData) {
   revalidatePath("/financeiro/avulsas");
 }
 
+/** Gera uma conta a pagar a partir de uma tarefa do Kanban — sempre revisado
+ * pelo owner (mesmos campos de `criarDespesaAvulsa`, só acrescentando o
+ * vínculo de origem). Índice único parcial em `contas_a_pagar.tarefa_id`
+ * garante que não dá pra gerar duas vezes da mesma tarefa. */
+export async function gerarContaAPagarDaTarefa(tarefaId: string, projetoId: string, formData: FormData) {
+  const tenantId = await garantirWorkspace();
+  await exigirOwner(tenantId);
+  const supabase = await createClient();
+
+  const nome = campoObrigatorio(formData, "nome");
+  const valor = Number(campoObrigatorio(formData, "valor"));
+  const categoria = campoObrigatorio(formData, "categoria") as CategoriaFinanceira;
+  const dataVencimento = campoObrigatorio(formData, "data_vencimento");
+
+  if (!Number.isFinite(valor) || valor <= 0) {
+    throw new Error("Valor inválido.");
+  }
+
+  const { error } = await supabase.from("contas_a_pagar").insert({
+    tenant_id: tenantId,
+    conta_fixa_id: null,
+    tarefa_id: tarefaId,
+    nome,
+    valor,
+    categoria,
+    mes_referencia: primeiroDiaDoMes(dataVencimento),
+    data_vencimento: dataVencimento,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("Essa tarefa já tem uma conta gerada.");
+    }
+    throw new Error(`Falha ao lançar despesa: ${error.message}`);
+  }
+
+  revalidatePath("/financeiro");
+  revalidatePath("/financeiro/avulsas");
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+/** Gera uma conta a pagar a partir de uma decisão — mesmo espírito de
+ * `gerarContaAPagarDaTarefa`, sem cruzar fronteira de permissão nenhuma já
+ * que `decisoes` também é owner-only. */
+export async function gerarContaAPagarDaDecisao(decisaoId: string, projetoId: string, formData: FormData) {
+  const tenantId = await garantirWorkspace();
+  await exigirOwner(tenantId);
+  const supabase = await createClient();
+
+  const nome = campoObrigatorio(formData, "nome");
+  const valor = Number(campoObrigatorio(formData, "valor"));
+  const categoria = campoObrigatorio(formData, "categoria") as CategoriaFinanceira;
+  const dataVencimento = campoObrigatorio(formData, "data_vencimento");
+
+  if (!Number.isFinite(valor) || valor <= 0) {
+    throw new Error("Valor inválido.");
+  }
+
+  const { error } = await supabase.from("contas_a_pagar").insert({
+    tenant_id: tenantId,
+    conta_fixa_id: null,
+    decisao_id: decisaoId,
+    nome,
+    valor,
+    categoria,
+    mes_referencia: primeiroDiaDoMes(dataVencimento),
+    data_vencimento: dataVencimento,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("Essa decisão já tem uma conta gerada.");
+    }
+    throw new Error(`Falha ao lançar despesa: ${error.message}`);
+  }
+
+  revalidatePath("/financeiro");
+  revalidatePath("/financeiro/avulsas");
+  revalidatePath(`/projetos/${projetoId}/decisoes`);
+}
+
 /** Ajusta valor e/ou vencimento da cobrança do mês — útil pra contas fixas
  * cujo valor real (ex: conta de luz) só se sabe quando o boleto chega,
  * sem precisar recadastrar o modelo. Não mexe em `mes_referencia`: o

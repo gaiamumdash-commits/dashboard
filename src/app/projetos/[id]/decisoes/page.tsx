@@ -36,6 +36,19 @@ export default async function PaginaDecisoes({ params }: { params: Promise<{ id:
     supabase.from("metas_smart").select("*").eq("tenant_id", tenantId).order("criado_em", { ascending: true }),
   ]);
 
+  const { data: contasGeradas } =
+    decisoes.length > 0
+      ? await supabase
+          .from("contas_a_pagar")
+          .select("decisao_id")
+          .not("decisao_id", "is", null)
+          .in(
+            "decisao_id",
+            decisoes.map((d) => d.id),
+          )
+      : { data: [] as { decisao_id: string | null }[] };
+  const decisoesComContaGerada = (contasGeradas ?? []).map((c) => c.decisao_id as string);
+
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart souOwner={souOwner} />
@@ -50,6 +63,7 @@ export default async function PaginaDecisoes({ params }: { params: Promise<{ id:
             projetoId={projetoId}
             decisoesIniciais={decisoes}
             metasSmart={(metasSmart as MetaSmart[]) ?? []}
+            decisoesComContaGerada={decisoesComContaGerada}
           />
         </div>
       </main>

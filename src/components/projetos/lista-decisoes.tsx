@@ -6,15 +6,18 @@ import type { Decisao, MetaSmart } from "@/lib/ecc/tipos";
 import { criarDecisao, editarDecisao, excluirDecisao } from "@/lib/ecc/decisoes";
 import { paraDatetimeLocal } from "@/lib/ecc/kanban";
 import { Dialog } from "@/components/ui/dialog";
+import { GerarContaAPagar } from "@/components/financeiro/gerar-conta-a-pagar";
 
 export function ListaDecisoes({
   projetoId,
   decisoesIniciais,
   metasSmart,
+  decisoesComContaGerada,
 }: {
   projetoId: string;
   decisoesIniciais: Decisao[];
   metasSmart: MetaSmart[];
+  decisoesComContaGerada: string[];
 }) {
   const [criando, setCriando] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Decisao | null>(null);
@@ -115,6 +118,17 @@ export function ListaDecisoes({
                   <dd className="text-gaiamum-text">{decisao.impacto_esperado}</dd>
                 </div>
               </dl>
+
+              <div className="mt-3">
+                <GerarContaAPagar
+                  origem="decisao"
+                  origemId={decisao.id}
+                  projetoId={projetoId}
+                  nomeInicial={decisao.titulo}
+                  valorInicial={decisao.valor_estimado}
+                  jaGerada={decisoesComContaGerada.includes(decisao.id)}
+                />
+              </div>
             </div>
           );
         })}
@@ -183,6 +197,18 @@ export function ListaDecisoes({
                   name="data"
                   required
                   defaultValue={paraDatetimeLocal(emEdicao?.data ?? new Date().toISOString())}
+                  className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+                💰 Valor estimado (opcional)
+                <input
+                  type="number"
+                  name="valor_estimado"
+                  step="0.01"
+                  min="0"
+                  defaultValue={emEdicao?.valor_estimado ?? ""}
                   className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
                 />
               </label>

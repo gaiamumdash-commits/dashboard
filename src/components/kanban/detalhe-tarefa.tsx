@@ -25,6 +25,7 @@ import {
   atualizarDatasTarefa,
   atualizarDescricaoTarefa,
   atualizarPrioridadeTarefa,
+  atualizarValorEstimadoTarefa,
   comentarNaTarefa,
   listarAtividadesDaTarefa,
   moverTarefa,
@@ -35,6 +36,7 @@ import { enviarAnexoTarefa } from "@/lib/ecc/anexos";
 import { AnexoArquivo } from "@/components/anexo-arquivo";
 import { AvatarIniciais } from "@/components/avatar-iniciais";
 import { CampoAlarme } from "@/components/campo-alarme";
+import { GerarContaAPagar } from "@/components/financeiro/gerar-conta-a-pagar";
 
 const PRIORIDADES: Prioridade[] = ["P1", "P2", "P3", "P4"];
 const CORES_ETIQUETA: CorEtiqueta[] = ["purple", "teal", "yellow", "blue", "coral", "lime"];
@@ -50,6 +52,8 @@ export function DetalheTarefa({
   etiquetasDaTarefa,
   anexos,
   antecedenciaAlarme,
+  souOwner,
+  jaGerouConta,
   aoFechar,
 }: {
   tarefa: Tarefa;
@@ -62,6 +66,8 @@ export function DetalheTarefa({
   etiquetasDaTarefa: string[];
   anexos: Anexo[];
   antecedenciaAlarme: number | null;
+  souOwner: boolean;
+  jaGerouConta: boolean;
   aoFechar: () => void;
 }) {
   const [descricao, setDescricao] = useState(tarefa.descricao ?? "");
@@ -410,6 +416,37 @@ export function DetalheTarefa({
             className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
           />
         </label>
+
+        <div className="mt-4 flex flex-col gap-1.5">
+          <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+            💰 Valor estimado (opcional)
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue={tarefa.valor_estimado ?? ""}
+              onBlur={(e) =>
+                atualizarValorEstimadoTarefa(
+                  tarefa.id,
+                  projetoId,
+                  e.target.value.trim() === "" ? null : Number(e.target.value),
+                )
+              }
+              placeholder="Ex.: 500"
+              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+            />
+          </label>
+          {souOwner && (
+            <GerarContaAPagar
+              origem="tarefa"
+              origemId={tarefa.id}
+              projetoId={projetoId}
+              nomeInicial={tarefa.titulo}
+              valorInicial={tarefa.valor_estimado}
+              jaGerada={jaGerouConta}
+            />
+          )}
+        </div>
 
         <div className="relative mt-4 flex flex-col gap-1.5">
           <span className="text-xs font-medium text-gaiamum-text-muted">Etiquetas</span>

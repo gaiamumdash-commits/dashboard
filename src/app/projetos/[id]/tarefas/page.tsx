@@ -65,7 +65,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
   const podeExcluirTarefa = papelAtual === "owner" || Boolean(gestorDoProjeto);
   const listaTarefas = (tarefas as Tarefa[]) ?? [];
 
-  const [{ data: anexosDasTarefas }, { data: alarmesDasTarefas }] =
+  const [{ data: anexosDasTarefas }, { data: alarmesDasTarefas }, { data: contasGeradas }] =
     listaTarefas.length > 0
       ? await Promise.all([
           supabase
@@ -84,13 +84,29 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
               "entidade_id",
               listaTarefas.map((t) => t.id),
             ),
+          // RLS de contas_a_pagar é owner-only — pra quem não é owner, isso
+          // simplesmente volta vazio (sem erro), o que já é o comportamento
+          // certo, já que só owner vê o botão/indicador de "gerar conta".
+          supabase
+            .from("contas_a_pagar")
+            .select("tarefa_id")
+            .not("tarefa_id", "is", null)
+            .in(
+              "tarefa_id",
+              listaTarefas.map((t) => t.id),
+            ),
         ])
-      : [{ data: [] as Anexo[] }, { data: [] as { entidade_id: string; antecedencia_min: number }[] }];
+      : [
+          { data: [] as Anexo[] },
+          { data: [] as { entidade_id: string; antecedencia_min: number }[] },
+          { data: [] as { tarefa_id: string | null }[] },
+        ];
 
   const alarmePorTarefa: Record<string, number> = {};
   for (const alarme of alarmesDasTarefas ?? []) {
     alarmePorTarefa[alarme.entidade_id] = alarme.antecedencia_min;
   }
+  const tarefasComContaGerada = (contasGeradas ?? []).map((c) => c.tarefa_id as string);
 
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
@@ -170,6 +186,8 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
             alarmePorTarefa={alarmePorTarefa}
             usuarioAtualId={user?.id ?? null}
             podeExcluirTarefa={podeExcluirTarefa}
+            souOwner={papelAtual === "owner"}
+            tarefasComContaGerada={tarefasComContaGerada}
           />
         </div>
       </main>

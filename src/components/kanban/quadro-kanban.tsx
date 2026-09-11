@@ -32,6 +32,8 @@ export function QuadroKanban({
   alarmePorTarefa,
   usuarioAtualId,
   podeExcluirTarefa,
+  souOwner,
+  tarefasComContaGerada,
 }: {
   projetoId: string;
   colunasIniciais: ColunaKanban[];
@@ -45,6 +47,8 @@ export function QuadroKanban({
   alarmePorTarefa: Record<string, number>;
   usuarioAtualId: string | null;
   podeExcluirTarefa: boolean;
+  souOwner: boolean;
+  tarefasComContaGerada: string[];
 }) {
   const [tarefas, setTarefas] = useState(tarefasIniciais);
   const [tarefasIniciaisAnteriores, setTarefasIniciaisAnteriores] = useState(tarefasIniciais);
@@ -135,6 +139,7 @@ export function QuadroKanban({
       tempo_realizado_min: null,
       criado_em: agora,
       aguardando_de: null,
+      valor_estimado: null,
     }));
 
     setTarefas((atual) => [...atual, ...novas]);
@@ -457,6 +462,8 @@ export function QuadroKanban({
             .map((te) => te.etiqueta_id)}
           anexos={anexosIniciais.filter((a) => a.entidade_id === tarefaAberta.id)}
           antecedenciaAlarme={alarmePorTarefa[tarefaAberta.id] ?? null}
+          souOwner={souOwner}
+          jaGerouConta={tarefasComContaGerada.includes(tarefaAberta.id)}
           aoFechar={fecharModal}
         />
       )}
