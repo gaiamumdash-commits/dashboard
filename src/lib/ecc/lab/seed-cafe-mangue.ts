@@ -125,6 +125,10 @@ export async function semearCafeMangue(tenantIdLab: string, userId: string): Pro
     DECISOES_CAFE_MANGUE.map((d) => ({
       tenant_id: tenantIdLab,
       projeto_id: projetoId,
+      // Vincula à meta SMART do case desde o seed — antes ficava null mesmo
+      // a meta existindo; a Fase A2 deixou esse vínculo visível no formulário
+      // de decisão, então a decisão pré-semeada já deve aparecer conectada.
+      meta_smart_id: (metaSmart as { id: string }).id,
       autor: userId,
       data: hoje,
       ...d,

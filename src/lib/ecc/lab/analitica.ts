@@ -10,19 +10,26 @@ import type { PassoLab } from "@/lib/ecc/lab/progresso";
  * esperado baixo nesta fase de validação: agregação feita em memória, sem
  * RPC/view SQL nova — mesmo estilo já usado em `calcularAlinhamentoGaiamum`. */
 
-const ROTULO_PASSO: Record<PassoLab, string> = {
+// Este painel cobre só o módulo núcleo (`modulo: "nucleo"`, filtrado nas
+// queries abaixo) — a Fase A2 ampliou PassoLab com passos de outro módulo
+// ("criar_decisao"/"atualizar_indicador"), então o tipo aqui é estreitado de
+// propósito: misturar funis de módulos diferentes no mesmo painel confundiria
+// mais do que ajudaria.
+type PassoNucleo = Extract<PassoLab, "explorar_quadro" | "concluir">;
+
+const ROTULO_PASSO: Record<PassoNucleo, string> = {
   explorar_quadro: "Explorou o quadro",
   concluir: "Concluiu o Lab (virou Explorador)",
 };
 
-const ORDEM_PASSOS: PassoLab[] = ["explorar_quadro", "concluir"];
+const ORDEM_PASSOS: PassoNucleo[] = ["explorar_quadro", "concluir"];
 
 const LIMITE_INATIVIDADE_MS = 48 * 60 * 60 * 1000;
 
 export type FunilLab = {
   totalEntraram: number;
   nuncaComecaram: number;
-  porPasso: { passo: PassoLab; rotulo: string; concluiram: number }[];
+  porPasso: { passo: PassoNucleo; rotulo: string; concluiram: number }[];
 };
 
 export async function obterFunilLab(): Promise<FunilLab> {
@@ -34,7 +41,7 @@ export async function obterFunilLab(): Promise<FunilLab> {
   ]);
 
   const totalEntraram = (tenants ?? []).length;
-  const linhasPassos = (passos as { user_id: string; passo: PassoLab }[] | null) ?? [];
+  const linhasPassos = (passos as { user_id: string; passo: PassoNucleo }[] | null) ?? [];
 
   const usuariosComAlgumPasso = new Set(linhasPassos.map((p) => p.user_id));
 

@@ -106,6 +106,23 @@ export const DECISOES_CAFE_MANGUE: { titulo: string; decisao: string; motivo: st
   },
 ];
 
+/** Missões da Fase A2 (Visão 360° do Lab) — mesmo espírito de
+ * MISSOES_QUADRO_CAFE_MANGUE, mas o critério de conclusão não deriva do
+ * estado atual de decisões/indicadores (frágil: editar e depois voltar ao
+ * valor original do seed desmarcaria uma missão genuinamente feita). Aqui o
+ * critério é a presença do passo em lab_passos, gravado dentro da própria
+ * Server Action Lab-aware no sucesso do insert/update (ver
+ * decisoes-indicadores.ts). */
+export type MissaoVisao360CafeMangue = {
+  id: "criar_decisao" | "atualizar_indicador";
+  texto: string;
+};
+
+export const MISSOES_VISAO_360_CAFE_MANGUE: MissaoVisao360CafeMangue[] = [
+  { id: "criar_decisao", texto: "Registre uma nova decisão do Café do Mangue." },
+  { id: "atualizar_indicador", texto: "Atualize o valor atual de um indicador." },
+];
+
 /** Estatísticas fictícias de incentivo — sempre exibidas com moldura visual
  * própria (ver estatistica-ficticia.tsx), claramente contextualizadas como
  * parte da narrativa do case, nunca confundíveis com dado real do Gaiamum. */

@@ -5,7 +5,13 @@ import { revalidatePath } from "next/cache";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirTenantLab } from "@/lib/ecc/lab/tenant";
 import { refazerCafeMangue, semearCafeMangue } from "@/lib/ecc/lab/seed-cafe-mangue";
-import { marcarPassoConcluido, resetarPassosDoModulo, type PassoLab } from "@/lib/ecc/lab/progresso";
+import {
+  marcarPassoConcluido,
+  resetarPassosDoModulo,
+  MODULO_NUCLEO,
+  MODULO_DECISOES_INDICADORES,
+  type PassoLab,
+} from "@/lib/ecc/lab/progresso";
 import { concederPatente } from "@/lib/ecc/lab/patentes";
 
 async function exigirUsuario() {
@@ -90,7 +96,8 @@ export async function moverTarefaLab(tarefaId: string, novaColunaId: string): Pr
 export async function refazerModuloLab(): Promise<void> {
   const user = await exigirUsuario();
   const tenantId = await garantirTenantLab();
-  await resetarPassosDoModulo(user.id);
+  await resetarPassosDoModulo(user.id, MODULO_NUCLEO);
+  await resetarPassosDoModulo(user.id, MODULO_DECISOES_INDICADORES);
   await refazerCafeMangue(tenantId, user.id);
   revalidatePath("/lab");
 }

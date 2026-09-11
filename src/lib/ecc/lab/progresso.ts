@@ -2,17 +2,18 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export type PassoLab = "explorar_quadro" | "concluir";
+export type PassoLab = "explorar_quadro" | "concluir" | "criar_decisao" | "atualizar_indicador";
 
-const MODULO_NUCLEO = "nucleo";
+export const MODULO_NUCLEO = "nucleo";
+export const MODULO_DECISOES_INDICADORES = "decisoes_indicadores";
 
-export async function passosConcluidos(userId: string): Promise<Set<PassoLab>> {
+export async function passosConcluidos(userId: string, modulo: string = MODULO_NUCLEO): Promise<Set<PassoLab>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("lab_passos")
     .select("passo")
     .eq("user_id", userId)
-    .eq("modulo", MODULO_NUCLEO);
+    .eq("modulo", modulo);
 
   if (error) {
     throw new Error(`Falha ao ler progresso do Lab: ${error.message}`);
@@ -25,26 +26,30 @@ export async function passosConcluidos(userId: string): Promise<Set<PassoLab>> {
  * cobre reexecução, erro 23505 tratado como sucesso silencioso). Via
  * service client: sem policy de insert pro usuário comum, mesmo padrão do
  * resto do módulo do Lab. */
-export async function marcarPassoConcluido(userId: string, passo: PassoLab): Promise<void> {
+export async function marcarPassoConcluido(
+  userId: string,
+  passo: PassoLab,
+  modulo: string = MODULO_NUCLEO,
+): Promise<void> {
   const service = createServiceClient();
   const { error } = await service
     .from("lab_passos")
-    .insert({ user_id: userId, modulo: MODULO_NUCLEO, passo });
+    .insert({ user_id: userId, modulo, passo });
 
   if (error && error.code !== "23505") {
     throw new Error(`Falha ao registrar passo do Lab: ${error.message}`);
   }
 }
 
-/** Usado pelo "refazer o case" — reseta só o roteiro do módulo núcleo, nunca
- * as patentes já conquistadas (patentes_usuario não é tocado aqui). */
-export async function resetarPassosDoModulo(userId: string): Promise<void> {
+/** Usado pelo "refazer o case" — reseta só o roteiro do módulo indicado,
+ * nunca as patentes já conquistadas (patentes_usuario não é tocado aqui). */
+export async function resetarPassosDoModulo(userId: string, modulo: string = MODULO_NUCLEO): Promise<void> {
   const service = createServiceClient();
   const { error } = await service
     .from("lab_passos")
     .delete()
     .eq("user_id", userId)
-    .eq("modulo", MODULO_NUCLEO);
+    .eq("modulo", modulo);
 
   if (error) {
     throw new Error(`Falha ao resetar progresso do Lab: ${error.message}`);

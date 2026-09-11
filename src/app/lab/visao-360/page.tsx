@@ -10,13 +10,20 @@ import { concluirLab } from "@/lib/ecc/lab/actions";
 import { listarDecisoesDoProjeto } from "@/lib/ecc/decisoes";
 import { listarIndicadoresDoProjeto } from "@/lib/ecc/indicadores";
 import { calcularAlinhamentoGaiamum } from "@/lib/ecc/visao-360";
-import { EXPLICACAO_SIMULADA_CAFE_MANGUE, ESTATISTICAS_FICTICIAS_CAFE_MANGUE } from "@/lib/ecc/lab/conteudo-cafe-mangue";
-import type { ColunaKanban, Projeto, Tarefa } from "@/lib/ecc/tipos";
+import {
+  EXPLICACAO_SIMULADA_CAFE_MANGUE,
+  ESTATISTICAS_FICTICIAS_CAFE_MANGUE,
+  MISSOES_VISAO_360_CAFE_MANGUE,
+} from "@/lib/ecc/lab/conteudo-cafe-mangue";
+import { passosConcluidos, MODULO_DECISOES_INDICADORES } from "@/lib/ecc/lab/progresso";
+import type { ColunaKanban, MetaSmart, Projeto, Tarefa } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
-import { BarraProgresso } from "@/components/ui/barra-progresso";
 import { AlinhamentoGaiamumBloco } from "@/components/projetos/alinhamento-gaiamum";
 import { ExplicacaoSimulada } from "@/components/lab/explicacao-simulada";
 import { EstatisticaFicticia } from "@/components/lab/estatistica-ficticia";
+import { ListaDecisoesLab } from "@/components/lab/lista-decisoes-lab";
+import { ListaIndicadoresLab } from "@/components/lab/lista-indicadores-lab";
+import { ListaMissoesVisao360Lab } from "@/components/lab/lista-missoes-visao-360-lab";
 
 export default async function PaginaVisao360Lab() {
   const tenantId = await garantirWorkspace();
@@ -38,17 +45,21 @@ export default async function PaginaVisao360Lab() {
   const projetoId = await semearCafeMangue(tenantIdLab, user.id);
 
   const supabase = await createClient();
-  const [{ data: projeto }, { data: colunas }, { data: tarefas }, decisoes, indicadores] = await Promise.all([
-    supabase.from("projetos").select("*").eq("id", projetoId).maybeSingle(),
-    supabase.from("colunas_kanban").select("*").eq("projeto_id", projetoId),
-    supabase.from("tarefas").select("*").eq("projeto_id", projetoId),
-    listarDecisoesDoProjeto(projetoId),
-    listarIndicadoresDoProjeto(projetoId),
-  ]);
+  const [{ data: projeto }, { data: colunas }, { data: tarefas }, { data: metasSmart }, decisoes, indicadores, passosDecisoesIndicadores] =
+    await Promise.all([
+      supabase.from("projetos").select("*").eq("id", projetoId).maybeSingle(),
+      supabase.from("colunas_kanban").select("*").eq("projeto_id", projetoId),
+      supabase.from("tarefas").select("*").eq("projeto_id", projetoId),
+      supabase.from("metas_smart").select("*").eq("tenant_id", tenantIdLab),
+      listarDecisoesDoProjeto(projetoId),
+      listarIndicadoresDoProjeto(projetoId),
+      passosConcluidos(user.id, MODULO_DECISOES_INDICADORES),
+    ]);
 
   const projetoTipado = projeto as Projeto;
   const listaColunas = (colunas as ColunaKanban[]) ?? [];
   const listaTarefas = (tarefas as Tarefa[]) ?? [];
+  const listaMetasSmart = (metasSmart as MetaSmart[]) ?? [];
   const colunasConcluidoIds = new Set(listaColunas.filter((c) => c.concluido).map((c) => c.id));
   const marcos = listaTarefas.filter((t) => t.is_marco);
 
@@ -78,6 +89,8 @@ export default async function PaginaVisao360Lab() {
 
         <ExplicacaoSimulada texto={EXPLICACAO_SIMULADA_CAFE_MANGUE} />
 
+        <ListaMissoesVisao360Lab missoes={MISSOES_VISAO_360_CAFE_MANGUE} passosConcluidos={passosDecisoesIndicadores} />
+
         <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
           <h2 className="text-lg font-semibold text-gaiamum-text">🚩 Marcos</h2>
           <ul className="mt-3 flex flex-col gap-2">
@@ -98,27 +111,16 @@ export default async function PaginaVisao360Lab() {
 
         <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
           <h2 className="text-lg font-semibold text-gaiamum-text">📊 Indicadores</h2>
-          <div className="mt-3 flex flex-col gap-4">
-            {indicadores.map((indicador) => (
-              <BarraProgresso
-                key={indicador.id}
-                percentual={indicador.meta > 0 ? Math.round(Math.min(indicador.valor_atual / indicador.meta, 1) * 100) : 0}
-                rotulo={`${indicador.nome} (${indicador.valor_atual}/${indicador.meta} ${indicador.unidade})`}
-              />
-            ))}
+          <div className="mt-3">
+            <ListaIndicadoresLab projetoId={projetoId} indicadoresIniciais={indicadores} />
           </div>
         </section>
 
         <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
           <h2 className="text-lg font-semibold text-gaiamum-text">📋 Decisões</h2>
-          <ul className="mt-3 flex flex-col gap-3">
-            {decisoes.map((decisao) => (
-              <li key={decisao.id} className="text-sm">
-                <p className="font-medium text-gaiamum-text">{decisao.titulo}</p>
-                <p className="mt-0.5 text-xs text-gaiamum-text-muted">{decisao.decisao}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-3">
+            <ListaDecisoesLab projetoId={projetoId} decisoesIniciais={decisoes} metasSmart={listaMetasSmart} />
+          </div>
         </section>
 
         <EstatisticaFicticia texto={ESTATISTICAS_FICTICIAS_CAFE_MANGUE[1]} />
