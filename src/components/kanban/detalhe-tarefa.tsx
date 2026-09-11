@@ -21,6 +21,7 @@ import {
   alternarChecklistItem,
   alternarMarcoTarefa,
   alternarMembroTarefa,
+  atualizarAguardandoDeTarefa,
   atualizarDatasTarefa,
   atualizarDescricaoTarefa,
   atualizarPrioridadeTarefa,
@@ -399,6 +400,16 @@ export function DetalheTarefa({
             />
           )}
         </div>
+
+        <label className="mt-4 flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+          🕓 Aguardando (opcional)
+          <input
+            defaultValue={tarefa.aguardando_de ?? ""}
+            onBlur={(e) => atualizarAguardandoDeTarefa(tarefa.id, projetoId, e.target.value)}
+            placeholder="Ex.: resposta do fornecedor, aprovação do cliente…"
+            className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+          />
+        </label>
 
         <div className="relative mt-4 flex flex-col gap-1.5">
           <span className="text-xs font-medium text-gaiamum-text-muted">Etiquetas</span>

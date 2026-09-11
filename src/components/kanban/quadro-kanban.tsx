@@ -134,6 +134,7 @@ export function QuadroKanban({
       tempo_estimado_min: null,
       tempo_realizado_min: null,
       criado_em: agora,
+      aguardando_de: null,
     }));
 
     setTarefas((atual) => [...atual, ...novas]);
@@ -362,6 +363,7 @@ export function QuadroKanban({
         <input
           name="titulo"
           placeholder="+ Adicionar cartão"
+          title="💡 GTD: se leva menos de 2 minutos, resolva agora — nem precisa virar cartão."
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
             e.preventDefault();

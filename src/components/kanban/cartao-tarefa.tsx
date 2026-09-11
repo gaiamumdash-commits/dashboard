@@ -255,6 +255,14 @@ export function CartaoTarefa({
               📎 {anexosDaTarefa.length}
             </span>
           )}
+          {tarefa.aguardando_de && (
+            <span
+              title={tarefa.aguardando_de}
+              className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted"
+            >
+              🕓 Aguardando
+            </span>
+          )}
         </div>
 
         {membrosDaTarefa.length > 0 && (

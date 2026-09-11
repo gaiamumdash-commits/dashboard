@@ -479,6 +479,22 @@ export async function atualizarPrioridadeTarefa(tarefaId: string, projetoId: str
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
+export async function atualizarAguardandoDeTarefa(tarefaId: string, projetoId: string, aguardandoDe: string) {
+  await garantirWorkspace();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("tarefas")
+    .update({ aguardando_de: aguardandoDe.trim() || null })
+    .eq("id", tarefaId);
+
+  if (error) {
+    throw new Error(`Falha ao atualizar "aguardando": ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
 export async function alternarMarcoTarefa(tarefaId: string, projetoId: string, isMarco: boolean) {
   await garantirWorkspace();
   const supabase = await createClient();

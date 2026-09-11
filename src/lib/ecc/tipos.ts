@@ -44,6 +44,9 @@ export type Tarefa = {
   tempo_estimado_min: number | null;
   tempo_realizado_min: number | null;
   criado_em: string;
+  // GTD (David Allen), lado acionável: preenchido = o cartão está esperando
+  // outra pessoa/evento pra andar (ex.: "resposta do fornecedor X").
+  aguardando_de: string | null;
 };
 
 // ---------------------------------------------------------------------------
