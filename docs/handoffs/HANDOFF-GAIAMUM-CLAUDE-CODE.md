@@ -10,7 +10,23 @@
 
 ---
 
-## Estado confirmado (2026-09-11, sessão nova #41 — última atualização)
+## Estado confirmado (2026-09-11, sessão nova #42 — última atualização)
+
+**Resumo em uma linha**: Sub-entrega 2/3 da frente "Integração cross-módulo do Gaiamum Lab" (Agenda fictícia + Agenda por voz como missão pontual, `/lab/agenda`) **planejada em detalhe e aprovada pelo Fabio** (`EnterPlanMode`/`ExitPlanMode`), nada implementado ainda — pedido explícito de só planejar nesta sessão, codar fica pra sessão nova.
+
+- **Confirmado com o Fabio antes de planejar**: ele ainda não produziu os vídeos no Google Flow a partir do roteiro (`roteiro-cafe-do-mangue.html`, sessão #41) — nada mudou no tom/personagens/enredo, o plano pôde seguir o tema "Noite do Mangue" já fechado sem checar de novo.
+- **Plano final salvo em** `C:\Users\proff\.claude\plans\peppy-prancing-jellyfish.md`. Antes de escrever o plano, rodei 2 agentes Explore em paralelo (um no módulo real de Agenda/voz, outro na infra do Lab — padrão `financeiro.ts`, `progresso.ts`, `seed-cafe-mangue.ts`, `conteudo-cafe-mangue.ts`, `por-que-isso-existe.tsx`) e li mais 5 arquivos reais direto (`gravador-voz-agenda.tsx`, `agenda.ts`, `painel-agenda.tsx`, `detalhe-item-agenda.tsx`, `formulario-evento-agenda.tsx`, `eventos-agenda.ts`) — o esboço de arquitetura da sessão #40 (`sorted-prancing-bubble.md`, seção "Sub-entrega 2/3") tinha sido escrito sem ler código, e a leitura real achou 5 correções que mudam decisões concretas de implementação (todas detalhadas no plano final, seção "Achados que corrigem o esboço original"):
+  1. `listarAgendaUnificada` sempre chama o Google Calendar real (resolve por `user_id`, não por tenant) — sem um parâmetro novo `incluirGoogle`, o calendário pessoal do usuário vazaria pro Lab.
+  2. Os `link` dos itens agregados (conta/tarefa/decisão) apontam pra rotas de produção reais com IDs do projeto fictício — precisam ser remapeados pros equivalentes do Lab (`/lab/financeiro`, `/lab/quadro`, `/lab/visao-360`).
+  3. `painel-agenda.tsx`/`grade-semanal.tsx`/`detalhe-item-agenda.tsx` não são apresentacionais puros (7 Server Actions de produção hardcoded) — são **3 componentes a duplicar**, não 1 "painel fino" como o esboço supôs.
+  4. Alarme (criação + edição) fica **fora do Lab** por decisão de produto, não só técnica — um alarme real disparando pra um compromisso fictício quebraria a fronteira do sandbox (mesma lógica já usada pra excluir anexo/alarme do `ListaContasLab` no Financeiro).
+  5. `transcreverAudioParaTexto` loga consumo de IA no tenant **real** do usuário mesmo quando chamado de dentro do Lab (o esboço da sessão #40 tinha aceitado isso) — decidi reverter essa aceitação: parâmetro `tenantIdOverride` novo, pra não poluir a métrica real de consumo de IA do usuário toda vez que ele testar a Agenda por voz no Lab.
+- **2 mudanças pequenas propostas em código de produção (não-Lab)**, ambas aditivas/opcionais, sem efeito no comportamento atual: `listarAgendaUnificada` (`src/lib/ecc/agenda.ts`) ganha parâmetro `incluirGoogle: boolean = true`; `transcreverAudioParaTexto` (`src/lib/ecc/transcricao-audio.ts`) ganha parâmetro `tenantIdOverride?: string`; `GravadorVozAgenda` ganha prop opcional `tenantIdLab?: string` pra repassar esse override.
+- **Próximo passo**: implementar o plano numa sessão nova, seguindo `peppy-prancing-jellyfish.md` arquivo por arquivo (migration `0038_lab_agenda.sql`, `src/lib/ecc/lab/agenda.ts` novo, 4 componentes Lab novos, conteúdo `EVENTOS_AGENDA_CAFE_MANGUE`/`MISSOES_AGENDA_CAFE_MANGUE`/`PORQUE_AGENDA_CAFE_MANGUE`, rota `/lab/agenda`), testar em produção isolada, aprovar commit/push com o Fabio, atualizar este handoff e oferecer prompt de recomeço pra Sub-entrega 3/3 (Página livre).
+
+---
+
+## Estado confirmado (2026-09-11, sessão nova #41)
 
 **Resumo em uma linha**: Sub-entrega 1/3 da frente "Integração cross-módulo do Gaiamum Lab" (Financeiro Lab-aware, `/lab/financeiro`) implementada seguindo o plano aprovado na sessão #40, testada de ponta a ponta em build de produção isolado, **aguardando aprovação do Fabio pro commit/push**.
 
@@ -1033,6 +1049,14 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-09-11 (sessão nova #42) — Sub-entrega 2/3 (Agenda + voz) planejada em detalhe, aprovada, nada codado
+
+Sessão só de planejamento, pedido explícito do Fabio (implementação fica pra sessão nova). Confirmei com ele antes de planejar que ainda não produziu os vídeos no Google Flow a partir do roteiro da sessão #41 — nada mudou no tom/personagens, segui o tema "Noite do Mangue" já fechado sem reabrir a decisão.
+
+Antes de escrever o plano, rodei 2 agentes Explore em paralelo (módulo real de Agenda/voz de um lado, infra do Lab do outro) mais 5 leituras diretas de arquivo, porque o esboço de arquitetura da sessão #40 (`sorted-prancing-bubble.md`) tinha sido escrito sem ler o código real. Achei 5 correções que mudam decisões concretas: `listarAgendaUnificada` sempre chama o Google Calendar real (resolve por `user_id`, vazaria pro Lab sem um parâmetro `incluirGoogle` novo); os `link` dos itens agregados apontam pra rotas de produção com IDs do projeto fictício (precisam remapear pros equivalentes `/lab/*`); `painel-agenda.tsx`/`grade-semanal.tsx`/`detalhe-item-agenda.tsx` chamam 7 Server Actions de produção hardcoded (são 3 componentes a duplicar, não 1 "painel fino" como o esboço supôs); alarme fica fora do Lab por decisão de produto (evitar notificação real de compromisso fictício); e reverti uma decisão anterior ("aceitável" deixar `transcreverAudioParaTexto` logar consumo de IA no tenant real mesmo chamado de dentro do Lab) propondo um parâmetro `tenantIdOverride` pra não poluir a métrica real do usuário.
+
+Plano final salvo em `C:\Users\proff\.claude\plans\peppy-prancing-jellyfish.md`, aprovado pelo Fabio via `ExitPlanMode`. Detalha migration `0038_lab_agenda.sql`, 2 mudanças pequenas em código de produção (aditivas, sem efeito no `/agenda` real), `src/lib/ecc/lab/agenda.ts` novo, 4 componentes Lab novos, conteúdo novo em `conteudo-cafe-mangue.ts` e a rota `/lab/agenda`. Próxima sessão implementa seguindo o plano arquivo por arquivo.
 
 ### 2026-09-11 (sessão nova #36) — Agenda por voz validada em iPhone real, 4 frentes fechadas, Lab liberado pra retomar
 
