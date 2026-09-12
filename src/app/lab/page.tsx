@@ -56,7 +56,7 @@ export default async function PaginaLab() {
           </div>
           <p className="mt-2 text-gaiamum-text-muted">
             Um estudo de caso fictício pra aprender o Gaiamum na prática: você vai assumir o Café
-            do Mangue, uma cafeteria que precisa lançar o delivery, e usar o quadro e a Visão 360°
+            do Mangue, uma cafeteria que precisa criar a Noite do Mangue, e usar o quadro e a Visão 360°
             de verdade — só que com dados de mentirinha, sem nenhum risco pro seu negócio real.
           </p>
         </div>

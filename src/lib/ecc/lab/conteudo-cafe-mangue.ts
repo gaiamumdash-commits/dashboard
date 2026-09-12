@@ -11,7 +11,7 @@ export const NOME_PROJETO_CAFE_MANGUE = "Café do Mangue";
 
 export const PROJETO_CAFE_MANGUE = {
   resultadoEsperado:
-    "Lançar o delivery da cafeteria em 60 dias sem perder qualidade no atendimento do salão.",
+    "Criar uma noite fixa de música ao vivo em 60 dias, sem perder qualidade no atendimento do dia a dia.",
 };
 
 export const META_SMART_CAFE_MANGUE: {
@@ -24,14 +24,14 @@ export const META_SMART_CAFE_MANGUE: {
   time_bound: string;
 } = {
   horizonte: "medio_prazo",
-  visao_macro: "Aumentar o faturamento mensal do Café do Mangue em 25% com um canal de delivery ativo.",
-  specific: "Lançar um serviço de delivery próprio (não terceirizado) para os produtos do Café do Mangue.",
-  measurable: "50 pedidos de delivery por semana, com nota média de avaliação acima de 4,5.",
+  visao_macro: "Aumentar o faturamento mensal do Café do Mangue em 25% enchendo o salão nos dias de semana mais fracos.",
+  specific: "Criar a Noite do Mangue: uma noite fixa de música ao vivo, com consumação mínima, nas terças do Café do Mangue.",
+  measurable: "50 pessoas por noite, com nota média de avaliação acima de 4,5.",
   attainable:
-    "A cafeteria já tem cozinha com capacidade ociosa no meio da tarde e uma base de clientes fiéis pra validar o serviço.",
+    "A cafeteria já tem o salão vazio nas noites de semana e uma base de clientes fiéis pra validar o formato.",
   relevant:
-    "O movimento do salão não cresce há 2 meses — o delivery é a próxima alavanca de receita sem abrir uma segunda unidade.",
-  time_bound: "60 dias, a partir do início da divulgação do cardápio de delivery.",
+    "O movimento do salão não cresce há 2 meses, principalmente nos dias de semana — a Noite do Mangue é a próxima alavanca de receita sem abrir uma segunda unidade.",
+  time_bound: "60 dias, a partir do início da divulgação da primeira Noite do Mangue.",
 };
 
 export const COLUNAS_CAFE_MANGUE: { nome: string; ordem: number; concluido: boolean }[] = [
@@ -53,7 +53,7 @@ export const TAREFAS_CAFE_MANGUE: {
   valorEstimado: number | null;
 }[] = [
   {
-    titulo: "Definir cardápio de delivery",
+    titulo: "Definir o repertório da primeira Noite do Mangue",
     coluna: "Concluído",
     isMarco: true,
     prioridade: "P2",
@@ -61,7 +61,7 @@ export const TAREFAS_CAFE_MANGUE: {
     valorEstimado: null,
   },
   {
-    titulo: "Testar embalagens térmicas",
+    titulo: "Testar o sistema de som",
     coluna: "A Fazer",
     isMarco: false,
     prioridade: "P1",
@@ -69,7 +69,7 @@ export const TAREFAS_CAFE_MANGUE: {
     valorEstimado: 640,
   },
   {
-    titulo: "Configurar app de pedidos",
+    titulo: "Divulgar a Noite do Mangue nas redes",
     coluna: "Em Andamento",
     isMarco: false,
     prioridade: "P2",
@@ -77,7 +77,7 @@ export const TAREFAS_CAFE_MANGUE: {
     valorEstimado: null,
   },
   {
-    titulo: "Contratar motoboy parceiro",
+    titulo: "Fechar músico fixo pras noites",
     coluna: "A Fazer",
     isMarco: true,
     prioridade: "P2",
@@ -85,7 +85,7 @@ export const TAREFAS_CAFE_MANGUE: {
     valorEstimado: null,
   },
   {
-    titulo: "Divulgar lançamento nas redes",
+    titulo: "Organizar reserva de mesas",
     coluna: "A Fazer",
     isMarco: false,
     prioridade: "P3",
@@ -93,7 +93,7 @@ export const TAREFAS_CAFE_MANGUE: {
     valorEstimado: null,
   },
   {
-    titulo: "Rodar teste piloto com clientes fiéis",
+    titulo: "Rodar noite piloto com clientes fiéis",
     coluna: "Em Andamento",
     isMarco: false,
     prioridade: "P1",
@@ -121,20 +121,20 @@ export type MissaoQuadroCafeMangue = {
 export const MISSOES_QUADRO_CAFE_MANGUE: MissaoQuadroCafeMangue[] = [
   {
     id: "mover-embalagens",
-    texto: "Mova a tarefa “Testar embalagens térmicas” para fora de “A Fazer”.",
-    criterio: { tipo: "mover_tarefa", tarefaTitulo: "Testar embalagens térmicas", colunaDiferenteDe: "A Fazer" },
+    texto: "Mova a tarefa “Testar o sistema de som” para fora de “A Fazer”.",
+    criterio: { tipo: "mover_tarefa", tarefaTitulo: "Testar o sistema de som", colunaDiferenteDe: "A Fazer" },
   },
   {
     id: "reparar-teste-piloto",
-    texto: "Repare: isso destrava “Rodar teste piloto com clientes fiéis”.",
+    texto: "Repare: isso destrava “Rodar noite piloto com clientes fiéis”.",
     criterio: { tipo: "dependente", dependeDeMissaoId: "mover-embalagens" },
   },
 ];
 
 export const INDICADORES_CAFE_MANGUE: { nome: string; valor_atual: number; meta: number; unidade: string }[] = [
-  { nome: "Pedidos de delivery por semana", valor_atual: 18, meta: 50, unidade: "pedidos" },
-  { nome: "Novos clientes cadastrados no app", valor_atual: 40, meta: 100, unidade: "clientes" },
-  { nome: "Nota média de avaliação do delivery", valor_atual: 4.2, meta: 5, unidade: "estrelas" },
+  { nome: "Público presente por noite", valor_atual: 18, meta: 50, unidade: "pessoas" },
+  { nome: "Clientes novos captados nas noites", valor_atual: 40, meta: 100, unidade: "clientes" },
+  { nome: "Nota média de avaliação da noite", valor_atual: 4.2, meta: 5, unidade: "estrelas" },
 ];
 
 export const DECISOES_CAFE_MANGUE: {
@@ -145,11 +145,11 @@ export const DECISOES_CAFE_MANGUE: {
   valor_estimado: number | null;
 }[] = [
   {
-    titulo: "Delivery próprio em vez de marketplace terceirizado",
+    titulo: "Cobrar consumação mínima em vez de entrada paga",
     decisao:
-      "Priorizar um app de pedidos próprio, mesmo sendo mais lento pra lançar, em vez de entrar num marketplace de delivery terceirizado.",
-    motivo: "A taxa dos marketplaces (até 30% por pedido) inviabilizaria a margem do cardápio do Café do Mangue.",
-    impacto_esperado: "Margem melhor por pedido, ao custo de um lançamento mais lento e mais trabalho de divulgação própria.",
+      "Cobrar consumação mínima na Noite do Mangue, em vez de cobrar entrada paga na porta.",
+    motivo: "Entrada paga afasta quem só quer passar pra ver — consumação mínima garante faturamento sem barreira na porta.",
+    impacto_esperado: "Mais gente experimentando a noite, ao custo de um ticket médio um pouco menor no começo.",
     valor_estimado: 4500,
   },
 ];
@@ -171,13 +171,13 @@ export const CONTAS_A_PAGAR_CAFE_MANGUE: {
   decisaoTitulo: string | null;
 }[] = [
   {
-    nome: "Fornecedor de embalagens térmicas",
+    nome: "Conserto do sistema de som",
     valor: 640,
     categoria: "consumo",
     offsetDiasVencimento: -3,
     pago: false,
     offsetDiasPagamento: null,
-    tarefaTitulo: "Testar embalagens térmicas",
+    tarefaTitulo: "Testar o sistema de som",
     decisaoTitulo: null,
   },
   {
@@ -191,14 +191,14 @@ export const CONTAS_A_PAGAR_CAFE_MANGUE: {
     decisaoTitulo: null,
   },
   {
-    nome: "Desenvolvimento do app de pedidos",
+    nome: "Montagem do cantinho de shows (palco e iluminação)",
     valor: 4500,
     categoria: "investimento",
     offsetDiasVencimento: -20,
     pago: true,
     offsetDiasPagamento: -18,
     tarefaTitulo: null,
-    decisaoTitulo: "Delivery próprio em vez de marketplace terceirizado",
+    decisaoTitulo: "Cobrar consumação mínima em vez de entrada paga",
   },
 ];
 
@@ -223,7 +223,7 @@ export const MISSOES_VISAO_360_CAFE_MANGUE: MissaoLab[] = [
 export const MISSOES_FINANCEIRO_CAFE_MANGUE: MissaoLab[] = [
   {
     id: "marcar_valor_estimado",
-    texto: 'Preencha o valor estimado da tarefa "Contratar motoboy parceiro".',
+    texto: 'Preencha o valor estimado da tarefa "Fechar músico fixo pras noites".',
   },
   {
     id: "gerar_conta_a_pagar",
@@ -239,7 +239,7 @@ export const MISSOES_FINANCEIRO_CAFE_MANGUE: MissaoLab[] = [
  * própria (ver estatistica-ficticia.tsx), claramente contextualizadas como
  * parte da narrativa do case, nunca confundíveis com dado real do Gaiamum. */
 export const ESTATISTICAS_FICTICIAS_CAFE_MANGUE: string[] = [
-  "No case do Café do Mangue, quem resolve a tarefa atrasada antes de continuar costuma destravar o teste piloto até 2x mais rápido.",
+  "No case do Café do Mangue, quem resolve a tarefa atrasada antes de continuar costuma destravar a noite piloto até 2x mais rápido.",
   "Cafeterias fictícias que vinculam uma meta SMART ao projeto, como o Café do Mangue fez, chegam à Visão 360° com um fator a menos pra se preocupar.",
 ];
 
@@ -247,7 +247,7 @@ export const ESTATISTICAS_FICTICIAS_CAFE_MANGUE: string[] = [
  * Gaiamum — nunca chama o Gemini de verdade dentro do Lab. Escrito em termos
  * qualitativos (não cita o score numérico exato), pra continuar coerente
  * mesmo que o score calculado ao vivo varie um pouco. */
-export const EXPLICACAO_SIMULADA_CAFE_MANGUE = `O Café do Mangue está com uma base estratégica boa — a meta SMART dá clareza de rumo — mas a execução ainda está no começo: só 1 das 6 tarefas do quadro foi concluída, e os dois indicadores de tração (pedidos e clientes cadastrados) estão bem abaixo da meta. O ponto de atenção real é a única tarefa atrasada, "Testar embalagens térmicas" — ela trava o teste piloto com clientes fiéis, que depende dela pra rodar. Prioridade prática: destravar essa tarefa primeiro, porque é ela que libera o resto da fila e começa a puxar os indicadores de pedidos e clientes pra cima.`;
+export const EXPLICACAO_SIMULADA_CAFE_MANGUE = `O Café do Mangue está com uma base estratégica boa — a meta SMART dá clareza de rumo — mas a execução ainda está no começo: só 1 das 6 tarefas do quadro foi concluída, e os dois indicadores de tração (público por noite e clientes novos) estão bem abaixo da meta. O ponto de atenção real é a única tarefa atrasada, "Testar o sistema de som" — ela trava a noite piloto com clientes fiéis, que depende dela pra rodar. Prioridade prática: destravar essa tarefa primeiro, porque é ela que libera o resto da fila e começa a puxar os indicadores de público e clientes pra cima.`;
 
 /** Blocos "por que isso existe no Gaiamum" (PorQueIssoExiste) — pedido do
  * Fabio (sessão da Sub-entrega 1 do cross-módulo): explicam o produto REAL
