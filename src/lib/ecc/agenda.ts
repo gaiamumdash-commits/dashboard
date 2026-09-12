@@ -24,6 +24,7 @@ export async function listarAgendaUnificada(
   souOwner: boolean,
   inicioSemana: Date,
   fimSemanaExclusivo: Date,
+  incluirGoogle: boolean = true,
 ): Promise<{ google: ResultadoAgenda; itens: ItemAgenda[] }> {
   const supabase = await createClient();
   const inicioIso = inicioSemana.toISOString();
@@ -31,7 +32,9 @@ export async function listarAgendaUnificada(
 
   const [google, resultadoContas, resultadoTarefas, resultadoColunas, resultadoEventos, resultadoDecisoes] =
     await Promise.all([
-      listarEventosGoogleCalendar(inicioSemana, fimSemanaExclusivo),
+      incluirGoogle
+        ? listarEventosGoogleCalendar(inicioSemana, fimSemanaExclusivo)
+        : Promise.resolve<ResultadoAgenda>({ status: "nao_conectado" }),
       souOwner
         ? supabase
             .from("contas_a_pagar")

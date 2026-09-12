@@ -4,6 +4,7 @@ import {
   COLUNAS_CAFE_MANGUE,
   CONTAS_A_PAGAR_CAFE_MANGUE,
   DECISOES_CAFE_MANGUE,
+  EVENTOS_AGENDA_CAFE_MANGUE,
   INDICADORES_CAFE_MANGUE,
   META_SMART_CAFE_MANGUE,
   NOME_PROJETO_CAFE_MANGUE,
@@ -179,6 +180,22 @@ export async function semearCafeMangue(tenantIdLab: string, userId: string): Pro
     throw new Error(`Falha ao semear contas a pagar do Lab: ${erroContas.message}`);
   }
 
+  const { error: erroEventos } = await service.from("eventos_agenda").insert(
+    EVENTOS_AGENDA_CAFE_MANGUE.map((e) => ({
+      tenant_id: tenantIdLab,
+      titulo: e.titulo,
+      inicio: dataLimiteDoOffset(e.offsetDias),
+      fim: null,
+      origem: e.origem,
+      transcricao_bruta: e.transcricaoBruta,
+      criado_por: userId,
+    })),
+  );
+
+  if (erroEventos) {
+    throw new Error(`Falha ao semear eventos da Agenda do Lab: ${erroEventos.message}`);
+  }
+
   return projetoId;
 }
 
@@ -193,6 +210,11 @@ export async function refazerCafeMangue(tenantIdLab: string, userId: string): Pr
   // — sem essa limpeza explícita, o reset apagaria o projeto mas deixaria as
   // contas fictícias órfãs (achado da sessão de planejamento).
   await service.from("contas_a_pagar").delete().eq("tenant_id", tenantIdLab);
+
+  // eventos_agenda não é filha de projeto/tarefa/decisão — nada cascateia a
+  // partir do delete do projeto abaixo, então precisa de limpeza explícita
+  // própria (mesmo cuidado já documentado acima pra contas_a_pagar).
+  await service.from("eventos_agenda").delete().eq("tenant_id", tenantIdLab);
 
   const { data: projeto } = await service
     .from("projetos")

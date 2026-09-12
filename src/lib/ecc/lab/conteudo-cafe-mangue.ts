@@ -257,3 +257,38 @@ export const EXPLICACAO_SIMULADA_CAFE_MANGUE = `O Café do Mangue está com uma 
 export const PORQUE_DECISOES_INDICADORES = `Uma "Decisão" aqui não é uma tarefa — é um registro do que foi decidido, por quê, e qual resultado se esperava. Meses depois, quando o resultado chegar (bom ou ruim), você vai lembrar exatamente a lógica que usou pra decidir, não só o que aconteceu — muito útil quando alguém pergunta "por que a gente fez isso mesmo?". Um "Indicador" é um número que você acompanha ao longo do tempo, sempre ligado a uma meta — ele existe pra você enxergar, de forma objetiva, se está se aproximando ou se afastando do que quer alcançar, em vez de confiar só na sensação de "acho que estamos indo bem".`;
 
 export const PORQUE_FINANCEIRO_CAFE_MANGUE = `Repare que a tarefa e a decisão que você viu na Visão 360° têm um valor estimado — e viram um lançamento aqui no Financeiro com um clique. Isso não é coincidência: no Gaiamum, o que você decide e executa no dia a dia se conecta automaticamente com o dinheiro do negócio, sem precisar copiar a mesma informação em duas ferramentas separadas. O Kanban, as Decisões e o Financeiro são o mesmo sistema, vistos de ângulos diferentes.`;
+
+/** Compromissos fictícios da Agenda do Lab — mesmo padrão de offsetDias das
+ * tarefas (dataLimiteDoOffset em seed-cafe-mangue.ts), cobrindo os 2 estados
+ * visuais de origem: um criado manualmente e um "por voz" (com
+ * transcricaoBruta preenchida, simulando que o Nonato criou por voz), pra
+ * reforçar visualmente que os dois caminhos já existem no case sem o usuário
+ * precisar criar nada pra ver a diferença. */
+export type EventoAgendaSeedCafeMangue = {
+  titulo: string;
+  offsetDias: number;
+  origem: "manual" | "voz";
+  transcricaoBruta: string | null;
+};
+
+export const EVENTOS_AGENDA_CAFE_MANGUE: EventoAgendaSeedCafeMangue[] = [
+  {
+    titulo: "Reunião com fornecedor de bebidas — fechar consumação mínima",
+    offsetDias: 3,
+    origem: "manual",
+    transcricaoBruta: null,
+  },
+  {
+    titulo: "Ensaio de som com a banda",
+    offsetDias: 5,
+    origem: "voz",
+    transcricaoBruta: "ensaio de som com a banda quinta às 19h",
+  },
+];
+
+export const MISSOES_AGENDA_CAFE_MANGUE: MissaoLab[] = [
+  { id: "criar_evento_agenda", texto: "Marque um compromisso manual, tipo a divulgação com o Théo." },
+  { id: "usar_agenda_por_voz", texto: "Use o gravador de voz pra criar outro compromisso, tipo o ensaio de som." },
+];
+
+export const PORQUE_AGENDA_CAFE_MANGUE = `Repare que a grade abaixo já mostra, no mesmo lugar, uma conta a pagar vencendo, uma tarefa com prazo, uma decisão datada e um compromisso manual ou por voz — sem exigir nada novo de você. No Gaiamum, a Agenda não é mais um lugar pra anotar coisas: ela junta o que já existe espalhado pelo Kanban, pelas Decisões e pelo Financeiro num único calendário, pra você não precisar checar 4 telas diferentes só pra saber o que tem hoje.`;

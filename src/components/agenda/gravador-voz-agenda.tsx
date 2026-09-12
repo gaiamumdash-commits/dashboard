@@ -84,8 +84,10 @@ function mensagemDeErroGravacaoAudio(erro: unknown): string {
  * é o componente que usa este. */
 export function GravadorVozAgenda({
   onTranscricaoFinal,
+  tenantIdLab,
 }: {
   onTranscricaoFinal: (texto: string) => void;
+  tenantIdLab?: string;
 }) {
   const suportado = useSyncExternalStore(inscreverSuporteVoz, suportaReconhecimentoDeVoz, () => false);
   const suportaAudio = useSyncExternalStore(inscreverSuporteVoz, suportaGravacaoDeAudio, () => false);
@@ -127,7 +129,7 @@ export function GravadorVozAgenda({
         try {
           const formData = new FormData();
           formData.append("audio", blob, "gravacao");
-          const resultado = await transcreverAudioParaTexto(formData);
+          const resultado = await transcreverAudioParaTexto(formData, tenantIdLab);
           if (resultado.erro !== null) {
             setErro(resultado.erro);
           } else {

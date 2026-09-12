@@ -16,9 +16,12 @@ export type ResultadoTranscricaoAudio = { texto: string; erro: null } | { texto:
  * (Next.js redige a mensagem de erros lançados em Server Actions em
  * produção). Não persiste o áudio em lugar nenhum — processa em memória e
  * descarta; só o texto transcrito segue adiante. */
-export async function transcreverAudioParaTexto(formData: FormData): Promise<ResultadoTranscricaoAudio> {
+export async function transcreverAudioParaTexto(
+  formData: FormData,
+  tenantIdOverride?: string,
+): Promise<ResultadoTranscricaoAudio> {
   try {
-    const tenantId = await garantirWorkspace();
+    const tenantId = tenantIdOverride ?? (await garantirWorkspace());
     const user = await obterUsuarioAtual();
     if (!user) {
       return { texto: null, erro: "Usuário não autenticado." };

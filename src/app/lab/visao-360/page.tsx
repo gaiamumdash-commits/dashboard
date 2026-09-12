@@ -131,6 +131,12 @@ export default async function PaginaVisao360Lab() {
           >
             💰 Ver Financeiro do Café do Mangue →
           </Link>
+          <Link
+            href="/lab/agenda"
+            className="mt-2 inline-block text-sm text-gaiamum-primary hover:underline"
+          >
+            🗓️ Ver Agenda do Café do Mangue →
+          </Link>
         </section>
 
         <EstatisticaFicticia texto={ESTATISTICAS_FICTICIAS_CAFE_MANGUE[1]} />
