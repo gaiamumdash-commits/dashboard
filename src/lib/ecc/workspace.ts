@@ -1,7 +1,9 @@
 import "server-only";
+import { redirect } from "next/navigation";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { buscarConvitePendentePorEmail, vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { buscarMembershipAtual } from "@/lib/ecc/membership";
+import { emailAutorizadoNoBeta, modoCadastroFechado, registrarUsoDoAcessoBeta } from "@/lib/ecc/acesso-beta";
 
 /**
  * Garante que o usuário autenticado tem um workspace (tenant) e retorna o
@@ -37,6 +39,20 @@ export async function garantirWorkspace(): Promise<string> {
     const convitePendente = await buscarConvitePendentePorEmail(user.email);
     if (convitePendente) {
       return vincularUsuarioAoConvite(convitePendente, user.id);
+    }
+  }
+
+  // Modo de cadastro fechado (temporário, ver acesso-beta.ts): só quem já
+  // tem convite pendente (checado acima, sempre vence) ou está na allowlist
+  // explícita ganha workspace novo por conta própria. Quem chega sem
+  // nenhum dos dois cai na tela de acesso restrito e nunca chama a RPC.
+  if (modoCadastroFechado()) {
+    const autorizado = user.email ? await emailAutorizadoNoBeta(user.email) : false;
+    if (!autorizado) {
+      redirect("/acesso-restrito");
+    }
+    if (user.email) {
+      await registrarUsoDoAcessoBeta(user.email);
     }
   }
 

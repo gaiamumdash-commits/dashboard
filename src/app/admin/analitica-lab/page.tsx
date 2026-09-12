@@ -12,6 +12,11 @@ import {
 } from "@/lib/ecc/lab/analitica";
 import { ROTULO_PATENTE } from "@/lib/ecc/lab/patentes";
 import { MenuLateral } from "@/components/layout/menu-lateral";
+import {
+  listarAcessoBetaPermitido,
+  autorizarEmailNoBeta,
+  alternarBloqueioAcessoBeta,
+} from "@/lib/ecc/acesso-beta";
 
 function formatarDataHora(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -24,7 +29,7 @@ export default async function PaginaAnaliticaLab() {
 
   const tenantId = await garantirWorkspace();
 
-  const [totalMetasSmart, papelAtual, funil, funilOferta, patentes, emRisco, logIA] = await Promise.all([
+  const [totalMetasSmart, papelAtual, funil, funilOferta, patentes, emRisco, logIA, acessoBeta] = await Promise.all([
     contarMetasSmart(tenantId),
     obterPapelAtual(tenantId),
     obterFunilLab(),
@@ -32,6 +37,7 @@ export default async function PaginaAnaliticaLab() {
     obterDistribuicaoPatentes(),
     listarUsuariosEmRiscoDeEvasao(),
     obterLogConsumoIA(),
+    listarAcessoBetaPermitido(),
   ]);
 
   return (
@@ -150,6 +156,63 @@ export default async function PaginaAnaliticaLab() {
                     {!r.sucesso && r.erro ? ` — ${r.erro}` : ""}
                   </span>
                   <span className="text-gaiamum-text-muted">{r.totalTokens ?? "—"} tokens</span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+        {/* Acesso fechado (allowlist) */}
+        <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
+          <h2 className="text-lg font-semibold text-gaiamum-text">Acesso fechado — quem pode entrar</h2>
+          <p className="mt-1 text-sm text-gaiamum-text-muted">
+            Enquanto o cadastro estiver fechado (env var <code>MODO_CADASTRO_FECHADO</code>), só e-mails
+            aqui embaixo (ou com convite pendente) conseguem ganhar workspace.
+          </p>
+
+          <form action={autorizarEmailNoBeta} className="mt-4 flex gap-2">
+            <input
+              type="email"
+              name="email"
+              required
+              placeholder="email@exemplo.com"
+              className="flex-1 rounded-lg border border-gaiamum-border bg-gaiamum-bg px-3 py-2 text-sm text-gaiamum-text"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-gaiamum-accent px-4 py-2 text-sm font-semibold text-white"
+            >
+              Autorizar
+            </button>
+          </form>
+
+          <div className="mt-4 flex flex-col gap-2 overflow-x-auto">
+            {acessoBeta.length === 0 ? (
+              <p className="text-sm text-gaiamum-text-muted">Nenhum e-mail autorizado ainda.</p>
+            ) : (
+              acessoBeta.map((linha) => (
+                <div
+                  key={linha.email}
+                  className="flex items-center justify-between gap-3 border-b border-gaiamum-border pb-2 text-sm last:border-0 last:pb-0"
+                >
+                  <div className="flex flex-col">
+                    <span className={linha.bloqueado ? "text-gaiamum-text-muted line-through" : "text-gaiamum-text"}>
+                      {linha.email}
+                    </span>
+                    <span className="text-xs text-gaiamum-text-muted">
+                      autorizado em {formatarDataHora(linha.criadoEm)}
+                      {linha.usadoEm ? ` · entrou em ${formatarDataHora(linha.usadoEm)}` : " · ainda não entrou"}
+                    </span>
+                  </div>
+                  <form action={alternarBloqueioAcessoBeta}>
+                    <input type="hidden" name="email" value={linha.email} />
+                    <input type="hidden" name="bloquear" value={linha.bloqueado ? "false" : "true"} />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-gaiamum-border px-2 py-0.5 text-xs text-gaiamum-text-muted"
+                    >
+                      {linha.bloqueado ? "Reativar" : "Congelar"}
+                    </button>
+                  </form>
                 </div>
               ))
             )}
