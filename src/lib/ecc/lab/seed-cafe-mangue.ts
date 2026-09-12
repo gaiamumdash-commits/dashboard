@@ -8,6 +8,7 @@ import {
   INDICADORES_CAFE_MANGUE,
   META_SMART_CAFE_MANGUE,
   NOME_PROJETO_CAFE_MANGUE,
+  PAGINA_LIVRE_CAFE_MANGUE,
   PROJETO_CAFE_MANGUE,
   TAREFAS_CAFE_MANGUE,
 } from "@/lib/ecc/lab/conteudo-cafe-mangue";
@@ -196,6 +197,18 @@ export async function semearCafeMangue(tenantIdLab: string, userId: string): Pro
     throw new Error(`Falha ao semear eventos da Agenda do Lab: ${erroEventos.message}`);
   }
 
+  const { error: erroPagina } = await service.from("paginas_livres").insert({
+    tenant_id: tenantIdLab,
+    projeto_id: projetoId,
+    titulo: PAGINA_LIVRE_CAFE_MANGUE.titulo,
+    conteudo: PAGINA_LIVRE_CAFE_MANGUE.conteudo,
+    criado_por: userId,
+  });
+
+  if (erroPagina) {
+    throw new Error(`Falha ao semear página livre do Lab: ${erroPagina.message}`);
+  }
+
   return projetoId;
 }
 
@@ -215,6 +228,11 @@ export async function refazerCafeMangue(tenantIdLab: string, userId: string): Pr
   // partir do delete do projeto abaixo, então precisa de limpeza explícita
   // própria (mesmo cuidado já documentado acima pra contas_a_pagar).
   await service.from("eventos_agenda").delete().eq("tenant_id", tenantIdLab);
+
+  // paginas_livres.projeto_id É "on delete cascade" (migration 0032, ao
+  // contrário de contas_a_pagar/eventos_agenda acima) — o delete do projeto
+  // logo abaixo já apaga todas as páginas livres do case sozinho. Não
+  // adicionar um delete explícito aqui: seria redundante.
 
   const { data: projeto } = await service
     .from("projetos")

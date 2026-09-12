@@ -1,5 +1,6 @@
 import type { CategoriaFinanceira, Horizonte, Prioridade } from "@/lib/ecc/tipos";
 import type { PassoLab } from "@/lib/ecc/lab/progresso";
+import type { PartialBlock } from "@blocknote/core";
 
 /** Conteúdo do estudo de caso fictício "Café Mangue" — constantes puras, sem
  * I/O. Calibrado pra render um score de Alinhamento Gaiamum intermediário
@@ -292,3 +293,56 @@ export const MISSOES_AGENDA_CAFE_MANGUE: MissaoLab[] = [
 ];
 
 export const PORQUE_AGENDA_CAFE_MANGUE = `Repare que a grade abaixo já mostra, no mesmo lugar, uma conta a pagar vencendo, uma tarefa com prazo, uma decisão datada e um compromisso manual ou por voz — sem exigir nada novo de você. No Gaiamum, a Agenda não é mais um lugar pra anotar coisas: ela junta o que já existe espalhado pelo Kanban, pelas Decisões e pelo Financeiro num único calendário, pra você não precisar checar 4 telas diferentes só pra saber o que tem hoje.`;
+
+/** Página livre fictícia pré-semeada — preenche os 2 blocos do template
+ * (Material de referência / Ideias-algum dia) com conteúdo do case "Noite do
+ * Mangue" pra reforçar visualmente a diferença entre os dois termos GTD, não
+ * só o rótulo: o primeiro bloco é estático e consultável (contato, valor
+ * combinado), o segundo são ideias ainda não comprometidas como tarefa ou
+ * decisão. Ver PORQUE_PAGINAS_LIVRES_CAFE_MANGUE abaixo. */
+export const PAGINA_LIVRE_CAFE_MANGUE: { titulo: string; conteudo: PartialBlock[] } = {
+  titulo: "Notas da Noite do Mangue",
+  conteudo: [
+    {
+      type: "heading",
+      props: { level: 2 },
+      content: "Material de referência",
+    },
+    {
+      type: "bulletListItem",
+      content: "Técnico de som (Rogério): (91) 98123-4567 — só chamar se o equipamento falhar de novo.",
+    },
+    {
+      type: "bulletListItem",
+      content: "Consumação mínima combinada com o salão: R$ 35 por pessoa.",
+    },
+    {
+      type: "bulletListItem",
+      content: "Senha do roteador do salão pra quem for tocar música (pedem sempre): mangue2024",
+    },
+    {
+      type: "heading",
+      props: { level: 2 },
+      content: "Ideias / algum dia",
+    },
+    {
+      type: "bulletListItem",
+      content: "Fazer uma noite temática uma vez por mês (samba, MPB, forró) em vez de sempre o mesmo repertório.",
+    },
+    {
+      type: "bulletListItem",
+      content: "Parceria com uma cervejaria artesanal local pra ter uma cerveja exclusiva da Noite do Mangue.",
+    },
+    {
+      type: "bulletListItem",
+      content: "Testar cobrar ingresso antecipado pelo site quando a casa já estiver lotando toda terça.",
+    },
+  ],
+};
+
+export const MISSOES_PAGINAS_LIVRES_CAFE_MANGUE: MissaoLab[] = [
+  { id: "criar_pagina_livre", texto: "Crie sua própria página livre." },
+  { id: "editar_pagina_livre", texto: "Escreva algo em Material de referência ou em Ideias/algum dia." },
+];
+
+export const PORQUE_PAGINAS_LIVRES_CAFE_MANGUE = `"Material de referência" é onde fica o que você só precisa consultar depois — não é uma tarefa, não tem prazo, não vai pro Kanban, só existe pra você não perder (tipo o contato de um fornecedor ou um valor combinado). "Ideias / algum dia" é onde ficam ideias que você ainda não decidiu perseguir — se um dia virar um compromisso de verdade, ela sai daqui e vira uma tarefa no quadro ou uma Decisão registrada. A Página livre existe pra essas duas coisas não ficarem perdidas num post-it, no bloco de notas do celular ou numa conversa que ninguém mais acha.`;

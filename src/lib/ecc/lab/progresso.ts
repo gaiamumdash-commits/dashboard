@@ -11,12 +11,15 @@ export type PassoLab =
   | "gerar_conta_a_pagar"
   | "marcar_conta_paga"
   | "criar_evento_agenda"
-  | "usar_agenda_por_voz";
+  | "usar_agenda_por_voz"
+  | "criar_pagina_livre"
+  | "editar_pagina_livre";
 
 export const MODULO_NUCLEO = "nucleo";
 export const MODULO_DECISOES_INDICADORES = "decisoes_indicadores";
 export const MODULO_FINANCEIRO = "financeiro";
 export const MODULO_AGENDA = "agenda";
+export const MODULO_PAGINAS_LIVRES = "paginas_livres";
 
 export async function passosConcluidos(userId: string, modulo: string = MODULO_NUCLEO): Promise<Set<PassoLab>> {
   const supabase = await createClient();

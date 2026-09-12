@@ -12,6 +12,7 @@ import {
   MODULO_DECISOES_INDICADORES,
   MODULO_FINANCEIRO,
   MODULO_AGENDA,
+  MODULO_PAGINAS_LIVRES,
   type PassoLab,
 } from "@/lib/ecc/lab/progresso";
 import { concederPatente } from "@/lib/ecc/lab/patentes";
@@ -102,6 +103,7 @@ export async function refazerModuloLab(): Promise<void> {
   await resetarPassosDoModulo(user.id, MODULO_DECISOES_INDICADORES);
   await resetarPassosDoModulo(user.id, MODULO_FINANCEIRO);
   await resetarPassosDoModulo(user.id, MODULO_AGENDA);
+  await resetarPassosDoModulo(user.id, MODULO_PAGINAS_LIVRES);
   await refazerCafeMangue(tenantId, user.id);
   revalidatePath("/lab");
 }
