@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
@@ -22,44 +23,53 @@ export default async function PaginaOfertaLab() {
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={Boolean(totalMetasSmart)} souOwner={papelAtual === "owner"} />
-      <main className="mx-auto flex max-w-3xl flex-1 flex-col justify-center px-4 py-12">
-        <h1 className="text-3xl font-semibold text-gaiamum-text">Antes de começar...</h1>
-        <p className="mt-2 text-gaiamum-text-muted">
-          O Gaiamum não é só uma ferramenta pra organizar tarefas — é controle total do seu negócio
-          num lugar só, o que te tira do dia a dia puramente operacional e te dá espaço pra pensar
-          estratégico. Você pode ver isso na prática agora, ou já ir direto pro seu workspace.
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-4 py-8">
+        <div className="relative w-full overflow-hidden rounded-2xl sm:hidden" style={{ aspectRatio: "941 / 1672" }}>
+          <Image
+            src="/lab/oferta-lab-mobile.png"
+            alt="Gaiamum Lab — coloque ordem no Mangue"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+        </div>
+        <div className="relative hidden w-full overflow-hidden rounded-2xl sm:block" style={{ aspectRatio: "1536 / 1024" }}>
+          <Image
+            src="/lab/oferta-lab-desktop.png"
+            alt="Gaiamum Lab — coloque ordem no Mangue"
+            fill
+            priority
+            sizes="(min-width: 640px) 768px, 100vw"
+            className="object-cover"
+          />
+        </div>
+
+        <form action={registrarDecisaoOfertaLab.bind(null, "lab")} className="mt-6 w-full">
+          <button
+            type="submit"
+            className="w-full rounded-xl bg-gaiamum-primary px-6 py-4 text-lg font-semibold text-white transition hover:bg-gaiamum-primary-dark"
+          >
+            🎮 Comece agora! Faça o Gaiamum Lab
+          </button>
+        </form>
+        <p className="mt-2 text-center text-sm text-gaiamum-text-muted">
+          É grátis e leva ~20 min: um estudo de caso guiado mostra como o Gaiamum pode potencializar
+          seu negócio, com decisões, indicadores e metas na prática, antes de aplicar de verdade.
+        </p>
+        <p className="mt-2 text-center text-sm text-gaiamum-text-muted">
+          Quem conclui ganha a patente 🏅 Explorador e um{" "}
+          <span className="rounded bg-gaiamum-warning px-1.5 py-0.5 font-semibold text-black">
+            cupom de 5% de desconto
+          </span>{" "}
+          na mensalidade do Gaiamum.
         </p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <form action={registrarDecisaoOfertaLab.bind(null, "lab")}>
-            <button
-              type="submit"
-              className="flex h-full w-full flex-col items-start gap-2 rounded-2xl border border-gaiamum-primary bg-gaiamum-surface p-6 text-left transition hover:border-gaiamum-primary-dark"
-            >
-              <span className="text-2xl">🎮</span>
-              <span className="text-lg font-semibold text-gaiamum-text">Fazer o Gaiamum Lab</span>
-              <span className="text-sm text-gaiamum-text-muted">
-                Um estudo de caso guiado mostra como sair do operacional pro estratégico usando
-                decisões, indicadores e metas na prática, antes de aplicar no seu negócio de
-                verdade. ~20 min.
-              </span>
-            </button>
-          </form>
-
-          <form action={registrarDecisaoOfertaLab.bind(null, "pular")}>
-            <button
-              type="submit"
-              className="flex h-full w-full flex-col items-start gap-2 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6 text-left transition hover:border-gaiamum-text-muted"
-            >
-              <span className="text-2xl">→</span>
-              <span className="text-lg font-semibold text-gaiamum-text">Ir direto pro app</span>
-              <span className="text-sm text-gaiamum-text-muted">
-                Prefere aprender fazendo? Comece já definindo suas metas SMART. O Lab continua
-                sempre disponível no menu e em Configurações.
-              </span>
-            </button>
-          </form>
-        </div>
+        <form action={registrarDecisaoOfertaLab.bind(null, "pular")} className="mt-8">
+          <button type="submit" className="text-xs text-gaiamum-text-muted underline hover:text-gaiamum-text">
+            Não, prefiro ir direto pro app
+          </button>
+        </form>
       </main>
     </div>
   );

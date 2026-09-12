@@ -49,12 +49,18 @@ export default async function PaginaLab() {
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={Boolean(totalMetasSmart)} souOwner={papelAtual === "owner"} />
       <main className="mx-auto flex max-w-2xl flex-1 flex-col gap-6 px-4 py-12">
-        <div>
-          <div className="flex items-center gap-2">
-            <LogoCafeDoMangue size={40} />
-            <h1 className="text-3xl font-semibold text-gaiamum-text">🎮 Gaiamum Lab</h1>
+        <div className="overflow-hidden rounded-3xl border border-[#6b4423] bg-gradient-to-br from-[#2b1d12] via-[#3a2817] to-[#1d130b] p-6 shadow-lg sm:p-8">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#d4a054]/15 px-3 py-1 text-xs font-medium text-[#e8c17d]">
+            📚 Case de aprendizado — dados fictícios, sem nenhum risco pro seu negócio real
+          </span>
+          <div className="mt-4 flex items-center gap-4">
+            <LogoCafeDoMangue size={64} />
+            <div>
+              <h1 className="text-2xl font-bold text-[#f5e6d3] sm:text-3xl">Café do Mangue</h1>
+              <p className="text-sm text-[#c9a876]">via Gaiamum Lab</p>
+            </div>
           </div>
-          <p className="mt-2 text-gaiamum-text-muted">
+          <p className="mt-4 text-[#e8d5bc]/90">
             Um estudo de caso fictício pra aprender o Gaiamum na prática: você vai assumir o Café
             do Mangue, uma cafeteria que precisa criar a Noite do Mangue, e usar o quadro e a Visão 360°
             de verdade — só que com dados de mentirinha, sem nenhum risco pro seu negócio real.
