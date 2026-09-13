@@ -52,6 +52,17 @@ export default async function PaginaOnboarding() {
               pular e preencher depois, se preferir — o menu lateral sempre te traz de volta aqui.
             </p>
 
+            <blockquote className="mt-6 rounded-2xl border border-gaiamum-primary/30 bg-gaiamum-primary/5 p-5">
+              <p className="text-lg italic leading-relaxed text-gaiamum-text">
+                “Transformar metas em compromissos concretos faz diferença: participantes que
+                escreveram seus objetivos apresentaram um nível de realização 42% maior do que
+                aqueles que apenas pensaram neles.”
+              </p>
+              <footer className="mt-3 text-sm font-medium text-gaiamum-text-muted">
+                — Gail Matthews, Dominican University of California
+              </footer>
+            </blockquote>
+
             <FormularioSmart />
           </>
         )}
