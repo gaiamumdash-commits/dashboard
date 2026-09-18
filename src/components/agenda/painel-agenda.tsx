@@ -193,35 +193,32 @@ export function PainelAgenda({
       )}
 
       <div className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <h2 className="text-sm font-medium text-gaiamum-text-muted sm:hidden">Próximos compromissos</h2>
-            <div className="hidden overflow-hidden rounded-lg border border-gaiamum-border sm:flex">
-              <Link
-                href="/agenda?visao=dia"
-                scroll={false}
-                className={`px-3 py-1 text-xs font-medium ${
-                  visaoAtiva === "dia"
-                    ? "bg-gaiamum-primary text-white"
-                    : "text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
-                }`}
-              >
-                Dia
-              </Link>
-              <Link
-                href="/agenda?visao=semana"
-                scroll={false}
-                className={`px-3 py-1 text-xs font-medium ${
-                  visaoAtiva === "semana"
-                    ? "bg-gaiamum-primary text-white"
-                    : "text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
-                }`}
-              >
-                Semana
-              </Link>
-            </div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="overflow-hidden rounded-lg border border-gaiamum-border flex shrink-0">
+            <Link
+              href="/agenda?visao=dia"
+              scroll={false}
+              className={`px-3 py-1 text-xs font-medium ${
+                visaoAtiva === "dia"
+                  ? "bg-gaiamum-primary text-white"
+                  : "text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+              }`}
+            >
+              Dia
+            </Link>
+            <Link
+              href="/agenda?visao=semana"
+              scroll={false}
+              className={`px-3 py-1 text-xs font-medium ${
+                visaoAtiva === "semana"
+                  ? "bg-gaiamum-primary text-white"
+                  : "text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+              }`}
+            >
+              Semana
+            </Link>
           </div>
-          <div className="hidden items-center gap-2 sm:flex">
+          <div className="flex items-center gap-2">
             {visaoAtiva === "dia" ? (
               <>
                 <Link
@@ -278,6 +275,7 @@ export function PainelAgenda({
           </div>
         </div>
 
+        {visaoAtiva === "semana" && (
         <div className="sm:hidden">
         {itens.length === 0 ? (
           <p className="mt-3 text-sm text-gaiamum-text-muted">Nada por aqui nos próximos dias.</p>
@@ -351,14 +349,15 @@ export function PainelAgenda({
           </div>
         )}
         </div>
+        )}
 
-        <div className="hidden sm:block">
-          {visaoAtiva === "dia" ? (
-            <GradeDia itens={itens} chaveDia={chaveDia} />
-          ) : (
+        {visaoAtiva === "dia" ? (
+          <GradeDia itens={itens} chaveDia={chaveDia} />
+        ) : (
+          <div className="hidden sm:block">
             <GradeSemanal itens={itens} chaveSemana={chaveSemana} />
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <FormularioEventoAgenda />
