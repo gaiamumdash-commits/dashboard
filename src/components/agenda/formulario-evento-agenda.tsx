@@ -36,11 +36,25 @@ export function FormularioEventoAgenda() {
   const [erro, setErro] = useState<string | null>(null);
   const [modo, setModo] = useState<"digitar" | "falar">("digitar");
   const [transcricaoBruta, setTranscricaoBruta] = useState("");
+  const [mesmoDia, setMesmoDia] = useState(true);
   const router = useRouter();
   const tituloRef = useRef<HTMLInputElement>(null);
   const inicioRef = useRef<HTMLInputElement>(null);
   const fimRef = useRef<HTMLInputElement>(null);
+  const fimHoraRef = useRef<HTMLInputElement>(null);
   const antecedenciaRef = useRef<HTMLSelectElement>(null);
+
+  // "Mesmo dia" (padrão, evento pontual é o caso comum): a pessoa só digita
+  // a hora de término, a data vem copiada do Início na hora de montar o
+  // datetime-local completo pro campo escondido que o form realmente envia
+  // — evita digitar a mesma data duas vezes.
+  function fimCompleto(): string {
+    if (!mesmoDia) return fimRef.current?.value ?? "";
+    const dataInicio = inicioRef.current?.value.split("T")[0];
+    const horaFim = fimHoraRef.current?.value;
+    if (!dataInicio || !horaFim) return "";
+    return `${dataInicio}T${horaFim}`;
+  }
 
   function handleTranscricao(texto: string) {
     setTranscricaoBruta(texto);
@@ -49,6 +63,17 @@ export function FormularioEventoAgenda() {
     if (inicioRef.current) inicioRef.current.value = resultado.inicioLocal;
     if (fimRef.current) fimRef.current.value = resultado.fimLocal ?? "";
     if (antecedenciaRef.current) antecedenciaRef.current.value = snapAntecedencia(resultado.antecedenciaMin);
+
+    // Se a fala trouxe um fim em dia diferente do início, "mesmo dia"
+    // deixaria de fazer sentido (esconderia a data real do fim) — volta pro
+    // campo completo nesse caso; senão, só copia a hora extraída.
+    const dataInicio = resultado.inicioLocal.split("T")[0];
+    const dataFim = resultado.fimLocal?.split("T")[0];
+    const ehMesmoDia = !dataFim || dataFim === dataInicio;
+    setMesmoDia(ehMesmoDia);
+    if (ehMesmoDia && fimHoraRef.current) {
+      fimHoraRef.current.value = resultado.fimLocal?.split("T")[1] ?? "";
+    }
   }
 
   if (!aberto) {
@@ -100,6 +125,7 @@ export function FormularioEventoAgenda() {
       <form
         action={async (formData) => {
           setErro(null);
+          formData.set("fim", mesmoDia ? fimCompleto() : (fimRef.current?.value ?? ""));
           try {
             await criarEventoAgendaManual(formData);
             setAberto(false);
@@ -134,11 +160,31 @@ export function FormularioEventoAgenda() {
             />
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-            Fim (opcional)
+            <span className="flex items-center justify-between gap-2">
+              <span>Fim {mesmoDia ? "(hora)" : "(opcional)"}</span>
+              <span className="flex items-center gap-1 text-[11px] font-normal normal-case text-gaiamum-text-muted">
+                <input
+                  type="checkbox"
+                  checked={mesmoDia}
+                  onChange={(e) => setMesmoDia(e.target.checked)}
+                  className="h-3 w-3"
+                />
+                📆 Mesmo dia
+              </span>
+            </span>
+            {/* Os dois inputs ficam sempre montados (só a visibilidade muda)
+                pra handleTranscricao (voz) sempre ter uma ref válida pra
+                preencher, independente de qual modo estava ativo antes. */}
+            <input
+              ref={fimHoraRef}
+              type="time"
+              hidden={!mesmoDia}
+              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
+            />
             <input
               ref={fimRef}
               type="datetime-local"
-              name="fim"
+              hidden={mesmoDia}
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
             />
           </label>

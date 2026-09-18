@@ -51,6 +51,7 @@ export function CartaoTarefa({
   aoMoverToque,
   aoSoltarToque,
   emArrastoToque,
+  aoSoltarSobre,
 }: {
   tarefa: Tarefa;
   coluna: ColunaKanban;
@@ -69,8 +70,13 @@ export function CartaoTarefa({
   aoMoverToque: (x: number, y: number) => void;
   aoSoltarToque: (x: number, y: number) => void;
   emArrastoToque: boolean;
+  /** Solto em cima de outro cartão (não na coluna vazia) — reordena dentro
+   * da coluna, na posição exata onde soltou (metade de cima = antes, metade
+   * de baixo = depois), não só troca de coluna. */
+  aoSoltarSobre: (tarefaArrastadaId: string, posicao: "antes" | "depois") => void;
 }) {
   const [editandoTitulo, setEditandoTitulo] = useState(false);
+  const [posicaoDrop, setPosicaoDrop] = useState<"antes" | "depois" | null>(null);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
 
@@ -166,9 +172,34 @@ export function CartaoTarefa({
       ref={cardRef}
       draggable
       onDragStart={(e) => e.dataTransfer.setData("text/tarefa-id", tarefa.id)}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("text/tarefa-id")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const meio = e.currentTarget.getBoundingClientRect().top + e.currentTarget.getBoundingClientRect().height / 2;
+        setPosicaoDrop(e.clientY < meio ? "antes" : "depois");
+      }}
+      onDragLeave={() => setPosicaoDrop(null)}
+      onDrop={(e) => {
+        const tarefaArrastadaId = e.dataTransfer.getData("text/tarefa-id");
+        if (!tarefaArrastadaId || tarefaArrastadaId === tarefa.id) {
+          setPosicaoDrop(null);
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        aoSoltarSobre(tarefaArrastadaId, posicaoDrop ?? "depois");
+        setPosicaoDrop(null);
+      }}
       className={`cursor-grab overflow-hidden rounded-xl border-2 bg-gaiamum-surface-raised shadow-sm transition hover:shadow-md active:cursor-grabbing ${
         souResponsavel ? "border-gaiamum-border-forte border-l-4 border-l-gaiamum-primary" : "border-gaiamum-border-forte"
-      } ${emArrastoToque ? "opacity-40" : ""}`}
+      } ${emArrastoToque ? "opacity-40" : ""} ${
+        posicaoDrop === "antes"
+          ? "border-t-2 border-t-gaiamum-primary"
+          : posicaoDrop === "depois"
+            ? "border-b-2 border-b-gaiamum-primary"
+            : ""
+      }`}
     >
       {/* Traço de urgência — só em P1, pedido do Fabio pra chamar mais
           atenção nos cartões mais urgentes. bg-gaiamum-danger é fixo

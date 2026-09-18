@@ -161,3 +161,15 @@ export function urgenciaDoPrazo(
   if (horasRestantes <= HORAS_PARA_ALERTA_AMARELO) return "proximo";
   return "ok";
 }
+
+/** Ordem fracionária do cartão solto entre `ordemAntes` e `ordemDepois`
+ * (qualquer um pode faltar — extremo da coluna) — mesma técnica de posição
+ * fracionária usada por Trello/Notion internamente: inserir um cartão vira
+ * 1 update (a média dos vizinhos), sem reindexar a coluna inteira a cada
+ * arrasto. */
+export function calcularNovaOrdem(ordemAntes: number | null, ordemDepois: number | null): number {
+  if (ordemAntes === null && ordemDepois === null) return 1000;
+  if (ordemAntes === null) return ordemDepois! - 1000;
+  if (ordemDepois === null) return ordemAntes + 1000;
+  return (ordemAntes + ordemDepois) / 2;
+}

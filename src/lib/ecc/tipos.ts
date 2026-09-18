@@ -37,6 +37,7 @@ export type Tarefa = {
   titulo: string;
   descricao: string | null;
   coluna_id: string;
+  ordem: number;
   prioridade: Prioridade;
   is_marco: boolean;
   data_inicio: string | null;

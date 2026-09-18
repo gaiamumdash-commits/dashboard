@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
-import { tocarSomConcluido } from "@/lib/ecc/kanban";
+import { calcularNovaOrdem, tocarSomConcluido } from "@/lib/ecc/kanban";
 import {
   criarColuna,
   criarTarefa,
@@ -83,18 +83,75 @@ export function QuadroKanban({
     setColunas(colunasIniciais);
   }
 
+  // Solto na área vazia da coluna (não em cima de um cartão específico) —
+  // vai pro fim dela. `soltarSobreCartao` abaixo cobre o caso de reordenar
+  // em cima de um cartão específico (inclusive dentro da mesma coluna).
   function moverPara(tarefaId: string, novaColunaId: string) {
     if (colunasIniciais.find((c) => c.id === novaColunaId)?.concluido) {
       tocarSomConcluido();
     }
-    const colunaAnterior = tarefas.find((t) => t.id === tarefaId)?.coluna_id;
-    setTarefas((atual) => atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: novaColunaId } : t)));
+    const tarefaAtual = tarefas.find((t) => t.id === tarefaId);
+    const colunaAnterior = tarefaAtual?.coluna_id;
+    const ordemAnterior = tarefaAtual?.ordem;
+    const ordensDaColunaAlvo = tarefas
+      .filter((t) => t.coluna_id === novaColunaId && t.id !== tarefaId)
+      .map((t) => t.ordem);
+    const novaOrdem = calcularNovaOrdem(ordensDaColunaAlvo.length > 0 ? Math.max(...ordensDaColunaAlvo) : null, null);
+
+    setTarefas((atual) => atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: novaColunaId, ordem: novaOrdem } : t)));
     iniciarTransicao(() => {
-      moverTarefa(tarefaId, projetoId, novaColunaId).catch((err) => {
+      moverTarefa(tarefaId, projetoId, novaColunaId, novaOrdem).catch((err) => {
         if (colunaAnterior) {
-          setTarefas((atual) => atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: colunaAnterior } : t)));
+          setTarefas((atual) =>
+            atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: colunaAnterior, ordem: ordemAnterior ?? t.ordem } : t)),
+          );
         }
         toast.error(mensagemDeErro(err, "Falha ao mover cartão."));
+      });
+    });
+  }
+
+  /** Solto em cima de um cartão específico (`tarefaAlvoId`) — reordena pra
+   * ficar exatamente antes/depois dele, dentro da coluna desse cartão-alvo
+   * (que pode ser a mesma coluna de origem ou outra). */
+  function soltarSobreCartao(tarefaArrastadaId: string, tarefaAlvoId: string, posicao: "antes" | "depois") {
+    if (tarefaArrastadaId === tarefaAlvoId) return;
+    const tarefaAlvo = tarefas.find((t) => t.id === tarefaAlvoId);
+    if (!tarefaAlvo) return;
+
+    if (colunasIniciais.find((c) => c.id === tarefaAlvo.coluna_id)?.concluido) {
+      tocarSomConcluido();
+    }
+
+    const ordenadasDaColunaAlvo = tarefas
+      .filter((t) => t.coluna_id === tarefaAlvo.coluna_id && t.id !== tarefaArrastadaId)
+      .sort((a, b) => a.ordem - b.ordem);
+    const indiceAlvo = ordenadasDaColunaAlvo.findIndex((t) => t.id === tarefaAlvoId);
+    if (indiceAlvo === -1) return;
+
+    const [ordemAntes, ordemDepois] =
+      posicao === "antes"
+        ? [ordenadasDaColunaAlvo[indiceAlvo - 1]?.ordem ?? null, ordenadasDaColunaAlvo[indiceAlvo].ordem]
+        : [ordenadasDaColunaAlvo[indiceAlvo].ordem, ordenadasDaColunaAlvo[indiceAlvo + 1]?.ordem ?? null];
+    const novaOrdem = calcularNovaOrdem(ordemAntes, ordemDepois);
+
+    const tarefaArrastada = tarefas.find((t) => t.id === tarefaArrastadaId);
+    const colunaAnterior = tarefaArrastada?.coluna_id;
+    const ordemAnterior = tarefaArrastada?.ordem;
+
+    setTarefas((atual) =>
+      atual.map((t) => (t.id === tarefaArrastadaId ? { ...t, coluna_id: tarefaAlvo.coluna_id, ordem: novaOrdem } : t)),
+    );
+    iniciarTransicao(() => {
+      moverTarefa(tarefaArrastadaId, projetoId, tarefaAlvo.coluna_id, novaOrdem).catch((err) => {
+        if (colunaAnterior) {
+          setTarefas((atual) =>
+            atual.map((t) =>
+              t.id === tarefaArrastadaId ? { ...t, coluna_id: colunaAnterior, ordem: ordemAnterior ?? t.ordem } : t,
+            ),
+          );
+        }
+        toast.error(mensagemDeErro(err, "Falha ao reordenar cartão."));
       });
     });
   }
@@ -124,6 +181,8 @@ export function QuadroKanban({
 
     const ids = titulos.map(() => crypto.randomUUID());
     const agora = new Date().toISOString();
+    const ordensDaColuna = tarefas.filter((t) => t.coluna_id === colunaId).map((t) => t.ordem);
+    const ordemBase = ordensDaColuna.length > 0 ? Math.max(...ordensDaColuna) : 0;
     const novas: Tarefa[] = titulos.map((titulo, indice) => ({
       id: ids[indice],
       tenant_id: "",
@@ -131,6 +190,7 @@ export function QuadroKanban({
       titulo,
       descricao: null,
       coluna_id: colunaId,
+      ordem: ordemBase + (indice + 1) * 1000,
       prioridade: "P3",
       is_marco: false,
       data_inicio: null,
@@ -273,7 +333,7 @@ export function QuadroKanban({
   const percentualConcluido = tarefas.length > 0 ? Math.round((tarefasConcluidas / tarefas.length) * 100) : 0;
 
   function renderColuna(coluna: ColunaKanban, ehFixa: boolean) {
-    const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id);
+    const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id).sort((a, b) => a.ordem - b.ordem);
 
     return (
       <div
@@ -361,6 +421,7 @@ export function QuadroKanban({
               aoMoverToque={moverArrastoToque}
               aoSoltarToque={soltarArrastoToque}
               emArrastoToque={arrastoToque?.tarefaId === tarefa.id}
+              aoSoltarSobre={(tarefaArrastadaId, posicao) => soltarSobreCartao(tarefaArrastadaId, tarefa.id, posicao)}
             />
           );
         })}

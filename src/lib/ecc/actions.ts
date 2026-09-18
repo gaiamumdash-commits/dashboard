@@ -403,6 +403,19 @@ export async function criarTarefa(projetoId: string, colunaId: string, formData:
     throw new Error("Informe ao menos um título de tarefa.");
   }
 
+  // Ordem nova sempre vai pro fim da coluna — pega a maior ordem já usada
+  // ali e empilha a partir dela (1000 em 1000, mesmo espaçamento do backfill
+  // da migration 0042, dá espaço de sobra pra reordenar por arrasto depois
+  // sem precisar reindexar).
+  const { data: ultimaOrdem } = await supabase
+    .from("tarefas")
+    .select("ordem")
+    .eq("coluna_id", colunaId)
+    .order("ordem", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const ordemBase = ultimaOrdem?.ordem ?? 0;
+
   // Criação rápida: só o título agora, o resto (prioridade, tag, datas) o
   // usuário preenche depois abrindo o cartão.
   const linhas = titulos.map((titulo, indice) => ({
@@ -412,6 +425,7 @@ export async function criarTarefa(projetoId: string, colunaId: string, formData:
     coluna_id: colunaId,
     titulo,
     prioridade: "P3" as Prioridade,
+    ordem: ordemBase + (indice + 1) * 1000,
   }));
 
   const { error } = await supabase.from("tarefas").insert(linhas);
@@ -662,7 +676,18 @@ export async function removerChecklistItem(itemId: string, tarefaId: string, pro
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
-export async function moverTarefa(tarefaId: string, projetoId: string, novaColunaId: string) {
+/** `novaOrdem` (opcional) posiciona o cartão dentro da coluna de destino —
+ * calculada no cliente como a média dos vizinhos onde foi solto (ou um
+ * extremo ±1000, se solto no topo/fim), ver `calcularNovaOrdem` em
+ * kanban.ts. Sem `novaOrdem` (troca de coluna pelo <select> do modal, por
+ * exemplo, que não tem noção de posição), o cartão vai pro fim da coluna
+ * nova — mesma regra de `criarTarefa`. */
+export async function moverTarefa(
+  tarefaId: string,
+  projetoId: string,
+  novaColunaId: string,
+  novaOrdem?: number,
+) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
@@ -677,7 +702,22 @@ export async function moverTarefa(tarefaId: string, projetoId: string, novaColun
   const nomeDe = colunas?.find((c) => c.id === tarefaAtual?.coluna_id)?.nome ?? "?";
   const nomePara = colunas?.find((c) => c.id === novaColunaId)?.nome ?? "?";
 
-  const { error } = await supabase.from("tarefas").update({ coluna_id: novaColunaId }).eq("id", tarefaId);
+  let ordem = novaOrdem;
+  if (ordem === undefined) {
+    const { data: ultimaOrdem } = await supabase
+      .from("tarefas")
+      .select("ordem")
+      .eq("coluna_id", novaColunaId)
+      .order("ordem", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    ordem = (ultimaOrdem?.ordem ?? 0) + 1000;
+  }
+
+  const { error } = await supabase
+    .from("tarefas")
+    .update({ coluna_id: novaColunaId, ordem })
+    .eq("id", tarefaId);
 
   if (error) {
     throw new Error(`Falha ao mover tarefa: ${error.message}`);

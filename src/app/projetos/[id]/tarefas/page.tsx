@@ -38,7 +38,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
       .eq("projeto_id", projetoId)
       .order("concluido", { ascending: true })
       .order("ordem", { ascending: true }),
-    supabase.from("tarefas").select("*").eq("projeto_id", projetoId).order("criado_em", { ascending: true }),
+    supabase.from("tarefas").select("*").eq("projeto_id", projetoId).order("ordem", { ascending: true }),
     contarMetasSmart(tenantId),
     supabase.from("tarefa_membros").select("*").eq("tenant_id", tenantId),
     supabase.from("tarefa_checklist_itens").select("*").eq("tenant_id", tenantId).order("ordem"),

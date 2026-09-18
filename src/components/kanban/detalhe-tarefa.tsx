@@ -97,6 +97,7 @@ export function DetalheTarefa({
   const [buscaMencaoItem, setBuscaMencaoItem] = useState<string | null>(null);
   const refItem = useRef<HTMLInputElement>(null);
   const cursorPendenteItemRef = useRef<number | null>(null);
+  const refDataInicio = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (cursorPendenteComentarioRef.current !== null && refComentario.current) {
@@ -244,6 +245,14 @@ export function DetalheTarefa({
     });
   }
 
+  function marcarInicioHoje() {
+    const hojeISO = new Date().toLocaleDateString("en-CA"); // "AAAA-MM-DD" local
+    // O <input type="date"> é não-controlado (defaultValue) — atualiza o
+    // valor exibido na hora, sem esperar o router.refresh() de salvarDatas.
+    if (refDataInicio.current) refDataInicio.current.value = hojeISO;
+    salvarDatas("data_inicio", hojeISO);
+  }
+
   function salvarDatas(campo: "data_inicio" | "data_limite", valor: string) {
     iniciarTransicao(async () => {
       const formData = new FormData();
@@ -365,7 +374,15 @@ export function DetalheTarefa({
           </label>
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-            Marco
+            <span className="flex items-center gap-1">
+              Marco
+              <span
+                title="Marque apenas se essa ação for algo muito importante no seu projeto — um marco de realização, não uma tarefa comum."
+                className="flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-gaiamum-text-muted text-[9px] leading-none text-gaiamum-text-muted"
+              >
+                ?
+              </span>
+            </span>
             <span className="flex items-center gap-1.5 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5">
               <input
                 type="checkbox"
@@ -379,12 +396,23 @@ export function DetalheTarefa({
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
             Data de início
-            <input
-              type="date"
-              defaultValue={tarefa.data_inicio ?? ""}
-              onChange={(e) => salvarDatas("data_inicio", e.target.value)}
-              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
-            />
+            <span className="flex items-center gap-1.5">
+              <input
+                ref={refDataInicio}
+                type="date"
+                defaultValue={tarefa.data_inicio ?? ""}
+                onChange={(e) => salvarDatas("data_inicio", e.target.value)}
+                className="w-full rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
+              />
+              <button
+                type="button"
+                onClick={marcarInicioHoje}
+                title="Começa hoje"
+                className="shrink-0 rounded-lg border border-gaiamum-border px-2 py-1.5 text-xs font-medium text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-primary"
+              >
+                📅 Hoje
+              </button>
+            </span>
           </label>
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
