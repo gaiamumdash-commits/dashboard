@@ -3,16 +3,16 @@ import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
 import { contarMetasSmart } from "@/lib/ecc/metas";
 import { listarAgendaUnificada } from "@/lib/ecc/agenda";
-import { limitesDaSemana } from "@/lib/ecc/semana";
+import { limitesDaSemana, limitesDoDia, chaveDiaAtual } from "@/lib/ecc/semana";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { PainelAgenda } from "@/components/agenda/painel-agenda";
 
 export default async function PaginaAgenda({
   searchParams,
 }: {
-  searchParams: Promise<{ erro?: string; semana?: string }>;
+  searchParams: Promise<{ erro?: string; semana?: string; dia?: string; visao?: string }>;
 }) {
-  const { erro, semana } = await searchParams;
+  const { erro, semana, dia, visao } = await searchParams;
   const tenantId = await garantirWorkspace();
 
   if (!(await temAcessoCompleto(tenantId))) {
@@ -24,7 +24,17 @@ export default async function PaginaAgenda({
     contarMetasSmart(tenantId),
   ]);
   const souOwner = papelAtual === "owner";
-  const { chave: chaveSemana, inicio, fimExclusivo } = limitesDaSemana(semana);
+  const visaoAtiva = visao === "dia" ? "dia" : "semana";
+
+  // Só calcula os limites (datas, sem query) da visão ativa pra buscar os
+  // itens — a outra visão só precisa da "chave" (pra navegação/abas), que
+  // sai de graça de limitesDaSemana/limitesDoDia mesmo sem usar o range.
+  const { chave: chaveSemana, inicio: inicioSemana, fimExclusivo: fimSemana } = limitesDaSemana(semana);
+  const { chave: chaveDia, inicio: inicioDia, fimExclusivo: fimDia } = limitesDoDia(dia ?? chaveDiaAtual());
+
+  const { inicio, fimExclusivo } =
+    visaoAtiva === "dia" ? { inicio: inicioDia, fimExclusivo: fimDia } : { inicio: inicioSemana, fimExclusivo: fimSemana };
+
   const { google, itens } = await listarAgendaUnificada(tenantId, souOwner, inicio, fimExclusivo);
 
   return (
@@ -37,7 +47,14 @@ export default async function PaginaAgenda({
         </p>
 
         <div className="mt-8">
-          <PainelAgenda google={google} itens={itens} erro={erro} chaveSemana={chaveSemana} />
+          <PainelAgenda
+            google={google}
+            itens={itens}
+            erro={erro}
+            chaveSemana={chaveSemana}
+            chaveDia={chaveDia}
+            visaoAtiva={visaoAtiva}
+          />
         </div>
       </main>
     </div>

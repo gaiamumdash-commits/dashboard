@@ -1,0 +1,130 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { ItemAgenda } from "@/lib/ecc/tipos";
+import { APENAS_DATA, COR_FONTE_AGENDA, formatarHora, mesmoDia } from "@/lib/ecc/agenda-apresentacao";
+import { CLASSE_COR_ETIQUETA } from "@/lib/ecc/kanban";
+import { DetalheItemAgenda } from "@/components/agenda/detalhe-item-agenda";
+import { distribuirColunas, type ItemComHorario } from "@/lib/ecc/agenda-grade";
+
+const ALTURA_HORA_PX = 48;
+const HORAS = Array.from({ length: 24 }, (_, i) => i);
+
+/** Mesma grade por horário da GradeSemanal, só que com 1 coluna — o dia
+ * escolhido em vez dos 7 da semana. Reaproveita distribuirColunas() pra
+ * itens que se sobrepõem no mesmo dia. */
+export function GradeDia({ itens, chaveDia }: { itens: ItemAgenda[]; chaveDia: string }) {
+  const [itemSelecionado, setItemSelecionado] = useState<ItemAgenda | null>(null);
+  const [agora, setAgora] = useState(() => new Date());
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dia = new Date(`${chaveDia}T00:00:00`);
+  const ehHoje = mesmoDia(dia, new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setAgora(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!ehHoje || !containerRef.current) return;
+    const agoraMin = new Date().getHours() * 60 + new Date().getMinutes();
+    containerRef.current.scrollTop = Math.max((agoraMin / 60 - 2) * ALTURA_HORA_PX, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveDia]);
+
+  const itensDiaInteiro = itens.filter(
+    (item) => APENAS_DATA.test(item.quando) && mesmoDia(new Date(`${item.quando}T00:00:00`), dia),
+  );
+
+  const itensPontuais: ItemComHorario[] = itens
+    .filter((item) => !APENAS_DATA.test(item.quando))
+    .filter((item) => mesmoDia(new Date(item.quando), dia))
+    .map((item) => {
+      const inicio = new Date(item.quando);
+      const inicioMin = inicio.getHours() * 60 + inicio.getMinutes();
+      const fim = item.fim ? new Date(item.fim) : null;
+      const fimMinBruto = fim ? fim.getHours() * 60 + fim.getMinutes() : inicioMin + 30;
+      return { item, inicioMin, fimMin: Math.max(fimMinBruto, inicioMin + 15) };
+    });
+  const itensPosicionados = distribuirColunas(itensPontuais);
+
+  return (
+    <div>
+      <div ref={containerRef} className="mt-2 max-h-[70vh] overflow-y-auto">
+        <div className="sticky top-0 z-20 bg-gaiamum-surface">
+          <div className="border-b border-gaiamum-border pb-2 text-center">
+            <div className={`capitalize text-xs font-medium ${ehHoje ? "text-gaiamum-primary" : "text-gaiamum-text-muted"}`}>
+              {dia.toLocaleDateString("pt-BR", { weekday: "long" })}
+            </div>
+            <div className="text-sm text-gaiamum-text">
+              {dia.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}
+            </div>
+          </div>
+
+          {itensDiaInteiro.length > 0 && (
+            <div className="flex flex-col gap-1 border-b border-gaiamum-border px-1 py-2">
+              {itensDiaInteiro.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setItemSelecionado(item)}
+                  className={`truncate rounded border px-1.5 py-0.5 text-left text-[11px] ${CLASSE_COR_ETIQUETA[COR_FONTE_AGENDA[item.fonte]]}`}
+                >
+                  {item.titulo}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-[48px_1fr]">
+          <div>
+            {HORAS.map((h) => (
+              <div
+                key={h}
+                style={{ height: ALTURA_HORA_PX }}
+                className="pr-2 text-right text-[11px] text-gaiamum-text-muted"
+              >
+                {String(h).padStart(2, "0")}:00
+              </div>
+            ))}
+          </div>
+          <div className="relative border-l border-gaiamum-border">
+            {HORAS.map((h) => (
+              <div key={h} style={{ height: ALTURA_HORA_PX }} className="border-t border-gaiamum-border" />
+            ))}
+
+            {itensPosicionados.map(({ item, inicioMin, fimMin, coluna, totalColunas }) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setItemSelecionado(item)}
+                style={{
+                  top: (inicioMin / 60) * ALTURA_HORA_PX,
+                  height: Math.max(((fimMin - inicioMin) / 60) * ALTURA_HORA_PX, 20),
+                  left: `${(coluna / totalColunas) * 100}%`,
+                  width: `${100 / totalColunas}%`,
+                }}
+                className={`absolute overflow-hidden rounded border px-1 py-0.5 text-left text-[11px] leading-tight ${CLASSE_COR_ETIQUETA[COR_FONTE_AGENDA[item.fonte]]}`}
+              >
+                <span className="block truncate font-medium">{item.titulo}</span>
+                <span className="block truncate opacity-80">{formatarHora(item.quando)}</span>
+              </button>
+            ))}
+
+            {ehHoje && (
+              <div
+                className="pointer-events-none absolute left-0 right-0 z-10 h-px bg-gaiamum-danger"
+                style={{ top: ((agora.getHours() * 60 + agora.getMinutes()) / 60) * ALTURA_HORA_PX }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {itemSelecionado && (
+        <DetalheItemAgenda key={itemSelecionado.id} item={itemSelecionado} aoFechar={() => setItemSelecionado(null)} />
+      )}
+    </div>
+  );
+}

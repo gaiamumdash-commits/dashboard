@@ -8,8 +8,16 @@ import { criarEventoGoogleCalendar, desconectarGoogleCalendar, iniciarConexaoGoo
 import { excluirEventoAgenda } from "@/lib/ecc/eventos-agenda";
 import { FormularioEventoAgenda } from "@/components/agenda/formulario-evento-agenda";
 import { GradeSemanal } from "@/components/agenda/grade-semanal";
+import { GradeDia } from "@/components/agenda/grade-dia";
 import { RÓTULO_FONTE, formatarHora, mesmoDia, paraDataLocal } from "@/lib/ecc/agenda-apresentacao";
-import { chaveSemanaAtual, semanaAnterior, semanaSeguinte } from "@/lib/ecc/semana";
+import {
+  chaveSemanaAtual,
+  semanaAnterior,
+  semanaSeguinte,
+  chaveDiaAtual,
+  diaAnterior,
+  diaSeguinte,
+} from "@/lib/ecc/semana";
 
 /** "Hoje" / "Amanhã" / "terça-feira, 2 de setembro" — mesma lógica de
  * rótulo relativo que o Google Calendar usa na visão "Agenda". */
@@ -60,11 +68,15 @@ export function PainelAgenda({
   itens,
   erro,
   chaveSemana,
+  chaveDia,
+  visaoAtiva,
 }: {
   google: ResultadoAgenda;
   itens: ItemAgenda[];
   erro?: string;
   chaveSemana: string;
+  chaveDia: string;
+  visaoAtiva: "dia" | "semana";
 }) {
   const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
@@ -182,34 +194,87 @@ export function PainelAgenda({
 
       <div className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-gaiamum-text-muted">
-            <span className="sm:hidden">Próximos compromissos</span>
-            <span className="hidden sm:inline">Semana</span>
-          </h2>
+          <div className="flex items-center gap-1">
+            <h2 className="text-sm font-medium text-gaiamum-text-muted sm:hidden">Próximos compromissos</h2>
+            <div className="hidden overflow-hidden rounded-lg border border-gaiamum-border sm:flex">
+              <Link
+                href="/agenda?visao=dia"
+                scroll={false}
+                className={`px-3 py-1 text-xs font-medium ${
+                  visaoAtiva === "dia"
+                    ? "bg-gaiamum-primary text-white"
+                    : "text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+                }`}
+              >
+                Dia
+              </Link>
+              <Link
+                href="/agenda?visao=semana"
+                scroll={false}
+                className={`px-3 py-1 text-xs font-medium ${
+                  visaoAtiva === "semana"
+                    ? "bg-gaiamum-primary text-white"
+                    : "text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+                }`}
+              >
+                Semana
+              </Link>
+            </div>
+          </div>
           <div className="hidden items-center gap-2 sm:flex">
-            <Link
-              href={`/agenda?semana=${semanaAnterior(chaveSemana)}`}
-              scroll={false}
-              className="rounded-lg border border-gaiamum-border px-2 py-1 text-sm text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
-              aria-label="Semana anterior"
-            >
-              ‹
-            </Link>
-            <Link
-              href={chaveSemana === chaveSemanaAtual() ? "#" : "/agenda"}
-              scroll={false}
-              className="rounded-lg border border-gaiamum-border px-3 py-1 text-xs font-medium text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
-            >
-              Hoje
-            </Link>
-            <Link
-              href={`/agenda?semana=${semanaSeguinte(chaveSemana)}`}
-              scroll={false}
-              className="rounded-lg border border-gaiamum-border px-2 py-1 text-sm text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
-              aria-label="Próxima semana"
-            >
-              ›
-            </Link>
+            {visaoAtiva === "dia" ? (
+              <>
+                <Link
+                  href={`/agenda?visao=dia&dia=${diaAnterior(chaveDia)}`}
+                  scroll={false}
+                  className="rounded-lg border border-gaiamum-border px-2 py-1 text-sm text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+                  aria-label="Dia anterior"
+                >
+                  ‹
+                </Link>
+                <Link
+                  href={chaveDia === chaveDiaAtual() ? "#" : "/agenda?visao=dia"}
+                  scroll={false}
+                  className="rounded-lg border border-gaiamum-border px-3 py-1 text-xs font-medium text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+                >
+                  Hoje
+                </Link>
+                <Link
+                  href={`/agenda?visao=dia&dia=${diaSeguinte(chaveDia)}`}
+                  scroll={false}
+                  className="rounded-lg border border-gaiamum-border px-2 py-1 text-sm text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+                  aria-label="Próximo dia"
+                >
+                  ›
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`/agenda?visao=semana&semana=${semanaAnterior(chaveSemana)}`}
+                  scroll={false}
+                  className="rounded-lg border border-gaiamum-border px-2 py-1 text-sm text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+                  aria-label="Semana anterior"
+                >
+                  ‹
+                </Link>
+                <Link
+                  href={chaveSemana === chaveSemanaAtual() ? "#" : "/agenda?visao=semana"}
+                  scroll={false}
+                  className="rounded-lg border border-gaiamum-border px-3 py-1 text-xs font-medium text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+                >
+                  Hoje
+                </Link>
+                <Link
+                  href={`/agenda?visao=semana&semana=${semanaSeguinte(chaveSemana)}`}
+                  scroll={false}
+                  className="rounded-lg border border-gaiamum-border px-2 py-1 text-sm text-gaiamum-text-muted hover:bg-gaiamum-surface-raised"
+                  aria-label="Próxima semana"
+                >
+                  ›
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -288,7 +353,11 @@ export function PainelAgenda({
         </div>
 
         <div className="hidden sm:block">
-          <GradeSemanal itens={itens} chaveSemana={chaveSemana} />
+          {visaoAtiva === "dia" ? (
+            <GradeDia itens={itens} chaveDia={chaveDia} />
+          ) : (
+            <GradeSemanal itens={itens} chaveSemana={chaveSemana} />
+          )}
         </div>
       </div>
 

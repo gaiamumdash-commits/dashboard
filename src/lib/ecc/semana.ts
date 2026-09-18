@@ -87,3 +87,30 @@ export function semanaSeguinte(chave: string): string {
 export function paraDataISO(data: Date): string {
   return dataISOemBrasil(data);
 }
+
+/** Chave do dia atual — valor default quando a URL não traz `?dia=`. */
+export function chaveDiaAtual(): string {
+  return dataISOemBrasil(new Date());
+}
+
+/** Início (00:00 Brasil) e fim exclusivo (00:00 do dia seguinte) do dia,
+ * como instantes UTC corretos pra filtrar as queries — mesma técnica de
+ * `limitesDaSemana`, só que pra 1 dia em vez de 7. */
+export function limitesDoDia(chaveRecebida?: string): {
+  chave: string;
+  inicio: Date;
+  fimExclusivo: Date;
+} {
+  const chave = chaveRecebida && CHAVE_VALIDA.test(chaveRecebida) ? chaveRecebida : chaveDiaAtual();
+  const inicio = paraUtcDoFuso(`${chave}T00:00`, FUSO_BRASIL);
+  const fimExclusivo = paraUtcDoFuso(`${somarDias(chave, 1)}T00:00`, FUSO_BRASIL);
+  return { chave, inicio, fimExclusivo };
+}
+
+export function diaAnterior(chave: string): string {
+  return somarDias(chave, -1);
+}
+
+export function diaSeguinte(chave: string): string {
+  return somarDias(chave, 1);
+}

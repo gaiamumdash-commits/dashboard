@@ -6,35 +6,10 @@ import { chaveSemanaAtual, diasDaSemana } from "@/lib/ecc/semana";
 import { APENAS_DATA, COR_FONTE_AGENDA, formatarHora, mesmoDia } from "@/lib/ecc/agenda-apresentacao";
 import { CLASSE_COR_ETIQUETA } from "@/lib/ecc/kanban";
 import { DetalheItemAgenda } from "@/components/agenda/detalhe-item-agenda";
+import { distribuirColunas, type ItemComHorario } from "@/lib/ecc/agenda-grade";
 
 const ALTURA_HORA_PX = 48;
 const HORAS = Array.from({ length: 24 }, (_, i) => i);
-
-type ItemComHorario = { item: ItemAgenda; inicioMin: number; fimMin: number };
-type ItemPosicionado = ItemComHorario & { coluna: number; totalColunas: number };
-
-/** Aloca cada item na primeira coluna cujo último item já terminou antes do
- * início deste — estratégia clássica e simples de layout de agenda pra
- * eventos sobrepostos. Largura uniforme por dia (não por cluster local):
- * suficiente pra V1, sem sofisticar. */
-function distribuirColunas(itens: ItemComHorario[]): ItemPosicionado[] {
-  const ordenados = [...itens].sort((a, b) => a.inicioMin - b.inicioMin);
-  const ultimoFimPorColuna: number[] = [];
-
-  const comColuna = ordenados.map((it) => {
-    let coluna = ultimoFimPorColuna.findIndex((fim) => fim <= it.inicioMin);
-    if (coluna === -1) {
-      coluna = ultimoFimPorColuna.length;
-      ultimoFimPorColuna.push(it.fimMin);
-    } else {
-      ultimoFimPorColuna[coluna] = it.fimMin;
-    }
-    return { ...it, coluna };
-  });
-
-  const totalColunas = Math.max(ultimoFimPorColuna.length, 1);
-  return comColuna.map((it) => ({ ...it, totalColunas }));
-}
 
 export function GradeSemanal({ itens, chaveSemana }: { itens: ItemAgenda[]; chaveSemana: string }) {
   const [itemSelecionado, setItemSelecionado] = useState<ItemAgenda | null>(null);
