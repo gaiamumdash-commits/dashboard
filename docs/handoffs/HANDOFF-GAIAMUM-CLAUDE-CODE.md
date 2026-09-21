@@ -10,6 +10,26 @@
 
 ---
 
+## Estado confirmado (2026-09-20, sessão nova #49 — última atualização)
+
+**Resumo em uma linha**: Fase 1 de acesso fechado (allowlist) implementada, testada e **publicada em produção**, junto com 4 melhorias pequenas (citação nas Metas SMART, visão Dia/Semana na Agenda incluindo correção pro mobile, reordenar cartões no Kanban, botão Hoje + tooltip Marco + evento "mesmo dia"). Sessão fecha aqui — Fabio vai migrar o foco pra uma proposta comercial do UltraQuadras (outro projeto) e dar `/clear`.
+
+- **Fase 1 (acesso fechado) publicada**: commit `89e9681` — migration `0041_acesso_beta_permitido.sql` aplicada manualmente pelo Fabio via SQL Editor (CLI local com token expirado de novo, mesmo achado recorrente). Gate em `garantirWorkspace()`, tela `/acesso-restrito`, gestão da allowlist embutida no painel `/admin/analitica-lab` existente. `MODO_CADASTRO_FECHADO` **ainda não foi ligado** — cadastro continua aberto até o Fabio decidir ativar a env var na Vercel e popular a allowlist.
+- **Citação motivacional nas Metas SMART** (commit `6ce2636`): Gail Matthews (42% mais realização escrevendo metas) em destaque acima do formulário em `/onboarding`.
+- **Agenda — visão Dia/Semana** (commits `33fb54f`, `d01afbd` parcial, `15b524a`): abas "Dia | Semana" com navegação anterior/hoje/próximo. Visão Dia (`src/components/agenda/grade-dia.tsx`, reaproveitando `distribuirColunas` de `lib/ecc/agenda-grade.ts`) funciona em qualquer tamanho de tela. Visão Semana usa a grade completa (7 colunas) só no desktop — no mobile cai na lista compacta agrupada por dia, que já existia (7 colunas não cabem numa tela de celular, limitação intencional). **Achado corrigido nesta sessão**: a primeira versão só mostrava as abas com `hidden sm:flex` (só desktop) — Fabio reportou que não aparecia no mobile, corrigido no commit `15b524a` deixando abas/navegação sempre visíveis.
+- **Kanban — reordenar cartões dentro da coluna** (commit `d01afbd`): nunca existiu coluna de posição em `tarefas` — a ordem sempre saía da data de criação, sem controle nenhum (era isso que o Fabio via como "cartão preso no lugar errado"). Migration `0042_ordem_tarefas.sql` (coluna `ordem double precision`, técnica de posição fracionária tipo Trello/Notion) aplicada manualmente pelo Fabio. Arrastar um cartão por cima de outro agora reordena de verdade (metade de cima = antes, metade de baixo = depois), persistido no banco.
+- **3 melhorias pequenas no mesmo commit `d01afbd`**: botão "📅 Hoje" ao lado da Data de início do cartão; tooltip (ícone "?") no campo Marco explicando quando usar; checkbox "Mesmo dia" (padrão ligado) no formulário de novo compromisso da Agenda — campo Fim vira só hora, data copiada do Início.
+- **Tudo testado com Playwright** em build de produção isolado (contas de teste descartáveis, limpas ao final de cada rodada) antes de cada commit — reordenação confirmada persistida após reload, evento "mesmo dia" confirmado no banco com data correta, visão Dia confirmada funcionando em viewport mobile (390×844).
+- **Todos os commits acima publicados em `origin/main`, deploy Vercel confirmado `success`** via `gh api .../commits/<sha>/status` (não só assumido).
+
+### Próxima tarefa pendente (pedido novo do Fabio, ainda não implementado)
+
+**Forma de pagamento + parcelamento no lançamento de despesa avulsa do Financeiro** (`/financeiro/avulsas`, tabela `contas_a_pagar`). Hoje o lançamento só aceita um valor absoluto único, sem campo de forma de pagamento nem parcelamento. Pedido do Fabio: poder informar (1) forma de pagamento (ex.: dinheiro, pix, débito, **cartão de crédito**) e (2) se foi parcelado — ex. compra de valor total X em 10x no cartão, mesmo dia de vencimento todo mês.
+
+**Achado técnico relevante pra quem for planejar isso**: `contas_a_pagar` (migration `0008_modulo_financeiro.sql:31-59`) já tem o padrão de "1 modelo gera N instâncias mensais" pra contas fixas recorrentes (`contas_fixas_modelo` → várias linhas de `contas_a_pagar`, uma por `mes_referencia`, com índice único `(conta_fixa_id, mes_referencia)` pra nunca duplicar o mês). Uma despesa parcelada no cartão é conceitualmente parecida — mas com **N finito** de parcelas (não recorrência indefinida) e **valor dividido** (valor_total / N por parcela, não o mesmo valor repetido). Vale decidir no planejamento: reaproveitar `conta_fixa_id` como FK "pai" da parcela (renomear conceito?) ou criar uma tabela nova tipo `despesas_parceladas_modelo` só pra isso, com `numero_parcela`/`total_parcelas` em cada linha de `contas_a_pagar` pra exibir "3/10" na UI. Não teve nenhum planejamento formal ainda — próxima sessão deveria começar por `EnterPlanMode` nisso (mudança de schema real do Financeiro, dado sensível).
+
+---
+
 ## Estado confirmado (2026-09-12, sessão nova #48 — última atualização)
 
 **Resumo em uma linha**: sessão #47 já foi commitada/publicada pelo Fabio (`b42b1d9`, confirmado em `origin/main` — o handoff só não tinha sido atualizado). Nesta sessão: planejamento formal (`EnterPlanMode`) da monetização do Gaiamum, com pivôs importantes de escopo, e a Fase 1 (fechar cadastro público) **implementada e com build limpo, aguardando aplicar a migration manualmente e o Fabio decidir quando ligar o gate** — nada commitado ainda.
