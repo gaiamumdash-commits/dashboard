@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ItemAgenda, ResultadoAgenda } from "@/lib/ecc/tipos";
-import { criarEventoGoogleCalendar, desconectarGoogleCalendar, iniciarConexaoGoogleCalendar } from "@/lib/ecc/google-calendar";
+import { desconectarGoogleCalendar, iniciarConexaoGoogleCalendar } from "@/lib/ecc/google-calendar";
 import { FormularioEventoAgenda } from "@/components/agenda/formulario-evento-agenda";
 import { GradeSemanal } from "@/components/agenda/grade-semanal";
 import { GradeDia } from "@/components/agenda/grade-dia";
@@ -99,13 +99,6 @@ export function PainelAgenda({
     });
   }
 
-  function criarEvento(formData: FormData) {
-    iniciarTransicao(async () => {
-      await criarEventoGoogleCalendar(formData);
-      router.refresh();
-    });
-  }
-
   return (
     <div className="flex flex-col gap-6">
       {/* Status da conexão com o Google — não bloqueia mais o resto da
@@ -159,51 +152,10 @@ export function PainelAgenda({
         </div>
       )}
 
-      {google.status === "conectado" && (
-        <div className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6">
-          <h2 className="text-sm font-medium text-gaiamum-text-muted">Novo evento no Google</h2>
-          <form action={criarEvento} className="mt-3 flex flex-col gap-3">
-            {/* O <input type="datetime-local"> não carrega fuso horário — a
-                Server Action roda no servidor (UTC), não no navegador de quem
-                preenche, então precisa saber o fuso local explicitamente pra
-                não errar o horário do evento. */}
-            <input type="hidden" name="fuso" value={Intl.DateTimeFormat().resolvedOptions().timeZone} />
-            <input
-              name="titulo"
-              required
-              placeholder="Título do evento"
-              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-                Início
-                <input
-                  type="datetime-local"
-                  name="inicio"
-                  required
-                  className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-                Fim
-                <input
-                  type="datetime-local"
-                  name="fim"
-                  required
-                  className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
-                />
-              </label>
-            </div>
-            <button
-              type="submit"
-              disabled={pendente}
-              className="self-start rounded-lg bg-gaiamum-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-            >
-              Criar evento
-            </button>
-          </form>
-        </div>
-      )}
+      {/* Formulário único de novo compromisso: cria no Gaiamum e, com o Google
+          conectado, copia pro Google Calendar (substitui o antigo cartão
+          "Novo evento no Google", que só criava lá e exigia data completa). */}
+      <FormularioEventoAgenda />
 
       <div className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6">
         <div className="flex items-center justify-between gap-2">
@@ -340,8 +292,6 @@ export function PainelAgenda({
           </div>
         )}
       </div>
-
-      <FormularioEventoAgenda />
 
       {itemSelecionado && (
         <DetalheItemAgenda key={itemSelecionado.id} item={itemSelecionado} aoFechar={() => setItemSelecionado(null)} />

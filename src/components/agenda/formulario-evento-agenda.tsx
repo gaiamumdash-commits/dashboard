@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { criarEventoAgendaManual } from "@/lib/ecc/eventos-agenda";
 import { mensagemDeErro } from "@/lib/erro-cliente";
@@ -52,6 +52,7 @@ export function FormularioEventoAgenda() {
   // escondido até a pessoa pedir.
   const [comFim, setComFim] = useState(false);
   const router = useRouter();
+  const cartaoRef = useRef<HTMLDivElement>(null);
   const tituloRef = useRef<HTMLInputElement>(null);
   const inicioRef = useRef<HTMLInputElement>(null);
   const inicioHoraRef = useRef<HTMLInputElement>(null);
@@ -107,21 +108,36 @@ export function FormularioEventoAgenda() {
     }
   }
 
+  // O cartão abre no topo da Agenda, mas o botão "+" é flutuante — quem
+  // tocou nele lá embaixo precisa ver o formulário aparecer.
+  useEffect(() => {
+    if (aberto) cartaoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [aberto]);
+
   if (!aberto) {
     return (
-      <button
-        type="button"
-        onClick={() => setAberto(true)}
-        aria-label="Novo compromisso"
-        className="fixed bottom-6 right-6 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gaiamum-primary text-2xl font-semibold text-white shadow-lg transition hover:opacity-90"
-      >
-        +
-      </button>
+      <>
+        <button
+          type="button"
+          onClick={() => setAberto(true)}
+          className="w-full rounded-2xl border border-dashed border-gaiamum-primary/60 bg-gaiamum-surface px-4 py-3 text-sm font-semibold text-gaiamum-primary transition hover:bg-gaiamum-surface-raised"
+        >
+          ＋ Novo compromisso
+        </button>
+        <button
+          type="button"
+          onClick={() => setAberto(true)}
+          aria-label="Novo compromisso"
+          className="fixed bottom-6 right-6 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gaiamum-primary text-2xl font-semibold text-white shadow-lg transition hover:opacity-90"
+        >
+          +
+        </button>
+      </>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6">
+    <div ref={cartaoRef} className="scroll-mt-20 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-gaiamum-text-muted">Novo compromisso</h2>
         <button
