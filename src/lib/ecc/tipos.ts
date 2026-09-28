@@ -458,6 +458,10 @@ export type EventoGoogleCalendar = {
 export type ResultadoAgenda =
   | { status: "nao_conectado" }
   | { status: "expirado" }
+  // Conexão salva sem a permissão do Calendar (caixa desmarcada na tela do Google).
+  | { status: "sem_permissao" }
+  // Falha inesperada ao ler o Google — a Agenda continua abrindo sem ele.
+  | { status: "erro" }
   | { status: "conectado"; googleEmail: string; eventos: EventoGoogleCalendar[] };
 
 /** Um item da Agenda unificada — pode vir do Google ou de dentro do

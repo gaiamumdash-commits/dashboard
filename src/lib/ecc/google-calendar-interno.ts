@@ -62,6 +62,15 @@ export function eErroDeTokenInvalido(erro: unknown): boolean {
   return mensagem.includes("invalid_grant");
 }
 
+/** 403 `insufficientPermissions`: a conexão existe, mas a pessoa não marcou a
+ * permissão do Calendar na tela de consentimento do Google (o Google deixa
+ * desmarcar cada permissão separadamente). Não adianta tentar de novo — só
+ * reconectando marcando todas as caixas. */
+export function eErroDePermissaoInsuficiente(erro: unknown): boolean {
+  const mensagem = erro instanceof Error ? erro.message : String(erro);
+  return /insufficient (authentication scopes|permission)/i.test(mensagem);
+}
+
 /** Resultado de uma tentativa de espelhar uma mudança no Google. Nunca é
  * exceção: o Gaiamum já salvou a mudança quando isso roda, então uma falha
  * do Google vira só um aviso pra pessoa (e, em produção, o Next.js redige a
@@ -73,6 +82,8 @@ export type ResultadoSincronizacao =
 
 const AVISO_EXPIRADO =
   "Salvo no Gaiamum, mas sua conexão com o Google expirou — reconecte na Agenda pra sincronizar.";
+const AVISO_SEM_PERMISSAO =
+  "Salvo no Gaiamum, mas o Google não liberou a permissão do Calendar — desconecte e conecte de novo marcando todas as caixas.";
 const AVISO_GENERICO = "Salvo no Gaiamum, mas não consegui atualizar o Google Calendar agora.";
 
 /** Roda `operacao` com o cliente do Google já conectado e traduz qualquer
@@ -94,6 +105,11 @@ async function comGoogle(
       const service = createServiceClient();
       await service.from("google_calendar_conexoes").delete().eq("user_id", conexao.userId);
       return { status: "falhou", aviso: AVISO_EXPIRADO };
+    }
+    if (eErroDePermissaoInsuficiente(erro)) {
+      const service = createServiceClient();
+      await service.from("google_calendar_conexoes").delete().eq("user_id", conexao.userId);
+      return { status: "falhou", aviso: AVISO_SEM_PERMISSAO };
     }
     console.error("Falha ao sincronizar com o Google Calendar:", erro);
     return { status: "falhou", aviso: AVISO_GENERICO };

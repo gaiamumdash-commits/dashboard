@@ -29,9 +29,9 @@ export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }
         <p className="mt-0.5 text-xs capitalize text-gaiamum-text-muted">{hoje}</p>
       </div>
 
-      {resultado.status === "expirado" ? (
+      {resultado.status === "problema" ? (
         <p className="text-sm text-gaiamum-danger">
-          Sua conexão com o Google expirou.{" "}
+          Não consegui ler seu Google Calendar.{" "}
           <Link href="/agenda" className="underline">
             Reconecte na Agenda
           </Link>{" "}

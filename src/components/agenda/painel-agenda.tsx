@@ -60,6 +60,8 @@ function agruparPorDia(itens: ItemAgenda[]): GrupoDoDia[] {
 const MENSAGEM_POR_ERRO: Record<string, string> = {
   conexao: "A conexão com o Google falhou ou expirou no meio do caminho — tenta de novo.",
   sem_refresh_token: "O Google não devolveu a permissão esperada — tenta desconectar no Google e conectar de novo.",
+  sem_permissao:
+    "Faltou liberar a permissão do Calendar. Ao conectar, na tela do Google, marque TODAS as caixas (principalmente \"Ver, editar, compartilhar e excluir todos os eventos…\") antes de continuar.",
   salvar: "Deu erro salvando a conexão no Gaiamum — tenta de novo em alguns segundos.",
 };
 
@@ -128,6 +130,14 @@ export function PainelAgenda({
           {google.status === "expirado" && (
             <p className="mb-2 text-sm text-gaiamum-danger">
               Sua conexão com o Google expirou — conecte de novo pra continuar.
+            </p>
+          )}
+          {google.status === "sem_permissao" && (
+            <p className="mb-2 text-sm text-gaiamum-danger">{MENSAGEM_POR_ERRO.sem_permissao}</p>
+          )}
+          {google.status === "erro" && (
+            <p className="mb-2 text-sm text-gaiamum-danger">
+              Não consegui ler seu Google Calendar agora. Tente de novo em instantes — se persistir, conecte de novo.
             </p>
           )}
           {erro && (

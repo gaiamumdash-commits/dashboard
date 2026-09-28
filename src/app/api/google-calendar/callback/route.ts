@@ -30,7 +30,21 @@ export async function GET(request: Request) {
     `${origin}/api/google-calendar/callback`,
   );
 
-  const { tokens } = await oauth2Client.getToken(code);
+  let tokens;
+  try {
+    ({ tokens } = await oauth2Client.getToken(code));
+  } catch (erro) {
+    console.error("Falha ao trocar o código do Google Calendar por token:", erro);
+    return NextResponse.redirect(`${origin}/agenda?erro=conexao`);
+  }
+
+  // O Google deixa a pessoa desmarcar cada permissão na tela de
+  // consentimento. Sem a do Calendar a conexão seria inútil (erro 403 em
+  // toda leitura) — não salva e explica o que fazer.
+  if (!tokens.scope?.includes("calendar.events")) {
+    return NextResponse.redirect(`${origin}/agenda?erro=sem_permissao`);
+  }
+
   if (!tokens.refresh_token) {
     // Só acontece se o Google não forçar o consentimento de novo — não
     // deveria ocorrer, já que iniciarConexaoGoogleCalendar sempre pede
@@ -41,13 +55,18 @@ export async function GET(request: Request) {
   oauth2Client.setCredentials(tokens);
 
   const oauth2 = google.oauth2({ auth: oauth2Client, version: "v2" });
-  const { data: perfil } = await oauth2.userinfo.get();
+  let email: string | null | undefined;
+  try {
+    email = (await oauth2.userinfo.get()).data.email;
+  } catch (erro) {
+    console.error("Falha ao ler o e-mail da conta Google:", erro);
+  }
 
   const service = createServiceClient();
   const { error } = await service.from("google_calendar_conexoes").upsert(
     {
       user_id: user.id,
-      google_email: perfil.email ?? "desconhecido",
+      google_email: email ?? "desconhecido",
       refresh_token: tokens.refresh_token,
       atualizado_em: new Date().toISOString(),
     },

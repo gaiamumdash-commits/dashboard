@@ -10,6 +10,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import {
   PROPRIEDADE_GAIAMUM,
   editarEventoDoGoogle,
+  eErroDePermissaoInsuficiente,
   eErroDeTokenInvalido,
   excluirEventoDoGoogle,
   montarOAuth2Client,
@@ -117,7 +118,17 @@ export async function listarEventosGoogleCalendar(inicio: Date, fimExclusivo: Da
       await service.from("google_calendar_conexoes").delete().eq("user_id", conexao.userId);
       return { status: "expirado" };
     }
-    throw erro;
+    if (eErroDePermissaoInsuficiente(erro)) {
+      // Conexão salva sem a permissão do Calendar — apaga pra a Agenda voltar
+      // a oferecer "Conectar" em vez de falhar a cada abertura.
+      const service = createServiceClient();
+      await service.from("google_calendar_conexoes").delete().eq("user_id", conexao.userId);
+      return { status: "sem_permissao" };
+    }
+    // Qualquer outra falha do Google não pode derrubar a página inteira (a
+    // Agenda, o quadro Kanban e a coluna de compromissos dependem disto).
+    console.error("Falha ao listar eventos do Google Calendar:", erro);
+    return { status: "erro" };
   }
 }
 

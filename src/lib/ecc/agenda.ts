@@ -182,7 +182,7 @@ export type CompromissoDoDia = {
 
 export type ResultadoCompromissosDoDia =
   | { status: "oculto" }
-  | { status: "expirado" }
+  | { status: "problema" }
   | { status: "conectado"; compromissos: CompromissoDoDia[] };
 
 function formatarHoraBrasil(iso: string): string {
@@ -213,7 +213,7 @@ export async function listarCompromissosDoDia(tenantId: string): Promise<Resulta
   ]);
 
   if (google.status === "nao_conectado") return { status: "oculto" };
-  if (google.status === "expirado") return { status: "expirado" };
+  if (google.status !== "conectado") return { status: "problema" };
 
   const eventosManuais = (manuais as Pick<EventoAgenda, "id" | "titulo" | "inicio" | "fim">[] | null) ?? [];
   const idsManuais = new Set(eventosManuais.map((e) => e.id));
