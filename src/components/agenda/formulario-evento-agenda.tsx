@@ -28,6 +28,13 @@ function snapAntecedencia(min: number): string {
   return String(maisProxima);
 }
 
+/** "AAAA-MM-DD" de hoje no fuso do navegador (é onde a pessoa está). */
+function dataLocalHoje(): string {
+  const d = new Date();
+  const dois = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
+}
+
 /** Botão flutuante + formulário curto de criação rápida de compromisso —
  * pedido do Fabio pra não precisar navegar até um formulário maior só pra
  * marcar algo simples. Sem modal/overlay (o projeto não tem esse padrão
@@ -38,20 +45,39 @@ export function FormularioEventoAgenda() {
   const [modo, setModo] = useState<"digitar" | "falar">("digitar");
   const [transcricaoBruta, setTranscricaoBruta] = useState("");
   const [mesmoDia, setMesmoDia] = useState(true);
+  // Compromisso de hoje é o caso mais comum: começa marcado, e a pessoa só
+  // digita a hora (a data vem de hoje, sem abrir o calendário).
+  const [inicioHoje, setInicioHoje] = useState(true);
+  // Quase todo compromisso é só "data + hora de início" — o término fica
+  // escondido até a pessoa pedir.
+  const [comFim, setComFim] = useState(false);
   const router = useRouter();
   const tituloRef = useRef<HTMLInputElement>(null);
   const inicioRef = useRef<HTMLInputElement>(null);
+  const inicioHoraRef = useRef<HTMLInputElement>(null);
   const fimRef = useRef<HTMLInputElement>(null);
   const fimHoraRef = useRef<HTMLInputElement>(null);
   const antecedenciaRef = useRef<HTMLSelectElement>(null);
 
-  // "Mesmo dia" (padrão, evento pontual é o caso comum): a pessoa só digita
-  // a hora de término, a data vem copiada do Início na hora de montar o
-  // datetime-local completo pro campo escondido que o form realmente envia
-  // — evita digitar a mesma data duas vezes.
+  // Início: com "Hoje" marcado só a hora é digitada e a data é a de hoje;
+  // desmarcado, vale o datetime-local completo. Os dois inputs ficam sempre
+  // montados (só a visibilidade muda) pra voz poder preencher qualquer um.
+  function inicioCompleto(): string {
+    if (inicioHoje) {
+      const hora = inicioHoraRef.current?.value;
+      return hora ? `${dataLocalHoje()}T${hora}` : "";
+    }
+    return inicioRef.current?.value ?? "";
+  }
+
+  // "Mesmo dia" / "Hoje" (padrão, evento pontual é o caso comum): a pessoa
+  // só digita a hora de término, a data vem copiada do Início na hora de
+  // montar o datetime-local completo que o form realmente envia — evita
+  // digitar a mesma data duas vezes.
   function fimCompleto(): string {
+    if (!comFim) return "";
     if (!mesmoDia) return fimRef.current?.value ?? "";
-    const dataInicio = inicioRef.current?.value.split("T")[0];
+    const dataInicio = inicioCompleto().split("T")[0];
     const horaFim = fimHoraRef.current?.value;
     if (!dataInicio || !horaFim) return "";
     return `${dataInicio}T${horaFim}`;
@@ -61,17 +87,21 @@ export function FormularioEventoAgenda() {
     setTranscricaoBruta(texto);
     const resultado = interpretarFalaAgenda(texto);
     if (tituloRef.current) tituloRef.current.value = resultado.titulo;
+    const [dataFalada, horaFalada] = resultado.inicioLocal.split("T");
+    setInicioHoje(dataFalada === dataLocalHoje());
     if (inicioRef.current) inicioRef.current.value = resultado.inicioLocal;
+    if (inicioHoraRef.current) inicioHoraRef.current.value = horaFalada ?? "";
     if (fimRef.current) fimRef.current.value = resultado.fimLocal ?? "";
     if (antecedenciaRef.current) antecedenciaRef.current.value = snapAntecedencia(resultado.antecedenciaMin);
 
     // Se a fala trouxe um fim em dia diferente do início, "mesmo dia"
     // deixaria de fazer sentido (esconderia a data real do fim) — volta pro
     // campo completo nesse caso; senão, só copia a hora extraída.
-    const dataInicio = resultado.inicioLocal.split("T")[0];
+    const dataInicio = dataFalada;
     const dataFim = resultado.fimLocal?.split("T")[0];
     const ehMesmoDia = !dataFim || dataFim === dataInicio;
     setMesmoDia(ehMesmoDia);
+    setComFim(Boolean(resultado.fimLocal));
     if (ehMesmoDia && fimHoraRef.current) {
       fimHoraRef.current.value = resultado.fimLocal?.split("T")[1] ?? "";
     }
@@ -126,6 +156,12 @@ export function FormularioEventoAgenda() {
       <form
         action={async (formData) => {
           setErro(null);
+          const inicio = inicioCompleto();
+          if (!inicio) {
+            setErro("Informe o horário de início.");
+            return;
+          }
+          formData.set("inicio", inicio);
           formData.set("fim", mesmoDia ? fimCompleto() : (fimRef.current?.value ?? ""));
           try {
             const resultado = await criarEventoAgendaManual(formData);
@@ -150,47 +186,52 @@ export function FormularioEventoAgenda() {
           placeholder="Título do compromisso"
           className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
         />
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-            Início
-            <input
-              ref={inicioRef}
-              type="datetime-local"
-              name="inicio"
-              required
-              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-            <span className="flex items-center justify-between gap-2">
-              <span>Fim {mesmoDia ? "(hora)" : "(opcional)"}</span>
-              <span className="flex items-center gap-1 text-[11px] font-normal normal-case text-gaiamum-text-muted">
-                <input
-                  type="checkbox"
-                  checked={mesmoDia}
-                  onChange={(e) => setMesmoDia(e.target.checked)}
-                  className="h-3 w-3"
-                />
-                📆 Mesmo dia
-              </span>
-            </span>
-            {/* Os dois inputs ficam sempre montados (só a visibilidade muda)
-                pra handleTranscricao (voz) sempre ter uma ref válida pra
-                preencher, independente de qual modo estava ativo antes. */}
-            <input
-              ref={fimHoraRef}
-              type="time"
-              hidden={!mesmoDia}
-              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
-            />
-            <input
-              ref={fimRef}
-              type="datetime-local"
-              hidden={mesmoDia}
-              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
-            />
-          </label>
+        <div className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+          <div className="flex items-center justify-between gap-2">
+            <span>{inicioHoje ? "Hora do compromisso" : "Data e hora"}</span>
+            <label className="flex cursor-pointer items-center gap-1.5 rounded-md bg-gaiamum-surface-raised px-2 py-1 text-[11px] font-medium normal-case text-gaiamum-text">
+              <input
+                type="checkbox"
+                checked={inicioHoje}
+                onChange={(e) => setInicioHoje(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Hoje
+            </label>
+          </div>
+          <input ref={inicioHoraRef} type="time" hidden={!inicioHoje} className="min-w-0 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary" />
+          <input ref={inicioRef} type="datetime-local" hidden={inicioHoje} className="min-w-0 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary" />
         </div>
+
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-gaiamum-text-muted">
+          <input
+            type="checkbox"
+            checked={comFim}
+            onChange={(e) => setComFim(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Definir horário de término
+        </label>
+
+        {/* O bloco do fim fica sempre montado (só some da tela) pra
+            handleTranscricao (voz) sempre ter uma ref válida pra preencher. */}
+        <div hidden={!comFim} className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+          <div className="flex items-center justify-between gap-2">
+            <span>{mesmoDia ? "Hora do término" : "Data e hora do término"}</span>
+            <label className="flex cursor-pointer items-center gap-1.5 rounded-md bg-gaiamum-surface-raised px-2 py-1 text-[11px] font-medium normal-case text-gaiamum-text">
+              <input
+                type="checkbox"
+                checked={mesmoDia}
+                onChange={(e) => setMesmoDia(e.target.checked)}
+                className="h-4 w-4"
+              />
+              {inicioHoje ? "Hoje" : "Mesmo dia"}
+            </label>
+          </div>
+          <input ref={fimHoraRef} type="time" hidden={!mesmoDia} className="min-w-0 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary" />
+          <input ref={fimRef} type="datetime-local" hidden={mesmoDia} className="min-w-0 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary" />
+        </div>
+
         <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
           Avisar
           <select
