@@ -39,11 +39,29 @@ export default function PaginaPrivacidade() {
               </li>
               <li>
                 <strong>Dados de integrações opcionais:</strong> se você conectar sua Google Agenda, o
-                Gaiamum acessa e cria eventos de calendário em seu nome, apenas para exibi-los e permitir a
-                criação de novos compromissos dentro do app — só acontece se você autorizar essa conexão
-                explicitamente.
+                Gaiamum lê, cria, edita e exclui eventos do seu calendário em seu nome, apenas para
+                exibi-los e permitir que você gerencie seus compromissos (inclusive mantendo os
+                compromissos criados no Gaiamum sincronizados com o Google Calendar) dentro do app — só
+                acontece se você autorizar essa conexão explicitamente, e você pode desconectar a
+                qualquer momento na tela da Agenda.
               </li>
             </ul>
+            <p className="mt-2">
+              O uso e a transferência, para qualquer outro app, das informações recebidas das APIs do
+              Google pelo Gaiamum obedecerão à{" "}
+              <a
+                href="https://developers.google.com/terms/api-services-user-data-policy"
+                className="underline underline-offset-2"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Política de Dados do Usuário dos Serviços de API do Google
+              </a>
+              , incluindo os requisitos de Uso Limitado. Os dados do seu calendário são usados somente
+              para oferecer a funcionalidade de Agenda que você vê no app: não são usados para
+              publicidade, não são vendidos e não são lidos por pessoas, exceto com seu consentimento
+              para suporte ou quando exigido por lei.
+            </p>
           </section>
 
           <section>

@@ -7,7 +7,7 @@ import { salvarAlarme } from "@/lib/ecc/alarmes";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { EntidadeAlarme } from "@/lib/ecc/tipos";
 
-const PRESETS_ANTECEDENCIA = [
+export const PRESETS_ANTECEDENCIA = [
   { minutos: 15, rotulo: "15 minutos antes" },
   { minutos: 60, rotulo: "1 hora antes" },
   { minutos: 180, rotulo: "3 horas antes" },

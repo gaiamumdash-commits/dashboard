@@ -2,11 +2,22 @@
 
 import "server-only";
 import { google } from "googleapis";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { obterUsuarioAtual } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  PROPRIEDADE_GAIAMUM,
+  editarEventoDoGoogle,
+  eErroDeTokenInvalido,
+  excluirEventoDoGoogle,
+  montarOAuth2Client,
+  obterClienteConectado,
+  origemAtual,
+  type ResultadoSincronizacao,
+} from "@/lib/ecc/google-calendar-interno";
+import { paraUtcDoFuso } from "@/lib/ecc/kanban";
 import type { EventoGoogleCalendar, ResultadoAgenda } from "@/lib/ecc/tipos";
 
 // calendar.events: restrito a eventos (ver + criar/editar/excluir em todos
@@ -20,24 +31,6 @@ const ESCOPOS = [
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 const NOME_COOKIE_STATE = "google_calendar_oauth_state";
-
-/** Origem exata da request atual (protocolo + host) — precisa bater com um
- * dos redirect URIs cadastrados no Google Cloud (produção, porta 3055 de
- * teste e dev local coexistem, então não dá pra fixar uma URL só). */
-async function origemAtual(): Promise<string> {
-  const listaHeaders = await headers();
-  const host = listaHeaders.get("host") ?? "www.gaiamum.com.br";
-  const protocolo = host.startsWith("localhost") ? "http" : "https";
-  return `${protocolo}://${host}`;
-}
-
-function montarOAuth2Client(origem: string) {
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CALENDAR_CLIENT_ID,
-    process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
-    `${origem}/api/google-calendar/callback`,
-  );
-}
 
 /** Inicia a conexão: gera a URL de consentimento do Google e redireciona.
  * `prompt: "consent"` força o Google a sempre reemitir um refresh_token,
@@ -88,36 +81,6 @@ export async function desconectarGoogleCalendar() {
   revalidatePath("/agenda");
 }
 
-/** Monta um OAuth2Client autenticado com o refresh_token salvo do usuário
- * atual, ou `null` se não houver conexão. */
-async function obterClienteConectado() {
-  const user = await obterUsuarioAtual();
-  if (!user) return null;
-
-  const service = createServiceClient();
-  const { data: conexao } = await service
-    .from("google_calendar_conexoes")
-    .select("refresh_token, google_email")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!conexao) return null;
-
-  const origem = await origemAtual();
-  const oauth2Client = montarOAuth2Client(origem);
-  oauth2Client.setCredentials({ refresh_token: conexao.refresh_token });
-
-  return { oauth2Client, googleEmail: conexao.google_email, userId: user.id };
-}
-
-/** `invalid_grant` é o erro do Google pra token revogado ou expirado —
- * comum no modo Teste, que expira o refresh_token a cada 7 dias. Nesse
- * caso a conexão é apagada e a tela volta a pedir reconexão. */
-function eErroDeTokenInvalido(erro: unknown): boolean {
-  const mensagem = erro instanceof Error ? erro.message : String(erro);
-  return mensagem.includes("invalid_grant");
-}
-
 export async function listarEventosGoogleCalendar(inicio: Date, fimExclusivo: Date): Promise<ResultadoAgenda> {
   const conexao = await obterClienteConectado();
   if (!conexao) return { status: "nao_conectado" };
@@ -142,6 +105,9 @@ export async function listarEventosGoogleCalendar(inicio: Date, fimExclusivo: Da
       inicio: evento.start?.dateTime ?? evento.start?.date ?? "",
       fim: evento.end?.dateTime ?? evento.end?.date ?? "",
       link: evento.htmlLink ?? null,
+      // Presente só nas cópias de compromissos do Gaiamum — a Agenda usa
+      // pra não mostrar o mesmo compromisso duas vezes.
+      gaiamumId: evento.extendedProperties?.private?.[PROPRIEDADE_GAIAMUM] ?? null,
     }));
 
     return { status: "conectado", googleEmail: conexao.googleEmail, eventos };
@@ -204,4 +170,38 @@ export async function criarEventoGoogleCalendar(formData: FormData) {
   }
 
   revalidatePath("/agenda");
+}
+
+/** Edita título e horário de um evento que nasceu no Google (compromissos
+ * criados pelo Gaiamum são editados por `editarEventoAgenda`, que já cuida da
+ * cópia no Google). Devolve o resultado em vez de lançar erro: em produção o
+ * Next.js redige a mensagem de qualquer `throw` de Server Action. */
+export async function editarEventoGoogleCalendar(
+  formData: FormData,
+): Promise<ResultadoSincronizacao | { status: "invalido"; aviso: string }> {
+  const googleEventId = String(formData.get("google_event_id") ?? "");
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  const inicio = String(formData.get("inicio") ?? "");
+  const fim = String(formData.get("fim") ?? "");
+  const fuso = String(formData.get("fuso") ?? "America/Sao_Paulo");
+
+  if (!googleEventId || !titulo || !inicio || !fim) {
+    return { status: "invalido", aviso: "Preencha título, início e fim do evento." };
+  }
+
+  const inicioUtc = paraUtcDoFuso(inicio, fuso);
+  const fimUtc = paraUtcDoFuso(fim, fuso);
+  if (fimUtc <= inicioUtc) {
+    return { status: "invalido", aviso: "O fim precisa ser depois do início." };
+  }
+
+  const resultado = await editarEventoDoGoogle({ googleEventId, titulo, inicio: inicioUtc, fim: fimUtc });
+  revalidatePath("/agenda");
+  return resultado;
+}
+
+export async function excluirEventoGoogleCalendar(googleEventId: string): Promise<ResultadoSincronizacao> {
+  const resultado = await excluirEventoDoGoogle(googleEventId);
+  revalidatePath("/agenda");
+  return resultado;
 }

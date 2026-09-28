@@ -7,6 +7,7 @@ import { listarPatentesDoUsuario, patenteMaisAlta } from "@/lib/ecc/lab/patentes
 import { souDonoDoSaas } from "@/lib/ecc/dono-saas";
 import { SinoNotificacoes } from "@/components/layout/sino-notificacoes";
 import { BotaoSair } from "@/components/layout/botao-sair";
+import { EmailDaConta } from "@/components/layout/email-da-conta";
 import { LinksNavegacao } from "@/components/layout/links-navegacao";
 import { MenuMobile } from "@/components/layout/menu-mobile";
 import { EmblemaPatente } from "@/components/lab/emblema-patente";
@@ -85,7 +86,10 @@ export function MenuLateral({
 }) {
   return (
     <>
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-gaiamum-border bg-gaiamum-surface px-4 py-6 sm:flex">
+      {/* `sticky` + `h-screen`: o menu fica preso à altura da tela mesmo em
+          página comprida, então o e-mail da conta e o "Sair" do rodapé estão
+          sempre à vista — sem isso o rodapé ia parar no fim da página. */}
+      <aside className="hidden h-screen w-60 shrink-0 flex-col self-start overflow-hidden border-r border-gaiamum-border bg-gaiamum-surface px-4 py-6 sm:sticky sm:top-0 sm:flex">
         <div className="mb-8 flex items-center justify-between px-2">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/brand/crab-mark.png" alt="" width={32} height={32} />
@@ -102,23 +106,28 @@ export function MenuLateral({
           </Suspense>
         </div>
 
-        <LinksNavegacao
-          temMetasSmart={temMetasSmart}
-          acessoCompleto={acessoCompleto}
-          souOwner={souOwner}
-          linkLab={
-            <Suspense fallback={null}>
-              <LinkLabCondicional />
-            </Suspense>
-          }
-          extra={
-            <Suspense fallback={null}>
-              <LinkAnaliticaDoSaas />
-            </Suspense>
-          }
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <LinksNavegacao
+            temMetasSmart={temMetasSmart}
+            acessoCompleto={acessoCompleto}
+            souOwner={souOwner}
+            linkLab={
+              <Suspense fallback={null}>
+                <LinkLabCondicional />
+              </Suspense>
+            }
+            extra={
+              <Suspense fallback={null}>
+                <LinkAnaliticaDoSaas />
+              </Suspense>
+            }
+          />
+        </div>
 
-        <div className="mt-auto flex flex-col border-t border-gaiamum-border pt-3">
+        <div className="mt-3 flex shrink-0 flex-col border-t border-gaiamum-border pt-3">
+          <Suspense fallback={null}>
+            <EmailDaConta />
+          </Suspense>
           <BotaoSair />
         </div>
       </aside>
@@ -140,6 +149,11 @@ export function MenuLateral({
         linkExtra={
           <Suspense fallback={null}>
             <LinkAnaliticaDoSaas />
+          </Suspense>
+        }
+        emailConta={
+          <Suspense fallback={null}>
+            <EmailDaConta />
           </Suspense>
         }
       />

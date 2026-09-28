@@ -450,6 +450,9 @@ export type EventoGoogleCalendar = {
   inicio: string;
   fim: string;
   link: string | null;
+  /** `eventos_agenda.id` do compromisso do Gaiamum que este evento espelha
+   * (cópia criada pelo próprio Gaiamum), ou `null` se nasceu no Google. */
+  gaiamumId: string | null;
 };
 
 export type ResultadoAgenda =

@@ -24,6 +24,7 @@ export function MenuMobile({
   sino,
   linkLab,
   linkExtra,
+  emailConta,
 }: {
   temMetasSmart: boolean;
   acessoCompleto?: boolean;
@@ -31,6 +32,7 @@ export function MenuMobile({
   sino: ReactNode;
   linkLab?: ReactNode;
   linkExtra?: ReactNode;
+  emailConta?: ReactNode;
 }) {
   const [aberto, setAberto] = useState(false);
 
@@ -69,9 +71,12 @@ export function MenuMobile({
               linkLab={linkLab}
               extra={linkExtra}
             />
-            <div className="mt-2 flex items-center justify-between border-t border-gaiamum-border pt-3">
-              <SeletorTema />
-              <BotaoSair />
+            <div className="mt-2 flex flex-col gap-2 border-t border-gaiamum-border pt-3">
+              {emailConta}
+              <div className="flex items-center justify-between">
+                <SeletorTema />
+                <BotaoSair />
+              </div>
             </div>
           </div>
         </div>

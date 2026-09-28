@@ -1,7 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { listarEventosGoogleCalendar } from "@/lib/ecc/google-calendar";
-import { paraDataISO } from "@/lib/ecc/semana";
+import { limitesDoDia, paraDataISO } from "@/lib/ecc/semana";
+import { FUSO_BRASIL } from "@/lib/ecc/kanban";
 import type {
   ColunaKanban,
   ContaAPagar,
@@ -110,17 +111,26 @@ export async function listarAgendaUnificada(
       };
     });
 
+  // Compromissos do Gaiamum são espelhados no Google (ver
+  // `google-calendar-interno.ts`); sem esse filtro cada um apareceria duas
+  // vezes na Agenda — como compromisso do Gaiamum e como evento do Google.
+  const idsManuais = new Set(
+    ((resultadoEventos.data as Pick<EventoAgenda, "id">[] | null) ?? []).map((evento) => evento.id),
+  );
+
   const itensGoogle: ItemAgenda[] =
     google.status === "conectado"
-      ? google.eventos.map((evento) => ({
-          id: evento.id,
-          fonte: "google",
-          titulo: evento.titulo,
-          quando: evento.inicio,
-          fim: evento.fim || null,
-          link: evento.link,
-          badge: null,
-        }))
+      ? google.eventos
+          .filter((evento) => !evento.gaiamumId || !idsManuais.has(evento.gaiamumId))
+          .map((evento) => ({
+            id: evento.id,
+            fonte: "google",
+            titulo: evento.titulo,
+            quando: evento.inicio,
+            fim: evento.fim || null,
+            link: evento.link,
+            badge: null,
+          }))
       : [];
 
   const itensManuais: ItemAgenda[] = (
@@ -159,4 +169,80 @@ export async function listarAgendaUnificada(
   );
 
   return { google, itens };
+}
+
+export type CompromissoDoDia = {
+  id: string;
+  titulo: string;
+  /** "Dia inteiro" ou "09:00" / "09:00–10:30", já no fuso Brasil. */
+  horario: string;
+  /** ISO usado só pra ordenar (dia inteiro vai primeiro). */
+  ordem: number;
+};
+
+export type ResultadoCompromissosDoDia =
+  | { status: "oculto" }
+  | { status: "expirado" }
+  | { status: "conectado"; compromissos: CompromissoDoDia[] };
+
+function formatarHoraBrasil(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", {
+    timeZone: FUSO_BRASIL,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Compromissos de hoje da pessoa logada, pra coluna do Kanban: eventos do
+ * Google Calendar dela + compromissos do Gaiamum (a cópia do Google de um
+ * compromisso do Gaiamum é descartada pra não repetir). Só aparece com o
+ * Google conectado — sem conexão devolve `oculto` e o quadro não mostra a
+ * coluna; conexão expirada devolve `expirado` pra avisar em vez de sumir. */
+export async function listarCompromissosDoDia(tenantId: string): Promise<ResultadoCompromissosDoDia> {
+  const { inicio, fimExclusivo } = limitesDoDia();
+  const supabase = await createClient();
+
+  const [google, { data: manuais }] = await Promise.all([
+    listarEventosGoogleCalendar(inicio, fimExclusivo),
+    supabase
+      .from("eventos_agenda")
+      .select("id, titulo, inicio, fim")
+      .eq("tenant_id", tenantId)
+      .gte("inicio", inicio.toISOString())
+      .lt("inicio", fimExclusivo.toISOString()),
+  ]);
+
+  if (google.status === "nao_conectado") return { status: "oculto" };
+  if (google.status === "expirado") return { status: "expirado" };
+
+  const eventosManuais = (manuais as Pick<EventoAgenda, "id" | "titulo" | "inicio" | "fim">[] | null) ?? [];
+  const idsManuais = new Set(eventosManuais.map((e) => e.id));
+
+  const doGoogle: CompromissoDoDia[] = google.eventos
+    .filter((e) => !e.gaiamumId || !idsManuais.has(e.gaiamumId))
+    .map((e) => {
+      const diaInteiro = /^\d{4}-\d{2}-\d{2}$/.test(e.inicio);
+      return {
+        id: `google-${e.id}`,
+        titulo: e.titulo,
+        horario: diaInteiro
+          ? "Dia inteiro"
+          : e.fim
+            ? `${formatarHoraBrasil(e.inicio)}–${formatarHoraBrasil(e.fim)}`
+            : formatarHoraBrasil(e.inicio),
+        ordem: diaInteiro ? 0 : new Date(e.inicio).getTime(),
+      };
+    });
+
+  const doGaiamum: CompromissoDoDia[] = eventosManuais.map((e) => ({
+    id: `gaiamum-${e.id}`,
+    titulo: e.titulo,
+    horario: e.fim ? `${formatarHoraBrasil(e.inicio)}–${formatarHoraBrasil(e.fim)}` : formatarHoraBrasil(e.inicio),
+    ordem: new Date(e.inicio).getTime(),
+  }));
+
+  return {
+    status: "conectado",
+    compromissos: [...doGoogle, ...doGaiamum].sort((a, b) => a.ordem - b.ordem),
+  };
 }

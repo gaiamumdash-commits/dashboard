@@ -1,14 +1,14 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ItemAgenda, ResultadoAgenda } from "@/lib/ecc/tipos";
 import { criarEventoGoogleCalendar, desconectarGoogleCalendar, iniciarConexaoGoogleCalendar } from "@/lib/ecc/google-calendar";
-import { excluirEventoAgenda } from "@/lib/ecc/eventos-agenda";
 import { FormularioEventoAgenda } from "@/components/agenda/formulario-evento-agenda";
 import { GradeSemanal } from "@/components/agenda/grade-semanal";
 import { GradeDia } from "@/components/agenda/grade-dia";
+import { DetalheItemAgenda } from "@/components/agenda/detalhe-item-agenda";
 import { RÓTULO_FONTE, formatarHora, mesmoDia, paraDataLocal } from "@/lib/ecc/agenda-apresentacao";
 import {
   chaveSemanaAtual,
@@ -80,6 +80,9 @@ export function PainelAgenda({
 }) {
   const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
+  // Lista mobile da semana: tocar num item abre o mesmo detalhe (com editar/
+  // excluir) que a grade do desktop e a visão Dia já usam.
+  const [itemSelecionado, setItemSelecionado] = useState<ItemAgenda | null>(null);
 
   function conectar() {
     iniciarTransicao(async () => {
@@ -290,57 +293,25 @@ export function PainelAgenda({
                 </h3>
                 <div className="mt-2 flex flex-col divide-y divide-gaiamum-border overflow-hidden rounded-lg border border-gaiamum-border">
                   {grupo.itens.map((item) => {
-                    const conteudo = (
-                      <>
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setItemSelecionado(item)}
+                        className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm hover:bg-gaiamum-surface-raised"
+                      >
                         <span className="h-2 w-2 shrink-0 rounded-full bg-gaiamum-primary" />
                         <span className="w-12 shrink-0 text-xs text-gaiamum-text-muted">
                           {formatarHora(item.quando)}
                         </span>
-                        <span className="flex-1 text-gaiamum-text">{item.titulo}</span>
+                        <span className="min-w-0 flex-1 text-gaiamum-text">{item.titulo}</span>
                         {item.badge && (
                           <span className="shrink-0 text-xs text-gaiamum-text-muted">{item.badge}</span>
                         )}
                         <span className="shrink-0 text-[11px] uppercase tracking-wide text-gaiamum-text-muted">
                           {RÓTULO_FONTE[item.fonte]}
                         </span>
-                      </>
-                    );
-
-                    if (item.fonte === "evento_agenda") {
-                      return (
-                        <div key={item.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                          {conteudo}
-                          <button
-                            type="button"
-                            disabled={pendente}
-                            onClick={() => {
-                              iniciarTransicao(async () => {
-                                await excluirEventoAgenda(item.id);
-                                router.refresh();
-                              });
-                            }}
-                            className="shrink-0 text-xs text-gaiamum-text-muted underline hover:text-gaiamum-danger disabled:opacity-60"
-                          >
-                            Excluir
-                          </button>
-                        </div>
-                      );
-                    }
-
-                    return item.link ? (
-                      <a
-                        key={item.id}
-                        href={item.link}
-                        target={item.fonte === "google" ? "_blank" : undefined}
-                        rel={item.fonte === "google" ? "noreferrer" : undefined}
-                        className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-gaiamum-surface-raised"
-                      >
-                        {conteudo}
-                      </a>
-                    ) : (
-                      <div key={item.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                        {conteudo}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -361,6 +332,10 @@ export function PainelAgenda({
       </div>
 
       <FormularioEventoAgenda />
+
+      {itemSelecionado && (
+        <DetalheItemAgenda key={itemSelecionado.id} item={itemSelecionado} aoFechar={() => setItemSelecionado(null)} />
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
@@ -8,6 +9,7 @@ import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
 import { contarMetasSmart } from "@/lib/ecc/metas";
 import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
+import { ColunaCompromissosDoDia } from "@/components/kanban/coluna-compromissos-do-dia";
 import { BotaoFreeze } from "@/components/kanban/botao-freeze";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
@@ -188,6 +190,13 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
             podeExcluirTarefa={podeExcluirTarefa}
             souOwner={papelAtual === "owner"}
             tarefasComContaGerada={tarefasComContaGerada}
+            colunaCompromissos={
+              acessoCompleto ? (
+                <Suspense fallback={null}>
+                  <ColunaCompromissosDoDia tenantId={tenantId} />
+                </Suspense>
+              ) : null
+            }
           />
         </div>
       </main>

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { criarEventoAgendaManual } from "@/lib/ecc/eventos-agenda";
 import { mensagemDeErro } from "@/lib/erro-cliente";
+import { avisarResultadoAgenda } from "@/components/agenda/avisar-sincronizacao";
 import { BotaoFormulario } from "@/components/botao-formulario";
 import { GravadorVozAgenda } from "@/components/agenda/gravador-voz-agenda";
 import { interpretarFalaAgenda } from "@/lib/ecc/parser-fala-agenda";
@@ -127,7 +128,8 @@ export function FormularioEventoAgenda() {
           setErro(null);
           formData.set("fim", mesmoDia ? fimCompleto() : (fimRef.current?.value ?? ""));
           try {
-            await criarEventoAgendaManual(formData);
+            const resultado = await criarEventoAgendaManual(formData);
+            avisarResultadoAgenda(resultado, "Compromisso criado");
             setAberto(false);
             router.refresh();
           } catch (e) {

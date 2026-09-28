@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
@@ -34,6 +34,7 @@ export function QuadroKanban({
   podeExcluirTarefa,
   souOwner,
   tarefasComContaGerada,
+  colunaCompromissos,
 }: {
   projetoId: string;
   colunasIniciais: ColunaKanban[];
@@ -49,6 +50,8 @@ export function QuadroKanban({
   podeExcluirTarefa: boolean;
   souOwner: boolean;
   tarefasComContaGerada: string[];
+  /** Coluna fixa à esquerda (compromissos do dia) — montada no servidor. */
+  colunaCompromissos?: ReactNode;
 }) {
   const [tarefas, setTarefas] = useState(tarefasIniciais);
   const [tarefasIniciaisAnteriores, setTarefasIniciaisAnteriores] = useState(tarefasIniciais);
@@ -445,6 +448,7 @@ export function QuadroKanban({
   return (
     <>
       <div className="flex gap-3 overflow-x-auto pb-2">
+        {colunaCompromissos}
         {colunasAbertas.map((coluna) => renderColuna(coluna, false))}
 
         {criandoColuna ? (
