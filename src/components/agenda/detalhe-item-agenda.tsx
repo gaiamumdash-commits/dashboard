@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { EntidadeAlarme, ItemAgenda } from "@/lib/ecc/tipos";
 import { obterAlarme } from "@/lib/ecc/alarmes";
@@ -10,7 +10,7 @@ import { CampoAlarme, PRESETS_ANTECEDENCIA } from "@/components/campo-alarme";
 import { avisarResultadoAgenda } from "@/components/agenda/avisar-sincronizacao";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import { toast } from "sonner";
-import { APENAS_DATA, RÓTULO_FONTE } from "@/lib/ecc/agenda-apresentacao";
+import { APENAS_DATA, RÓTULO_FONTE, dataLocalHoje } from "@/lib/ecc/agenda-apresentacao";
 
 function formatarDataHoraCompleta(item: ItemAgenda): string {
   const ehDiaInteiro = /^\d{4}-\d{2}-\d{2}$/.test(item.quando);
@@ -55,6 +55,25 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
   const [alarme, setAlarme] = useState<number | null | undefined>(undefined);
   const [editando, setEditando] = useState(false);
 
+  const ehEventoGaiamum = item.fonte === "evento_agenda";
+  const ehEventoGoogleComHora = item.fonte === "google" && !APENAS_DATA.test(item.quando);
+  const inicioPadrao = APENAS_DATA.test(item.quando) ? "" : paraInputLocal(item.quando);
+  const fimPadrao = item.fim
+    ? paraInputLocal(item.fim)
+    : ehEventoGoogleComHora
+      ? paraInputLocal(new Date(new Date(item.quando).getTime() + 60 * 60_000).toISOString())
+      : "";
+
+  // Mesmo padrão do formulário de novo compromisso: "Hoje" = só a hora; o
+  // término é opcional nos compromissos do Gaiamum (o Google exige um fim).
+  const [inicioHoje, setInicioHoje] = useState(inicioPadrao.split("T")[0] === dataLocalHoje());
+  const [comFim, setComFim] = useState(Boolean(item.fim) || item.fonte === "google");
+  const [mesmoDia, setMesmoDia] = useState(!fimPadrao || fimPadrao.split("T")[0] === inicioPadrao.split("T")[0]);
+  const inicioHoraRef = useRef<HTMLInputElement>(null);
+  const inicioRef = useRef<HTMLInputElement>(null);
+  const fimHoraRef = useRef<HTMLInputElement>(null);
+  const fimRef = useRef<HTMLInputElement>(null);
+
   // Alarme só existe pra entidades cobertas por `EntidadeAlarme` — google é
   // gerenciado pelo próprio Google, decisão não tem alarme (fora de escopo
   // desta rodada; `alarmes.entidade_tipo` no banco não aceita "decisao").
@@ -63,8 +82,6 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
   // Compromisso do Gaiamum ou evento do Google com hora marcada podem ser
   // editados/excluídos aqui. Eventos de dia inteiro do Google seguem sendo
   // geridos no próprio Google (o formulário só cobre data + hora).
-  const ehEventoGaiamum = item.fonte === "evento_agenda";
-  const ehEventoGoogleComHora = item.fonte === "google" && !APENAS_DATA.test(item.quando);
   const podeEditar = ehEventoGaiamum || ehEventoGoogleComHora;
   const podeExcluir = ehEventoGaiamum || item.fonte === "google";
 
@@ -103,7 +120,35 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
     });
   }
 
+  function inicioCompleto(): string {
+    if (inicioHoje) {
+      const hora = inicioHoraRef.current?.value;
+      return hora ? `${dataLocalHoje()}T${hora}` : "";
+    }
+    return inicioRef.current?.value ?? "";
+  }
+
+  function fimCompleto(): string {
+    if (!comFim) return "";
+    if (!mesmoDia) return fimRef.current?.value ?? "";
+    const data = inicioCompleto().split("T")[0];
+    const hora = fimHoraRef.current?.value;
+    return data && hora ? `${data}T${hora}` : "";
+  }
+
   function salvarEdicao(formData: FormData) {
+    const inicio = inicioCompleto();
+    const fim = fimCompleto();
+    if (!inicio) {
+      toast.error("Informe a hora de início.");
+      return;
+    }
+    if (comFim && !fim) {
+      toast.error("Informe o horário de término (ou desmarque o término).");
+      return;
+    }
+    formData.set("inicio", inicio);
+    formData.set("fim", fim);
     formData.set("fuso", Intl.DateTimeFormat().resolvedOptions().timeZone);
     if (ehEventoGaiamum) {
       formData.set("evento_id", item.id);
@@ -126,13 +171,6 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
       }
     });
   }
-
-  const inicioPadrao = APENAS_DATA.test(item.quando) ? "" : paraInputLocal(item.quando);
-  const fimPadrao = item.fim
-    ? paraInputLocal(item.fim)
-    : ehEventoGoogleComHora
-      ? paraInputLocal(new Date(new Date(item.quando).getTime() + 60 * 60_000).toISOString())
-      : "";
 
   return (
     <div
@@ -161,21 +199,74 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
               Título
               <input name="titulo" required defaultValue={item.titulo} className={CLASSE_CAMPO} />
             </label>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-                Início
-                <input type="datetime-local" name="inicio" required defaultValue={inicioPadrao} className={CLASSE_CAMPO} />
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
-                Fim {ehEventoGaiamum ? "(opcional)" : ""}
+            <div className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+              <div className="flex items-center justify-between gap-2">
+                <span>{inicioHoje ? "Hora do compromisso" : "Data e hora"}</span>
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-md bg-gaiamum-surface-raised px-2 py-1 text-[11px] font-medium normal-case text-gaiamum-text">
+                  <input
+                    type="checkbox"
+                    checked={inicioHoje}
+                    onChange={(e) => setInicioHoje(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Hoje
+                </label>
+              </div>
+              <input
+                ref={inicioHoraRef}
+                type="time"
+                hidden={!inicioHoje}
+                defaultValue={inicioPadrao.split("T")[1] ?? ""}
+                className="min-w-0 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+              />
+              <input
+                ref={inicioRef}
+                type="datetime-local"
+                hidden={inicioHoje}
+                defaultValue={inicioPadrao}
+                className="min-w-0 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+              />
+            </div>
+
+            {ehEventoGaiamum && (
+              <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-gaiamum-text-muted">
                 <input
-                  type="datetime-local"
-                  name="fim"
-                  required={!ehEventoGaiamum}
-                  defaultValue={fimPadrao}
-                  className={CLASSE_CAMPO}
+                  type="checkbox"
+                  checked={comFim}
+                  onChange={(e) => setComFim(e.target.checked)}
+                  className="h-4 w-4"
                 />
+                Definir horário de término
               </label>
+            )}
+
+            <div hidden={!comFim} className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+              <div className="flex items-center justify-between gap-2">
+                <span>{mesmoDia ? "Hora do término" : "Data e hora do término"}</span>
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-md bg-gaiamum-surface-raised px-2 py-1 text-[11px] font-medium normal-case text-gaiamum-text">
+                  <input
+                    type="checkbox"
+                    checked={mesmoDia}
+                    onChange={(e) => setMesmoDia(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  {inicioHoje ? "Hoje" : "Mesmo dia"}
+                </label>
+              </div>
+              <input
+                ref={fimHoraRef}
+                type="time"
+                hidden={!mesmoDia}
+                defaultValue={fimPadrao.split("T")[1] ?? ""}
+                className="min-w-0 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+              />
+              <input
+                ref={fimRef}
+                type="datetime-local"
+                hidden={mesmoDia}
+                defaultValue={fimPadrao}
+                className="min-w-0 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary"
+              />
             </div>
             {ehEventoGaiamum && (
               <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">

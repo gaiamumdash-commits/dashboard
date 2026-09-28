@@ -18,6 +18,13 @@ export function formatarHora(iso: string): string {
   return data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** "AAAA-MM-DD" de hoje no fuso do navegador (é onde a pessoa está). */
+export function dataLocalHoje(): string {
+  const d = new Date();
+  const dois = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
+}
+
 export function mesmoDia(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }

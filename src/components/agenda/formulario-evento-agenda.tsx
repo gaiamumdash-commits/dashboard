@@ -7,6 +7,7 @@ import { mensagemDeErro } from "@/lib/erro-cliente";
 import { avisarResultadoAgenda } from "@/components/agenda/avisar-sincronizacao";
 import { BotaoFormulario } from "@/components/botao-formulario";
 import { GravadorVozAgenda } from "@/components/agenda/gravador-voz-agenda";
+import { dataLocalHoje } from "@/lib/ecc/agenda-apresentacao";
 import { interpretarFalaAgenda } from "@/lib/ecc/parser-fala-agenda";
 
 /** Opções fixas do <select> de antecedência — usado tanto pro valor
@@ -26,13 +27,6 @@ function snapAntecedencia(min: number): string {
     }
   }
   return String(maisProxima);
-}
-
-/** "AAAA-MM-DD" de hoje no fuso do navegador (é onde a pessoa está). */
-function dataLocalHoje(): string {
-  const d = new Date();
-  const dois = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
 }
 
 /** Botão flutuante + formulário curto de criação rápida de compromisso —

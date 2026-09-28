@@ -24,7 +24,9 @@
 - **Testes**: cada mudança testada com Playwright em `next dev` local (conta descartável via Admin API, apagada ao final; desktop 1280 e mobile 390). A sincronização real com o Google só foi confirmada em produção pelo próprio Fabio (não dá pra testar automatizado sem a conta dele).
 - **Vercel CLI não está autenticada neste ambiente** (`Not authorized`) — sem acesso a logs de runtime; diagnóstico foi por código + banco. Deploy é confirmado via `gh api repos/gaiamumdash-commits/dashboard/commits/<sha>/status`.
 
-**Pendências herdadas (nenhuma nova bloqueante)**: forma de pagamento + parcelamento no Financeiro (ver seção da sessão #49 logo abaixo, começar por `EnterPlanMode`); `MODO_CADASTRO_FECHADO` ainda desligado; possível extensão: aplicar o padrão "Hoje" também no Editar e o vídeo de verificação do Google quando for comercializar.
+- **Editar com "Hoje" + término opcional** (commit desta rodada, após `6f10c8f`): o Editar dos compromissos ganhou o mesmo padrão do formulário de criação — "Hoje" (só a hora; já marcado se o compromisso é de hoje), término escondido até marcar "Definir horário de término" (compromisso do Google mantém o término obrigatório, exigência da API). Helper `dataLocalHoje()` movido pra `agenda-apresentacao.ts` e usado pelos dois formulários. Testado (Playwright, mobile 390): editar hora de hoje + definir término, e mover pra outro dia removendo o término — ambos gravaram certo no banco.
+
+**Pendências herdadas (nenhuma nova bloqueante)**: forma de pagamento + parcelamento no Financeiro (ver seção da sessão #49 logo abaixo, começar por `EnterPlanMode`); `MODO_CADASTRO_FECHADO` ainda desligado; vídeo de demonstração + roteiro pra verificação do app no Google quando for comercializar (o padrão "Hoje" no Editar já foi feito, ver acima).
 
 ---
 
