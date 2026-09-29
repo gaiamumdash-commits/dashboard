@@ -10,6 +10,19 @@
 
 ---
 
+## Estado confirmado (2026-09-29, sessão nova #51 — última atualização)
+
+**Resumo em uma linha**: cadastro público **fechado em produção** — `MODO_CADASTRO_FECHADO=true` ligado na Vercel e allowlist populada com os 3 primeiros e-mails, tudo feito direto via CLI (sem pedir pro Fabio mexer no painel) e testado ao vivo em produção. Nenhuma linha de código mudou nesta sessão — só configuração + dado.
+
+- **Vercel CLI autenticada neste ambiente** (`vercel login`, dispositivo confirmado pelo Fabio no navegador) e projeto vinculado (`vercel link --yes --team team_Fx4OOrjdfaO9By1NsLkXOZCw --project prj_gPqNTJ1WmbgCaS7t4LzexefjfZWQ` — o `vercel link --yes` sozinho falha tentando usar o nome da pasta local como nome de projeto; precisa passar `--team`/`--project` explícitos). A partir de agora dá pra gerenciar env vars e redeploy direto por aqui, sem depender do Fabio no painel.
+- **Allowlist populada** (upsert direto em `acesso_beta_permitido` via REST + service role, mais rápido que passar pela Server Action): `ceo.ifaz@gmail.com`, `gaiamumdash@gmail.com`, `contato@gaiamum.com.br`.
+- **`MODO_CADASTRO_FECHADO=true` setado em Production** (`vercel env add`, tipo Sensitive) + redeploy disparado (`vercel redeploy <url-do-deploy-anterior>` — **não existe flag `--yes`** nesse comando, precisa confirmar "y" no prompt via stdin) — `Ready` em ~2min, alias `gaiamum.com.br` reaplicado.
+- **Testado ao vivo em produção, não só assumido**: criei uma conta de teste descartável sem allowlist (Admin API), tentei logar numa aba anônima do próprio navegador do Fabio (evitando mexer nas abas reais dele) e confirmei o redirect real pra `/acesso-restrito`. Conta de teste apagada em seguida. Confirmado no código (`garantirWorkspace()`) que o gate só roda **depois** do early-return de `membershipExistente` — ninguém que já tem workspace (Fabio incluído) é afetado.
+- **Como adicionar mais testadores dali pra frente (autosserviço, não precisa de sessão nova)**: painel `/admin/analitica-lab`, seção "Acesso fechado — quem pode entrar", digitar o e-mail e "Autorizar". Bloquear é o toggle ao lado do e-mail na mesma lista.
+- **Discussão Eduzz x Stripe (mesma sessão, antes do acesso fechado)**: Fabio em dúvida entre os dois pra cobrar valor baixo de poucos testadores. Recomendação dada (registrada em [[projeto_gaiamum_stripe_gate_pos_lab]] e [[projeto_gaiamum_modelo_preco_freemium_ia]] na memória): **Eduzz** (ele já tem conta/produtos lá, menos fricção que Stripe pro público BR — Pix/boleto nativos, sem precisar abrir conta nova) e **nem integrar ainda** — cobrar manualmente com link de pagamento avulso do próprio Eduzz enquanto for só um punhado de testadores, só construir o checkout automático (Fase 2, já desenhada) quando o preço estiver validado. Nada implementado, é só recomendação — decisão de negócio do Fabio, sem prazo.
+
+---
+
 ## Estado confirmado (2026-09-28, sessão nova #50 — última atualização)
 
 **Resumo em uma linha**: Agenda ganhou edição de compromissos com sincronização bidirecional-parcial com o Google Calendar, menu com e-mail da conta + Sair sempre visível, coluna "Compromissos de hoje" no Kanban e formulário de novo compromisso simplificado (Hoje + término opcional). **Tudo publicado (`db98181`, `2c52734`, `3712150`, `1c4ba40`), deploy `success` confirmado, e o Fabio testou em produção e confirmou "tudo certo"** (conectou o Google pessoal, sincronização funcionando).
@@ -26,7 +39,7 @@
 
 - **Editar com "Hoje" + término opcional** (commit desta rodada, após `6f10c8f`): o Editar dos compromissos ganhou o mesmo padrão do formulário de criação — "Hoje" (só a hora; já marcado se o compromisso é de hoje), término escondido até marcar "Definir horário de término" (compromisso do Google mantém o término obrigatório, exigência da API). Helper `dataLocalHoje()` movido pra `agenda-apresentacao.ts` e usado pelos dois formulários. Testado (Playwright, mobile 390): editar hora de hoje + definir término, e mover pra outro dia removendo o término — ambos gravaram certo no banco.
 
-**Pendências herdadas (nenhuma nova bloqueante)**: forma de pagamento + parcelamento no Financeiro (ver seção da sessão #49 logo abaixo, começar por `EnterPlanMode`); `MODO_CADASTRO_FECHADO` ainda desligado; vídeo de demonstração + roteiro pra verificação do app no Google quando for comercializar (o padrão "Hoje" no Editar já foi feito, ver acima).
+**Pendências herdadas (nenhuma nova bloqueante)**: forma de pagamento + parcelamento no Financeiro (ver seção da sessão #49 logo abaixo, começar por `EnterPlanMode`); vídeo de demonstração + roteiro pra verificação do app no Google quando for comercializar (o padrão "Hoje" no Editar já foi feito, ver acima). (`MODO_CADASTRO_FECHADO` foi ligado na sessão #51, ver acima.)
 
 ---
 
@@ -1187,6 +1200,20 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-09-28 (sessão nova #50) — Agenda editável + sincronização com Google Calendar, menu com e-mail, coluna do dia no Kanban
+
+Resumo completo em "Estado confirmado" (seção da própria sessão #50, acima) — entrada de Checkpoints não foi escrita na hora por falha de disciplina, backfillada agora na sessão #51 pra não deixar buraco na continuidade. Em uma linha: editar/excluir compromissos (Gaiamum e Google) com sincronização real, menu lateral fixo com e-mail da conta acima do Sair, coluna "Compromissos de hoje" no Kanban, formulário simplificado ("Hoje" + término opcional, também no Editar), e a correção do "server error" na Agenda causado por permissão do Calendar desmarcada no consentimento do Google. Tudo publicado e testado em produção pelo próprio Fabio.
+
+### 2026-09-29 (sessão nova #51) — Cadastro fechado ligado em produção via Vercel CLI, decisão Eduzz x Stripe
+
+Fabio pediu pra bloquear cadastro público (só e-mails liberados) e trouxe a dúvida Eduzz x Stripe pra cobrar valor baixo de testadores. Separei os dois problemas: o gate de acesso (Fase 1, já implementado desde a sessão #49) não depende de nenhuma decisão de pagamento — só faltava ligar. Dei a recomendação Eduzz (sem integrar ainda, cobrar manual por link avulso) e ele aceitou adiar isso.
+
+Fabio perguntou se existia MCP da Vercel — não tem MCP, mas a CLI local não estava autenticada (achado da sessão #50, "Vercel CLI não está autenticada neste ambiente"). Perguntei como ele preferia resolver (`AskUserQuestion`: autenticar a CLI agora / passar token / ele mesmo no painel) — escolheu autenticar. `vercel login` funcionou (device code confirmado por ele no navegador). Dali em diante fiz tudo direto: autorizei os 3 e-mails na allowlist (REST direto, mais rápido que passar pela Server Action), setei `MODO_CADASTRO_FECHADO=true` em Production, disparei o redeploy.
+
+**Testei antes de dar por encerrado** (regra de sempre verificar): criei conta de teste sem allowlist e tentei logar de verdade em produção. Pra não mexer nas abas reais do Fabio (o navegador automatizado é o dele mesmo, com Zoho Mail aberto), usei uma aba anônima já existente pro teste — confirmei o redirect real pra `/acesso-restrito`, apaguei a conta de teste depois. Nota: a aba 0 dele foi navegada pra tela de login do Gaiamum durante a investigação inicial (antes de eu perceber que era o navegador real) — não sei qual era o conteúdo original, avisei o Fabio.
+
+Handoff e memória atualizados nesta entrada. **Nada pendente desta frente** — só falta o Fabio ir adicionando testadores no painel conforme for convidando gente.
 
 ### 2026-09-11 (sessão nova #42) — Sub-entrega 2/3 (Agenda + voz) planejada em detalhe, aprovada, nada codado
 
