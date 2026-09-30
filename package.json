@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run tests/integration"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
@@ -40,6 +43,7 @@
     "eslint-config-next": "16.2.12",
     "supabase": "2.109.1",
     "tailwindcss": "4.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual, temAcessoCompleto } from "@/lib/ecc/equipe";
-import { contarMetasSmart } from "@/lib/ecc/metas";
+import { contarMetasSmart, listarMetasSmart } from "@/lib/ecc/metas";
 import { deveOferecerLab } from "@/lib/ecc/lab/oferta";
 import { FormularioSmart } from "@/components/onboarding/formulario-smart";
 import { MenuLateral } from "@/components/layout/menu-lateral";
@@ -22,9 +21,17 @@ export default async function PaginaOnboarding() {
   }
 
   const totalMetasSmart = await contarMetasSmart(tenantId);
-
   const temMetasSmart = Boolean(totalMetasSmart);
   const souOwner = (await obterPapelAtual(tenantId)) === "owner";
+
+  // Correção do P0 (2026-09-30): antes desta mudança, com metas já
+  // salvas esta página não renderizava formulário nenhum — só uma
+  // mensagem estática com um botão pra "/projetos". O link "Editar →" do
+  // dashboard (app/page.tsx) aponta pra cá prometendo edição, então agora
+  // ela existe de verdade: busca as metas já salvas e reabre o mesmo
+  // formulário, preenchido, usando `salvarMetasSmart` (upsert real —
+  // ver actions.ts) pra editar em vez de duplicar.
+  const metasExistentes = temMetasSmart ? await listarMetasSmart(tenantId) : [];
 
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
@@ -32,16 +39,11 @@ export default async function PaginaOnboarding() {
       <main className="mx-auto max-w-3xl flex-1 px-4 py-12">
         {temMetasSmart ? (
           <>
-            <h1 className="text-3xl font-semibold text-gaiamum-text">Suas metas já estão salvas</h1>
+            <h1 className="text-3xl font-semibold text-gaiamum-text">Suas metas SMART</h1>
             <p className="mt-2 text-gaiamum-text-muted">
-              Você já preencheu suas metas SMART de médio e longo prazo.
+              Revise ou ajuste o que você definiu — as mudanças ficam salvas na mesma meta, nada é
+              duplicado.
             </p>
-            <Link
-              href="/projetos"
-              className="mt-6 inline-block rounded-lg bg-gaiamum-primary px-6 py-3 font-medium text-white transition hover:bg-gaiamum-primary-dark"
-            >
-              Ir pros projetos
-            </Link>
           </>
         ) : (
           <>
@@ -49,7 +51,7 @@ export default async function PaginaOnboarding() {
             <p className="mt-2 text-gaiamum-text-muted">
               Antes de criar projetos e tarefas, defina onde seu negócio precisa chegar. Cada meta
               vira uma meta SMART: Específica, Mensurável, Atingível, Relevante e Temporal. Pode
-              pular e preencher depois, se preferir — o menu lateral sempre te traz de volta aqui.
+              pular e preencher depois, se preferir.
             </p>
 
             <blockquote className="mt-6 rounded-2xl border border-gaiamum-primary/30 bg-gaiamum-primary/5 p-5">
@@ -62,10 +64,10 @@ export default async function PaginaOnboarding() {
                 — Gail Matthews, Dominican University of California
               </footer>
             </blockquote>
-
-            <FormularioSmart />
           </>
         )}
+
+        <FormularioSmart metasExistentes={metasExistentes} />
       </main>
     </div>
   );

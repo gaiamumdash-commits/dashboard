@@ -5,6 +5,7 @@ import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterUsuarioAtual } from "@/lib/supabase/server";
 import { transcreverAudioComGemini, mensagemDeErroGemini, MODELO_GEMINI_PADRAO } from "@/lib/ecc/gemini";
 import { registrarConsumoIA } from "@/lib/ecc/ia-consumo";
+import { verificarRateLimitIA } from "@/lib/ecc/ia-rate-limit";
 
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024; // 5MB — generoso pra ~25s de áudio de voz, bem abaixo do limite de payload de Server Actions (16MB, ver next.config.ts).
 
@@ -33,6 +34,15 @@ export async function transcreverAudioParaTexto(
     }
     if (audio.size > TAMANHO_MAXIMO_BYTES) {
       return { texto: null, erro: "Áudio muito longo — grave uma frase mais curta." };
+    }
+
+    // Rate limit (P0, 2026-09-30) — checado DEPOIS de validar sessão/payload
+    // (não desperdiça "tentativa" num request que já seria rejeitado de
+    // qualquer forma) e ANTES de qualquer chamada real ao Gemini (é isso
+    // que de fato impede o gasto, não adianta checar depois).
+    const rateLimit = await verificarRateLimitIA({ userId: user.id, tenantId });
+    if (!rateLimit.permitido) {
+      return { texto: null, erro: rateLimit.motivo };
     }
 
     const bytes = new Uint8Array(await audio.arrayBuffer());

@@ -3,6 +3,7 @@ import { autorizacaoCronValida } from "@/lib/cron-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { listarUsuariosEmRiscoDeEvasao } from "@/lib/ecc/lab/analitica";
 import { enviarEmailReengajamentoLab } from "@/lib/ecc/notificacoes";
+import { gerarIdCorrelacao, registrarErro, registrarInfo } from "@/lib/observabilidade";
 
 /** Roda 1x/dia (vercel.json) — reengajamento não-punitivo do Gaiamum Lab:
  * usuários há 48h+ sem atividade e ainda sem a patente Explorador recebem
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
+  const idExecucao = gerarIdCorrelacao();
   const service = createServiceClient();
   const candidatos = (await listarUsuariosEmRiscoDeEvasao()).filter((u) => !u.reengajamentoJaEnviado);
 
@@ -57,5 +59,19 @@ export async function GET(request: NextRequest) {
     enviados++;
   }
 
-  return NextResponse.json({ verificados: candidatos.length, enviados, falhas });
+  if (falhas.length > 0) {
+    registrarErro({
+      operacao: "cron.reengajamento-lab",
+      idCorrelacao: idExecucao,
+      contexto: { verificados: candidatos.length, enviados, totalFalhas: falhas.length },
+      erro: falhas.join(" | "),
+    });
+  } else {
+    registrarInfo({
+      operacao: "cron.reengajamento-lab",
+      contexto: { idExecucao, verificados: candidatos.length, enviados },
+    });
+  }
+
+  return NextResponse.json({ idExecucao, verificados: candidatos.length, enviados, falhas });
 }

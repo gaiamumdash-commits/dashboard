@@ -1,0 +1,55 @@
+name: CI
+
+# Rede de segurança automatizada (P0, 2026-09-30) — lint, tipos, testes
+# unitários e build em toda mudança. Os testes de integração/RLS (ver
+# tests/integration/) NÃO rodam aqui: exigem um Postgres real com as
+# migrations aplicadas, e este workflow não sobe um Supabase local nem usa
+# secrets de produção — ficam para rodar manualmente/localmente por
+# enquanto (ver tests/integration/README.md). Sem isso, `npm test` (só os
+# testes unitários) já cobre regras de negócio determinísticas.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela execuções antigas do mesmo PR/branch quando um push novo chega —
+# economiza minutos de CI, não muda o resultado (só a última execução
+# importa pra decidir se o PR pode ser mesclado).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-tipos-testes-build:
+    runs-on: ubuntu-latest
+    # Valores FICTÍCIOS de propósito — nunca um secret real do repositório
+    # nem de produção. `next build` inicializa os clients do Supabase
+    # (@supabase/ssr) na hora de montar o grafo de módulos, mas não faz
+    # nenhuma chamada de rede real durante o build — um valor de URL/chave
+    # sintaticamente válido, mesmo falso, é suficiente pra essa etapa.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: "https://placeholder-ci.supabase.co"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key-somente-para-ci-nao-e-real"
+      SUPABASE_SERVICE_ROLE_KEY: "placeholder-service-role-key-somente-para-ci-nao-e-real"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências (lockfile travado — sem atualizar versões)
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Checagem de tipos (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Testes unitários (regras de negócio determinísticas)
+        run: npm test
+
+      - name: Build de produção
+        run: npm run build

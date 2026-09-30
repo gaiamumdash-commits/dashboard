@@ -52,7 +52,22 @@ function campoObrigatorio(formData: FormData, nome: string): string {
 // Módulo 0 — Onboarding & Metas SMART
 // ---------------------------------------------------------------------------
 
-export async function criarMetasSmart(formData: FormData) {
+/**
+ * Cria OU edita as metas SMART do workspace num único fluxo (upsert real,
+ * não insert puro) — corrige o achado da auditoria de 2026-09-30 (handoff
+ * canônico, seções 11/16/21): antes disso, não havia nenhuma forma de
+ * editar uma meta depois de criada, e o link "Editar" do dashboard
+ * prometia uma ação que a tela de destino não oferecia.
+ *
+ * `onConflict: "tenant_id,horizonte"` usa o índice único da migration 0045
+ * — preserva o `id` (e portanto `projetos.meta_smart_id`/
+ * `decisoes.meta_smart_id`, que apontam pra ele) quando a meta daquele
+ * horizonte já existia, e cria uma linha nova só na primeira vez. O mesmo
+ * índice único garante, no banco, que um clique duplo no botão "Salvar"
+ * nunca duplica a meta do mesmo horizonte — mesmo que os dois requests
+ * cheguem quase ao mesmo tempo.
+ */
+export async function salvarMetasSmart(formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
@@ -70,9 +85,9 @@ export async function criarMetasSmart(formData: FormData) {
     time_bound: campoObrigatorio(formData, `${horizonte}_time_bound`),
   }));
 
-  const { data: metasCriadas, error } = await supabase
+  const { data: metasSalvas, error } = await supabase
     .from("metas_smart")
-    .insert(linhas)
+    .upsert(linhas, { onConflict: "tenant_id,horizonte" })
     .select("*");
 
   if (error) {
@@ -84,14 +99,43 @@ export async function criarMetasSmart(formData: FormData) {
   const { data: tenant } = await supabase.from("tenants").select("nome").eq("id", tenantId).single();
   const nomeWorkspace = tenant?.nome ?? "Gaiamum";
 
-  for (const meta of (metasCriadas ?? []) as MetaSmart[]) {
+  for (const meta of (metasSalvas ?? []) as MetaSmart[]) {
     await exportarMetaSmartMarkdown(meta, nomeWorkspace);
   }
 
   redirect("/projetos");
 }
 
+/**
+ * Pular o onboarding agora GRAVA a decisão (`tenants.onboarding_metas_pulado_em`,
+ * migration 0045) antes de sair — sem isso, o Painel geral (`/`) redirecionava
+ * de volta pro onboarding em toda visita seguinte enquanto não houvesse
+ * nenhuma meta salva, um loop de fato pra quem pula (achado do P0, handoff
+ * canônico). Via service client de propósito: quem pula pode ser um member
+ * com escopo completo, não só o owner, e a policy de UPDATE de `tenants`
+ * (migration 0036) é só-owner — `tenantId` aqui nunca vem de input do
+ * cliente (sempre de garantirWorkspace()), então é seguro escrever assim,
+ * mesmo padrão já usado em vincularUsuarioAoConvite().
+ */
 export async function pularOnboarding() {
+  const tenantId = await garantirWorkspace();
+  const service = createServiceClient();
+
+  const { error } = await service
+    .from("tenants")
+    .update({ onboarding_metas_pulado_em: new Date().toISOString() })
+    .eq("id", tenantId)
+    // Nunca sobrescreve uma decisão já registrada (idempotente) — só grava
+    // na primeira vez que a pessoa pula.
+    .is("onboarding_metas_pulado_em", null);
+
+  if (error) {
+    console.error("[pularOnboarding] falha ao registrar decisão de pular:", error);
+    // Nunca bloqueia a navegação por causa disso — pior caso, a pessoa vê
+    // o onboarding de novo na próxima visita, mesmo comportamento de antes
+    // desta correção.
+  }
+
   redirect("/projetos");
 }
 

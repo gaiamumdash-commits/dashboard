@@ -10,7 +10,20 @@
 
 ---
 
-## Estado confirmado (2026-09-29, sessão nova #52 — última atualização)
+## Estado confirmado (2026-09-30, sessão nova #53 — última atualização)
+
+**Resumo em uma linha**: auditoria forense completa do estado real do produto (`GAIAMUM-HANDOFF-CANONICO-ESTADO-ATUAL.md`, na raiz do repo — leitura de código, sem alterar nada) seguida do incremento P0 de "Consolidação Inteligente" (branch `consolidacao/p0-confiabilidade-metas`, **não mesclada, não publicada**): correção real do bug de edição de Metas SMART, correção do loop de onboarding, rate limit de IA, observabilidade mínima nos crons, e a primeira rede de testes automatizados + CI do projeto. **Impedimento real desta sessão**: Docker Desktop indisponível neste ambiente — os testes de integração/RLS e as 2 migrations novas ficaram prontos mas não executados/aplicados contra nenhum banco.
+
+- **Auditoria** (pedida pelo Fabio antes de qualquer mudança): `GAIAMUM-HANDOFF-CANONICO-ESTADO-ATUAL.md` na raiz do repo — 26 seções, evidência arquivo:linha em cada afirmação técnica, achados centrais: (a) a "Entrevista guiada por IA" de Marketing não usa IA nenhuma no fluxo real (código Anthropic pronto, mas órfão); (b) não existia NENHUMA forma de editar uma Meta SMART depois de criada; (c) zero testes automatizados, zero CI, zero rate limit de IA no projeto inteiro.
+- **P0 implementado** (detalhe completo, arquivo por arquivo, em `docs/gaiamum/GAIAMUM-RELATORIO-INCREMENTO-P0.md`): `salvarMetasSmart` (upsert real por `tenant_id+horizonte`, substitui o antigo `criarMetasSmart` que só fazia `insert`); `pularOnboarding` agora grava `tenants.onboarding_metas_pulado_em`; onboarding reabre preenchido pra edição; rate limit de IA em 3 camadas (usuário/workspace/global), atômico no Postgres, fail-closed (`ia-rate-limit.ts` + migration `0046`); logger estruturado (`observabilidade.ts`) aplicado nos 3 crons; Vitest com 55 testes unitários reais passando + 14 testes de integração/RLS prontos (não executados); GitHub Actions (`ci.yml`) rodando lint/tipos/testes/build, validado localmente simulando o ambiente do CI (build passou só com env vars fictícias, sem `.env.local`/`.env` reais).
+- **Migrations novas, preparadas mas NÃO aplicadas em nenhum ambiente**: `0045_onboarding_pulado_e_upsert_metas.sql`, `0046_rate_limit_ia.sql` — ambas com pré-requisito/rollback documentado no próprio arquivo e no relatório do P0.
+- **`tsc`/`lint`/`build` limpos** antes e depois de todas as mudanças (39 rotas, mesmos 3 warnings pré-existentes de sempre) — nenhuma regressão.
+- **Nada publicado**: branch local `consolidacao/p0-confiabilidade-metas`, sem push, sem PR, sem deploy, sem migration aplicada, sem cadastro aberto, sem e-mail enviado a usuário real.
+- **Próximo passo**: revisão deste ciclo (auditoria + Blueprint + Backlog + Relatório P0, todos em `docs/gaiamum/`) antes de qualquer P1; assim que houver Docker/Postgres disponível, aplicar as 2 migrations num banco local e rodar `npm run test:integration` de verdade antes de considerar o P0 validado de ponta a ponta.
+
+---
+
+## Estado confirmado (2026-09-29, sessão nova #52)
 
 **Resumo em uma linha**: 3 pedidos novos do Fabio (pedido por voz) implementados, testados de ponta a ponta em produção real (conta de teste descartável) e **publicados** (`41966e8`, deploy Vercel `success`) — mais o bug de fuso horário encontrado no teste, corrigido e também **publicado** na sequência (`c8b6e03`, deploy Vercel `success`). Sessão fechada, nada pendente.
 
