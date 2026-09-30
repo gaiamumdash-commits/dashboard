@@ -1,6 +1,7 @@
 # Gaiamum — Backlog de Consolidação (P0/P1/P2)
 
 **Criado:** 2026-09-30. Fonte: `Gaiamum-Prompt-Consolidacao-Inteligente-v1.txt` (prompt de execução), seções 5 e 6.
+**Atualizado:** 2026-09-30, sessão de validação — quase todo o P0 passou de "IMPLEMENTADO NÃO VALIDADO" para "IMPLEMENTADO E TESTADO" depois que o Docker Desktop foi localizado e um Postgres de teste isolado foi criado e usado de verdade. Ver `GAIAMUM-RELATORIO-INCREMENTO-P0.md` seções 4-9 para o detalhe completo. Um achado de segurança NOVO (fora do escopo do P0) foi descoberto nesta validação — ver P1-E abaixo, adicionado por causa disso.
 
 Estado de cada item usa exatamente 4 rótulos, sem meio-termo:
 - **IMPLEMENTADO E TESTADO** — código existe, roda, e há teste automatizado que passou de verdade nesta sessão.
@@ -18,17 +19,17 @@ Estado de cada item usa exatamente 4 rótulos, sem meio-termo:
 |---|---|---|
 | Vitest configurado (`vitest.config.ts`, scripts `test`/`test:watch`/`test:integration`) | **IMPLEMENTADO E TESTADO** | `npm test` roda e passa |
 | Testes unitários de lógica/regras determinísticas (kanban, parser de fala, categorização, score de alinhamento, menções, rate limit, observabilidade) | **IMPLEMENTADO E TESTADO** | 55 testes, 7 arquivos, todos verdes — ver `src/lib/**/__tests__/*.test.ts` |
-| Testes de integração/RLS (isolamento entre tenants, financeiro owner-only, upsert de metas) | **IMPLEMENTADO NÃO VALIDADO** | Código pronto em `tests/integration/*.test.ts`, mas **não executado**: Docker Desktop indisponível neste ambiente (nem o binário no caminho padrão), sem Postgres local pra rodar contra. `describe.skipIf` os pula automaticamente sem a env var de banco de teste — ver `tests/integration/README.md` |
-| CI (GitHub Actions): lint, tipos, testes unitários, build | **IMPLEMENTADO E TESTADO** | `.github/workflows/ci.yml`; build validado localmente rodando só com as mesmas env vars fictícias que o workflow usa (sem `.env.local`/`.env` reais) — passou |
-| CI rodando testes de integração/RLS automaticamente | **BLOQUEADO** | Exigiria subir Postgres/Supabase no runner do GitHub Actions (Supabase Action ou Docker Compose) — decisão de infraestrutura de CI que não foi tomada nesta rodada (fora do "mínimo" pedido); documentado como próximo passo no P1 se o piloto justificar |
-| Testes de permissão (owner/gestor/member, edição/exclusão) | **IMPLEMENTADO NÃO VALIDADO** | Cobertos dentro de `rls-isolamento.test.ts`/`rls-financeiro-owner-only.test.ts` — mesmo impedimento acima |
+| Testes de integração/RLS (isolamento entre tenants, limites entre projetos, financeiro owner-only, metas) | **IMPLEMENTADO E TESTADO** | 29 testes, todos verdes, contra Postgres real (Docker local, isolado do projeto "platform"), com login real (não `service_role`) — ver `tests/integration/*.test.ts` e relatório P0 seções 5-6 |
+| CI (GitHub Actions): lint, tipos, testes unitários, build | **IMPLEMENTADO E TESTADO localmente — NUNCA rodou no GitHub remoto** | `.github/workflows/ci.yml` existe e foi validado localmente (env vars fictícias, sem tocar `.env.local`/`.env` reais); só roda de verdade quando a branch for publicada (push/PR), o que não aconteceu nesta sessão |
+| CI rodando testes de integração/RLS automaticamente | **BLOQUEADO** | Exigiria subir Postgres/Supabase no runner do GitHub Actions (Supabase Action ou Docker Compose) — decisão de infraestrutura de CI não tomada nesta rodada; próximo passo no P1 se o piloto justificar |
+| Testes de permissão (owner/gestor/member, limites entre projetos, edição/exclusão) | **IMPLEMENTADO E TESTADO** | `rls-isolamento.test.ts`, `rls-limites-entre-projetos.test.ts`, `rls-financeiro-owner-only.test.ts` — 17 testes, contra Postgres real |
 
 ### 5.2 Observabilidade mínima
 
 | Item | Estado | Evidência |
 |---|---|---|
 | Logger estruturado (JSON, id de correlação, operação, severidade, contexto sem dado sensível) | **IMPLEMENTADO E TESTADO** | `src/lib/observabilidade.ts`, 5 testes unitários verdes |
-| Aplicado nos 3 crons (`disparar-alarmes`, `gerar-contas-fixas`, `reengajamento-lab`) | **IMPLEMENTADO NÃO VALIDADO** | Código compila e builda; execução real só acontece em produção/staging com o cron rodando de verdade (não simulável sem banco nesta sessão) |
+| Aplicado nos 3 crons (`disparar-alarmes`, `gerar-contas-fixas`, `reengajamento-lab`) | **IMPLEMENTADO — validação parcial** | Código compila, builda, revisão estática de todos os call sites confirma ausência de dado sensível nos logs; **nenhum disparo real de endpoint de cron** foi feito contra dado de negócio real (alarme vencido, conta do mês) nesta sessão — ver relatório P0, matriz seção 9 |
 | Aplicado em mutations críticas fora dos crons (Kanban, Financeiro, Equipe) | **PROPOSTO** | Fora do escopo mínimo desta rodada — essas Server Actions já lançam `Error` com mensagem específica tratada caso a caso; instrumentar tudo de uma vez era desproporcional ao risco atual (ver Blueprint, decisão registrada) |
 | Serviço externo de observabilidade (Sentry ou equivalente) | **PROPOSTO** | Vetado explicitamente nesta rodada pelo prompt de consolidação ("não criar conta/assinatura paga"); ver questão de decisão no relatório do P0 |
 
@@ -36,20 +37,28 @@ Estado de cada item usa exatamente 4 rótulos, sem meio-termo:
 
 | Item | Estado | Evidência |
 |---|---|---|
-| Rate limit atômico em 3 camadas (usuário/workspace/global), no Postgres | **IMPLEMENTADO NÃO VALIDADO** (lógica de janela testada; contagem atômica real não) | `supabase/migrations/0046_rate_limit_ia.sql` + `src/lib/ecc/ia-rate-limit.ts`; 6 testes unitários cobrem `inicioDoMinuto`/`inicioDaHora` (determinístico, sem banco); a função SQL `ia_registrar_tentativa` em si não foi exercitada contra Postgres real nesta sessão (mesmo impedimento do Docker) |
-| Aplicado nos 2 pontos reais de chamada de IA (transcrição de voz, explicação de alinhamento) | **IMPLEMENTADO NÃO VALIDADO** | Código integrado em `transcricao-audio.ts`/`explicacao-alinhamento.ts`, compila e builda; validação end-to-end depende do mesmo banco indisponível |
-| Fail-closed (bloqueia se a checagem falhar) | **IMPLEMENTADO E TESTADO** (via leitura de código + teste de log) | `verificarRateLimitIA` devolve `permitido: false` em qualquer erro do RPC, registra via `observabilidade.ts` |
+| Rate limit atômico em 3 camadas (usuário/workspace/global), no Postgres | **IMPLEMENTADO E TESTADO** | `tests/integration/rate-limit-concorrencia.test.ts`: 10 chamadas simultâneas, limite 5 → exatamente 5 permitidas/5 bloqueadas, contagem exata (10) na tabela — prova real de atomicidade sob concorrência, contra Postgres |
+| Aplicado nos 2 pontos reais de chamada de IA (transcrição de voz, explicação de alinhamento) | **IMPLEMENTADO E TESTADO** | `bloqueio-nao-chama-provedor.test.ts` — prova, com stub do SDK do Gemini, que bloqueio impede a chamada real ao provedor; caso liberado testado no mesmo arquivo |
+| Fail-closed (indisponibilidade do controle de cota bloqueia) | **IMPLEMENTADO E TESTADO** | `ia-rate-limit-mock.test.ts` — RPC mockado retornando erro, em qualquer das 3 camadas |
+| EXECUTE da função restrito ao service role | **IMPLEMENTADO E TESTADO** | Teste de integração com login real tentando chamar a RPC — permission denied |
 | Anthropic/entrevista conversacional ativada | **Deliberadamente NÃO feito** | Prompt de consolidação veda ativar código desconectado nesta rodada |
 
 ### 5.4 Metas e onboarding
 
 | Item | Estado | Evidência |
 |---|---|---|
-| `salvarMetasSmart` — upsert real por `(tenant_id, horizonte)`, preserva id/vínculos | **IMPLEMENTADO NÃO VALIDADO** (compila e builda; upsert real contra Postgres não exercitado) | `src/lib/ecc/actions.ts`; índice único em `supabase/migrations/0045_...sql`; teste de integração pronto em `tests/integration/metas-smart-upsert.test.ts` (não executado, mesmo impedimento) |
-| Onboarding reabre preenchido para edição (não mais só uma mensagem estática) | **IMPLEMENTADO NÃO VALIDADO** | `src/app/onboarding/page.tsx` + `FormularioSmart` atualizados, build passa; não testado num navegador real nesta sessão (sem app rodando) |
-| "Pular" grava estado persistido (`tenants.onboarding_metas_pulado_em`) | **IMPLEMENTADO NÃO VALIDADO** | `pularOnboarding()` em `actions.ts`; migration 0045; mesmo impedimento de validação end-to-end |
-| Dashboard não força mais redirect pra quem já pulou | **IMPLEMENTADO NÃO VALIDADO** | `src/app/page.tsx` — build passa, comportamento não visto rodando |
-| Reconciliação de usuários antigos sem apagar dado | **IMPLEMENTADO** (por desenho, não por migração de dado) | Coluna nova é `nullable` sem default — ninguém preexistente teve estado alterado; quem já pulou antes desta migration vê o onboarding uma vez a mais até pular de novo (comportamento aceito, documentado) |
+| `salvarMetasSmart` — update explícito por `id` (não upsert genérico — corrigido na validação, ver relatório P0 seção 2), preserva id/vínculos | **IMPLEMENTADO E TESTADO** | `tests/integration/metas-smart-upsert.test.ts` (4/4, contra Postgres real) + confirmado via UI real (Playwright) |
+| Onboarding reabre preenchido para edição | **IMPLEMENTADO E TESTADO** | Confirmado via UI real: formulário reabre com os 6 campos preenchidos, botão vira "Salvar alterações" |
+| "Pular" grava estado persistido (`tenants.onboarding_metas_pulado_em`), é idempotente | **IMPLEMENTADO E TESTADO** | `onboarding-pulado.test.ts` + confirmado via UI real |
+| Dashboard não força mais redirect pra quem já pulou | **IMPLEMENTADO E TESTADO** | Confirmado via UI real: nova navegação pra "/" não redireciona, mostra CTA "Criar suas metas" |
+| Criar meta depois de ter pulado continua funcionando | **IMPLEMENTADO E TESTADO** | Confirmado via UI real + teste de integração |
+| Reconciliação de usuários antigos sem apagar dado | **IMPLEMENTADO** (por desenho, não por migração de dado) | Coluna nova é `nullable` sem default — ninguém preexistente teve estado alterado |
+
+### 5.5 Achado de segurança novo, fora do escopo original (descoberto durante a validação)
+
+| Item | Estado | Evidência |
+|---|---|---|
+| `membros_do_tenant()` vaza e-mail de todo o workspace pra membro com `escopo: 'projeto'` | **ACHADO CONFIRMADO, NÃO CORRIGIDO** (fora do escopo deste P0) | `tests/integration/rls-limites-entre-projetos.test.ts` — teste que prova o vazamento contra Postgres real; ver P1-E abaixo para a correção proposta |
 
 ---
 
@@ -78,6 +87,13 @@ Menu contextual no BlockNote: selecionar texto → prévia editável → confirm
 Evolui o Freeze/consolidação já existente (`enviarConsolidacaoProjeto`), com prévia antes de enviar, baseline pra "o que mudou", revisão de destinatários.
 **Critério de aceite:** prévia consistente com o banco; envio explícito (nunca automático nesta etapa); gestor nunca recebe resumo financeiro owner-only.
 **Depende de:** definir se "o que mudou" precisa de uma tabela de snapshot nova (schema) ou se dá pra inferir sem persistir histórico — decisão de arquitetura a tomar antes de codar.
+
+### P1-E — Corrigir vazamento de e-mail em `membros_do_tenant()` (achado de segurança, descoberto na validação do P0)
+**Estado: PROPOSTO — recomendo priorizar sobre P1-A/B/C/D.**
+`membros_do_tenant()` (migration 0002) devolve todos os membros (user_id + e-mail + papel) de um tenant pra qualquer chamador com membership ali, sem checar `escopo`. Quem tem `escopo: 'projeto'` (convidado só pra 1 quadro) recebe a lista completa, inclusive o e-mail do owner — divergência real do design documentado.
+**Correção mínima sugerida:** adicionar `and tem_acesso_completo(t_id)` ao `where` da function (mesmo padrão já usado em `metas_smart`/`eventos_agenda`), OU criar uma segunda function restrita (`membros_do_tenant_com_acesso_completo`) se `membros_do_tenant()` tiver outros chamadores legítimos que precisem do comportamento atual — checar todos os call sites de `listarMembros()`/`membros_do_tenant` antes de mudar.
+**Critério de aceite:** membro com `escopo: 'projeto'` não recebe mais e-mail de ninguém fora do próprio projeto via essa RPC; owner e membros de `escopo: 'completo'` continuam vendo a lista normalmente; teste de integração `rls-limites-entre-projetos.test.ts` passa a esperar bloqueio, não vazamento.
+**Depende de:** nada tecnicamente bloqueante — é uma migration pequena e um teste já existe (só precisa inverter a expectativa depois de corrigir).
 
 ---
 

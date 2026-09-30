@@ -10,7 +10,23 @@
 
 ---
 
-## Estado confirmado (2026-09-30, sessão nova #53 — última atualização)
+## Estado confirmado (2026-09-30, sessão nova #54 — última atualização)
+
+**Resumo em uma linha**: validação real do P0 da sessão #53 — Docker Desktop foi localizado (estava em outro caminho) e usado pra criar um Postgres de teste 100% isolado (portas 573xx, sem tocar o ambiente Docker do projeto "platform"); as 2 migrations novas foram aplicadas e **92 testes passaram de verdade** (63 unitários + 29 de integração contra banco real, com login comum, não `service_role`); as jornadas principais (criar meta, editar meta, pular onboarding, criar depois de pular, mobile) foram executadas via Playwright numa instância real do app. Um desvio de especificação foi corrigido (update explícito em vez de upsert genérico) e **um achado de segurança novo, fora do escopo do P0**, foi descoberto e documentado (não corrigido). Branch `consolidacao/p0-confiabilidade-metas` **continua não publicada**.
+
+- **Correção de especificação**: a 1ª versão de `salvarMetasSmart` usava `.upsert()` — o prompt de consolidação pedia explicitamente "update explícito, não upsert genérico". Reescrita pra fazer `UPDATE ... WHERE id = <id>` no caminho de edição (com `INSERT` + fallback de corrida no caminho de criação) — ver `docs/gaiamum/GAIAMUM-RELATORIO-INCREMENTO-P0.md` seção 2 pro detalhe técnico completo.
+- **Ambiente de teste local recuperado**: Docker Desktop estava instalado em `AppData\Local\Programs\DockerDesktop\` (não no caminho padrão checado na sessão #53). Achado real: já havia uma instância Supabase local do projeto "platform" (UltraQuadras) rodando nas portas padrão há 5 semanas — o Gaiamum foi isolado no bloco de portas 573xx (`supabase/config.toml`, novo) pra não tocar nada do outro projeto. Achado técnico à parte: essa versão do Postgres/CLI local (17.6) não auto-expõe tabela nova pra `service_role` sem `GRANT` explícito (diferente do Supabase Cloud, onde produção roda) — corrigido só na config do ambiente de teste (`auto_expose_new_tables = true`), não nas migrations reais.
+- **92 testes passando**: os 14 testes de integração da sessão #53 rodaram de verdade + 15 novos escritos nesta validação (limites entre projetos do mesmo tenant, concorrência real do rate limit de IA, persistência de "pular onboarding", fail-closed e "bloqueio nunca chama o provedor" via stub/mock). Tudo documentado numa matriz completa (Item | Implementado | Validado | Evidência | Pendência) no relatório do P0.
+- **Jornadas reais via Playwright** (não simulação): 2 usuários de teste descartáveis, contra `next dev` conectado ao Postgres de teste (nunca ao `.env.local` real — confirmado por hash SHA256 idêntico antes/depois). Confirmado visualmente: formulário de edição de meta reabre preenchido; edição persiste após navegação nova; "pular" não força mais loop de volta ao onboarding; criar meta depois de pular funciona; tudo também testado em viewport mobile (390×844).
+- **Achado de segurança NOVO, fora do escopo do P0** (não corrigido, registrado como P1-E prioritário no Backlog): `membros_do_tenant()` vaza e-mail de todo o workspace pra quem tem só `escopo: 'projeto'` — deveria ver só o próprio quadro. Confirmado contra Postgres real, não é suposição.
+- **`tsc`/`lint`/`build` limpos** antes e depois (39 rotas, mesmos 3 warnings pré-existentes).
+- **Nada publicado**: mesma branch local de antes, sem push, sem PR, sem migration em produção, sem e-mail a usuário real — os 2 usuários de teste foram apagados do banco de teste ao final.
+- **Estado do ambiente de teste**: containers Docker do Gaiamum (Postgres de teste) continuam rodando neste ambiente — `npx supabase stop` (dentro de `Documents\Gaiamum`) pra derrubar quando não precisar mais, sem afetar o projeto "platform".
+- **Próximo passo**: decisão do Fabio sobre priorizar a correção do achado de segurança (P1-E) antes do P1-A/B/C/D; decidir se publica a branch pra validar o CI remoto do GitHub Actions (nunca rodou de verdade ainda).
+
+---
+
+## Estado confirmado (2026-09-30, sessão nova #53)
 
 **Resumo em uma linha**: auditoria forense completa do estado real do produto (`GAIAMUM-HANDOFF-CANONICO-ESTADO-ATUAL.md`, na raiz do repo — leitura de código, sem alterar nada) seguida do incremento P0 de "Consolidação Inteligente" (branch `consolidacao/p0-confiabilidade-metas`, **não mesclada, não publicada**): correção real do bug de edição de Metas SMART, correção do loop de onboarding, rate limit de IA, observabilidade mínima nos crons, e a primeira rede de testes automatizados + CI do projeto. **Impedimento real desta sessão**: Docker Desktop indisponível neste ambiente — os testes de integração/RLS e as 2 migrations novas ficaram prontos mas não executados/aplicados contra nenhum banco.
 

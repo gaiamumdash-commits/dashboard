@@ -49,12 +49,13 @@ detalhada — este Blueprint resume só o que é permanente):
 
 | Decisão | Alternativas consideradas | Por quê |
 |---|---|---|
-| Upsert por `(tenant_id, horizonte)` em vez de tabela de histórico de metas | Versionar cada edição de meta numa tabela separada | Fora de escopo do P0 ("nesta rodada não construir módulo OKR"); upsert simples resolve o bug real sem redesenho de schema |
+| Update explícito por `id` (não upsert genérico) por `(tenant_id, horizonte)`, com índice único como backstop de corrida — corrigido na validação, ver `GAIAMUM-RELATORIO-INCREMENTO-P0.md` seção 2 | 1ª versão usava `.upsert()`; versionar cada edição numa tabela de histórico separada | O prompt de consolidação pediu explicitamente "update explícito autorizado, não upsert genérico"; update por `id` é a expressão mais direta de "preservar esta meta"; histórico de versão fica fora de escopo do P0 (não é módulo OKR) |
 | Rate limit em 3 camadas (usuário/workspace/global) no Postgres | Rate limit só em memória do processo | Serverless não compartilha memória entre instâncias — só banco garante atomicidade real entre instâncias concorrentes |
 | Fail-closed no rate limit (bloqueia se não conseguir checar) | Fail-open (deixa passar se a checagem falhar) | Custo de uma tentativa bloqueada é sempre zero; fail-open poderia deixar passar uma rajada sem limite justo quando o controle está com problema |
 | Observabilidade só nos 3 crons nesta rodada, não em toda Server Action | Instrumentar tudo de uma vez | Proporcional ao risco: crons são o ponto mais silencioso (ninguém vê a resposta HTTP deles); as ~90 Server Actions já lançam `Error` com mensagem específica, tratado caso a caso |
 | Sem serviço de observabilidade externo (Sentry etc.) nesta rodada | Integrar Sentry free tier | Prompt de consolidação veda criar conta/assinatura nova nesta rodada; fica como decisão explícita pro P1/P2 (ver Backlog) |
-| CI só com testes unitários, sem integração/RLS rodando automaticamente | Subir Postgres/Supabase no runner do GitHub Actions | Impedimento externo desta sessão (sem Docker local pra validar a abordagem primeiro) + escopo mínimo; testes de integração ficam prontos e documentados, não descartados |
+| CI só com testes unitários, sem integração/RLS rodando automaticamente | Subir Postgres/Supabase no runner do GitHub Actions | Escopo mínimo desta rodada; os testes de integração/RLS já rodam de verdade LOCALMENTE (Docker foi localizado e usado na sessão de validação), só não estão automatizados no CI remoto ainda — ver Backlog |
+| Não corrigir `membros_do_tenant()` (vazamento de e-mail pra escopo='projeto') nesta rodada, apesar de descoberto durante a validação | Corrigir imediatamente, já que é achado de segurança | Fora do escopo original do P0 (não mexe em metas/onboarding/IA/observabilidade); corrigir sem planejamento isolado arriscaria quebrar outro call site de `listarMembros()` sem revisão — registrado como P1-E prioritário no Backlog, com correção mínima já esboçada |
 
 ## 6. Fora de escopo nesta rodada (documentado, não implementado)
 

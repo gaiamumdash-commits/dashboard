@@ -53,19 +53,35 @@ function campoObrigatorio(formData: FormData, nome: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Cria OU edita as metas SMART do workspace num único fluxo (upsert real,
- * não insert puro) — corrige o achado da auditoria de 2026-09-30 (handoff
- * canônico, seções 11/16/21): antes disso, não havia nenhuma forma de
- * editar uma meta depois de criada, e o link "Editar" do dashboard
- * prometia uma ação que a tela de destino não oferecia.
+ * Cria OU edita as metas SMART do workspace — corrige o achado da auditoria
+ * de 2026-09-30 (handoff canônico, seções 11/16/21): antes disso, não
+ * havia nenhuma forma de editar uma meta depois de criada, e o link
+ * "Editar" do dashboard prometia uma ação que a tela de destino não
+ * oferecia.
  *
- * `onConflict: "tenant_id,horizonte"` usa o índice único da migration 0045
- * — preserva o `id` (e portanto `projetos.meta_smart_id`/
- * `decisoes.meta_smart_id`, que apontam pra ele) quando a meta daquele
- * horizonte já existia, e cria uma linha nova só na primeira vez. O mesmo
- * índice único garante, no banco, que um clique duplo no botão "Salvar"
- * nunca duplica a meta do mesmo horizonte — mesmo que os dois requests
- * cheguem quase ao mesmo tempo.
+ * Revisão de 2026-09-30 (validação do P0): a primeira versão usava
+ * `.upsert(..., {onConflict: "tenant_id,horizonte"})` — funcionalmente
+ * seguro (nunca duplica, nunca troca tenant, porque `tenant_id` sempre vem
+ * de `garantirWorkspace()`), mas era exatamente o "upsert genérico" que o
+ * prompt de consolidação pediu pra NÃO usar. Trocado por um UPDATE
+ * explícito por `id` no caminho de edição — mais direto de auditar (o alvo
+ * da mudança é o próprio id da meta, não uma inferência via índice) e mais
+ * alinhado ao pedido original ("Criar update explícito autorizado").
+ *
+ * Fluxo, por horizonte:
+ * 1. Busca o id já existente daquele horizonte pro tenant (se houver).
+ * 2. Existe → UPDATE por `id` (+ `tenant_id` redundante, defesa em
+ *    profundidade sobre a RLS) — nunca toca `id`/`criado_em`/`tenant_id`
+ *    da linha, então `projetos.meta_smart_id`/`decisoes.meta_smart_id`
+ *    continuam válidos depois de editar.
+ * 3. Não existe → INSERT (primeira vez desse horizonte). Índice único
+ *    `(tenant_id, horizonte)` (migration 0045) continua sendo o backstop
+ *    de verdade contra corrida: se dois requests quase simultâneos (ex.:
+ *    clique duplo) passarem pelo SELECT do passo 1 vendo "ainda não
+ *    existe", só o primeiro INSERT vence — o segundo recebe erro 23505
+ *    (violação do índice único) e cai no fallback abaixo, que vira um
+ *    UPDATE de verdade na linha que o outro request acabou de criar (nunca
+ *    perde a submissão do segundo clique, nunca duplica).
  */
 export async function salvarMetasSmart(formData: FormData) {
   const tenantId = await garantirWorkspace();
@@ -74,24 +90,92 @@ export async function salvarMetasSmart(formData: FormData) {
   // Fonte única com a UI (HORIZONTES, smart.ts) — evita os dois listarem
   // horizontes diferentes e o form quebrar por campo ausente.
   const horizontes: Horizonte[] = HORIZONTES.map((h) => h.valor);
-  const linhas = horizontes.map((horizonte) => ({
-    tenant_id: tenantId,
-    horizonte,
-    visao_macro: campoObrigatorio(formData, `${horizonte}_visao_macro`),
-    specific: campoObrigatorio(formData, `${horizonte}_specific`),
-    measurable: campoObrigatorio(formData, `${horizonte}_measurable`),
-    attainable: campoObrigatorio(formData, `${horizonte}_attainable`),
-    relevant: campoObrigatorio(formData, `${horizonte}_relevant`),
-    time_bound: campoObrigatorio(formData, `${horizonte}_time_bound`),
-  }));
 
-  const { data: metasSalvas, error } = await supabase
+  const { data: existentes, error: erroLeitura } = await supabase
     .from("metas_smart")
-    .upsert(linhas, { onConflict: "tenant_id,horizonte" })
-    .select("*");
+    .select("id, horizonte")
+    .eq("tenant_id", tenantId);
 
-  if (error) {
-    throw new Error(`Falha ao salvar metas SMART: ${error.message}`);
+  if (erroLeitura) {
+    throw new Error(`Falha ao carregar metas existentes: ${erroLeitura.message}`);
+  }
+
+  const idPorHorizonte = new Map(
+    ((existentes ?? []) as { id: string; horizonte: Horizonte }[]).map((m) => [m.horizonte, m.id]),
+  );
+
+  const metasSalvas: MetaSmart[] = [];
+
+  for (const horizonte of horizontes) {
+    const campos = {
+      visao_macro: campoObrigatorio(formData, `${horizonte}_visao_macro`),
+      specific: campoObrigatorio(formData, `${horizonte}_specific`),
+      measurable: campoObrigatorio(formData, `${horizonte}_measurable`),
+      attainable: campoObrigatorio(formData, `${horizonte}_attainable`),
+      relevant: campoObrigatorio(formData, `${horizonte}_relevant`),
+      time_bound: campoObrigatorio(formData, `${horizonte}_time_bound`),
+    };
+
+    const idExistente = idPorHorizonte.get(horizonte);
+
+    if (idExistente) {
+      // Caminho de EDIÇÃO — update explícito pelo id da meta.
+      const { data, error } = await supabase
+        .from("metas_smart")
+        .update(campos)
+        .eq("id", idExistente)
+        .eq("tenant_id", tenantId)
+        .select("*")
+        .single();
+
+      if (error) {
+        throw new Error(`Falha ao atualizar meta (${horizonte}): ${error.message}`);
+      }
+      metasSalvas.push(data as MetaSmart);
+      continue;
+    }
+
+    // Caminho de CRIAÇÃO — só quando este horizonte ainda não tem meta.
+    const { data, error } = await supabase
+      .from("metas_smart")
+      .insert({ tenant_id: tenantId, horizonte, ...campos })
+      .select("*")
+      .single();
+
+    if (!error) {
+      metasSalvas.push(data as MetaSmart);
+      continue;
+    }
+
+    if (error.code !== "23505") {
+      throw new Error(`Falha ao criar meta (${horizonte}): ${error.message}`);
+    }
+
+    // Corrida real: outro request criou a linha entre o SELECT do início
+    // da função e este INSERT — resolve como edição de verdade, não perde
+    // a submissão nem duplica.
+    const { data: criadaPeloOutro, error: erroBusca } = await supabase
+      .from("metas_smart")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("horizonte", horizonte)
+      .single();
+
+    if (erroBusca || !criadaPeloOutro) {
+      throw new Error(`Falha ao resolver corrida ao salvar meta (${horizonte}): ${erroBusca?.message}`);
+    }
+
+    const { data: atualizada, error: erroUpdate } = await supabase
+      .from("metas_smart")
+      .update(campos)
+      .eq("id", criadaPeloOutro.id as string)
+      .select("*")
+      .single();
+
+    if (erroUpdate) {
+      throw new Error(`Falha ao salvar meta (${horizonte}) após corrida: ${erroUpdate.message}`);
+    }
+    metasSalvas.push(atualizada as MetaSmart);
   }
 
   updateTag(tagMetasSmart(tenantId));
@@ -99,7 +183,7 @@ export async function salvarMetasSmart(formData: FormData) {
   const { data: tenant } = await supabase.from("tenants").select("nome").eq("id", tenantId).single();
   const nomeWorkspace = tenant?.nome ?? "Gaiamum";
 
-  for (const meta of (metasSalvas ?? []) as MetaSmart[]) {
+  for (const meta of metasSalvas) {
     await exportarMetaSmartMarkdown(meta, nomeWorkspace);
   }
 

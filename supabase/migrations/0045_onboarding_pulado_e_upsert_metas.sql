@@ -4,13 +4,16 @@
 -- 1. Não existia nenhuma forma de editar uma Meta SMART depois de criada —
 --    a única escrita em metas_smart era um `insert` puro. O link "Editar"
 --    do dashboard levava a uma tela que, com metas já existentes, não
---    mostrava formulário nenhum. Índice único (tenant_id, horizonte)
---    permite trocar `criarMetasSmart` (insert puro) por um upsert real
---    (`.upsert(..., {onConflict: "tenant_id,horizonte"})`), que PRESERVA o
---    id e os vínculos existentes (projetos.meta_smart_id,
---    decisoes.meta_smart_id) ao editar — nunca duplica a linha do mesmo
---    horizonte, mesmo em clique duplo/corrida (o índice único garante isso
---    no banco, não só no código da aplicação).
+--    mostrava formulário nenhum. `salvarMetasSmart` (actions.ts) agora faz
+--    um UPDATE explícito por `id` no caminho de edição (não um upsert
+--    genérico — pedido explícito do prompt de consolidação de 2026-09-30),
+--    o que PRESERVA o id e os vínculos existentes
+--    (projetos.meta_smart_id, decisoes.meta_smart_id). Este índice único
+--    (tenant_id, horizonte) é o backstop no BANCO contra corrida — nunca
+--    duplica a linha do mesmo horizonte mesmo se dois requests quase
+--    simultâneos (ex.: clique duplo) tentarem criar o mesmo horizonte ao
+--    mesmo tempo: o código trata o erro 23505 (violação deste índice)
+--    resolvendo como uma edição de verdade, não como falha.
 --
 -- 2. "Pular onboarding" não tinha estado persistido: `pularOnboarding()`
 --    manda pra /projetos, mas o Painel geral (`/`) sempre redireciona de
