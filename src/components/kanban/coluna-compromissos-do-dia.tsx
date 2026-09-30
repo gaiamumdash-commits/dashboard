@@ -1,24 +1,14 @@
 import Link from "next/link";
-import { listarCompromissosDoDia } from "@/lib/ecc/agenda";
+import { listarCompromissosDoDia, type ResultadoCompromissosDoDia } from "@/lib/ecc/agenda";
+import { listarContasDoDia } from "@/lib/ecc/financeiro";
+import { ListaContasDoDiaKanban } from "@/components/kanban/lista-contas-do-dia-kanban";
 
-/** Coluna fixa à esquerda do quadro Kanban com os compromissos de hoje de
- * quem está logado — pra planejar os cartões sabendo quanto do dia já está
- * ocupado. Server Component, montado dentro de `<Suspense>` na página: a
- * chamada ao Google não segura o resto do quadro. Sem Google conectado não
- * renderiza nada. */
-export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }) {
-  const resultado = await listarCompromissosDoDia(tenantId);
-  if (resultado.status === "oculto") return null;
-
-  const hoje = new Date().toLocaleDateString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-
+/** Extraída à parte pra o TS estreitar `resultado` (exclui "oculto") de
+ * forma confiável — dentro de um `&&` JSX aninhado o narrowing de union
+ * discriminada nem sempre se propaga pros galhos internos do ternário. */
+function BlocoCompromissos({ resultado, hoje }: { resultado: Exclude<ResultadoCompromissosDoDia, { status: "oculto" }>; hoje: string }) {
   return (
-    <div className="flex min-h-[10rem] w-[85vw] shrink-0 flex-col gap-2.5 rounded-xl border border-gaiamum-primary/40 bg-gaiamum-surface p-3 sm:min-h-[16rem] sm:w-64">
+    <>
       <div>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
           📅 Compromissos de hoje
@@ -49,6 +39,36 @@ export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }
           ))}
         </ul>
       )}
+    </>
+  );
+}
+
+/** Coluna fixa à esquerda do quadro Kanban com os compromissos de hoje de
+ * quem está logado (Google Calendar) e as contas a pagar que vencem hoje —
+ * pra planejar os cartões sabendo quanto do dia já está ocupado/pendente.
+ * Server Component, montado dentro de `<Suspense>` na página: a chamada ao
+ * Google não segura o resto do quadro. Sem Google conectado e sem conta
+ * vencendo hoje, não renderiza nada. */
+export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }) {
+  const [resultado, contasDoDia] = await Promise.all([
+    listarCompromissosDoDia(tenantId),
+    listarContasDoDia(tenantId),
+  ]);
+
+  if (resultado.status === "oculto" && contasDoDia.length === 0) return null;
+
+  const hoje = new Date().toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  return (
+    <div className="flex min-h-[10rem] w-[85vw] shrink-0 flex-col gap-2.5 rounded-xl border border-gaiamum-primary/40 bg-gaiamum-surface p-3 sm:min-h-[16rem] sm:w-64">
+      {resultado.status !== "oculto" && <BlocoCompromissos resultado={resultado} hoje={hoje} />}
+
+      <ListaContasDoDiaKanban contas={contasDoDia} />
 
       <Link href="/agenda?visao=dia" className="mt-auto text-xs text-gaiamum-text-muted underline hover:text-gaiamum-text">
         Abrir a Agenda

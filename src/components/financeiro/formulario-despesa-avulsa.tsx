@@ -11,6 +11,16 @@ const CATEGORIAS = [
   { valor: "despesa", rotulo: "Despesa" },
 ];
 
+// Opcional aqui de propósito: no lançamento muitas vezes ainda não se sabe
+// como vai pagar — o lugar normal de preencher é ao marcar como paga
+// (`<ListaContas>`), este campo é só por completude pra quem já sabe.
+const FORMAS_PAGAMENTO = [
+  { valor: "dinheiro", rotulo: "Dinheiro" },
+  { valor: "pix", rotulo: "Pix" },
+  { valor: "debito", rotulo: "Débito" },
+  { valor: "credito", rotulo: "Crédito" },
+];
+
 export function FormularioDespesaAvulsa() {
   const [erro, setErro] = useState<string | null>(null);
 
@@ -68,6 +78,22 @@ export function FormularioDespesaAvulsa() {
           {CATEGORIAS.map((c) => (
             <option key={c.valor} value={c.valor}>
               {c.rotulo}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
+        Forma de pagamento
+        <select
+          name="forma_pagamento"
+          defaultValue=""
+          className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none"
+        >
+          <option value="">Ainda não sei</option>
+          {FORMAS_PAGAMENTO.map((f) => (
+            <option key={f.valor} value={f.valor}>
+              {f.rotulo}
             </option>
           ))}
         </select>

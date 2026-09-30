@@ -30,6 +30,11 @@ export type Projeto = {
 
 export type Prioridade = "P1" | "P2" | "P3" | "P4";
 
+/** Sub-seção de uma coluna dividida em turnos (`ColunaKanban.dividida_em_turnos`).
+ * `null` = cartão fora de qualquer turno (coluna não dividida, ou ainda não
+ * classificado numa coluna recém-dividida). */
+export type Turno = "manha" | "tarde" | "noite";
+
 export type Tarefa = {
   id: string;
   tenant_id: string;
@@ -50,6 +55,9 @@ export type Tarefa = {
   aguardando_de: string | null;
   // Ponte pro Financeiro: estimativa informativa, não é o lançamento em si.
   valor_estimado: number | null;
+  // Só tem sentido quando `coluna_id` aponta pra uma coluna com
+  // `dividida_em_turnos: true` — ver comentário do tipo `Turno`.
+  turno: Turno | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -107,9 +115,15 @@ export type ColunaKanban = {
   ordem: number;
   concluido: boolean;
   criado_em: string;
+  // Coluna organizada em 3 sub-seções (Manhã/Tarde/Noite) — as tarefas dela
+  // ganham `Tarefa.turno`. Nunca `true` numa coluna `concluido` (bloqueado
+  // tanto na Server Action quanto por regra de negócio).
+  dividida_em_turnos: boolean;
 };
 
 export type CategoriaFinanceira = "consumo" | "investimento" | "despesa";
+
+export type FormaPagamento = "dinheiro" | "pix" | "debito" | "credito";
 
 export type ContaFixaModelo = {
   id: string;
@@ -138,6 +152,10 @@ export type ContaAPagar = {
   // cartão/decisão (ver "Gerar conta a pagar" em detalhe-tarefa/lista-decisoes).
   tarefa_id: string | null;
   decisao_id: string | null;
+  // Preenchida normalmente no momento de marcar como paga (não no
+  // lançamento — antes de pagar, muitas vezes ainda não se sabe como vai
+  // pagar). `null` = não informada.
+  forma_pagamento: FormaPagamento | null;
 };
 
 export type EntidadeAnexo = "conta_a_pagar" | "tarefa";

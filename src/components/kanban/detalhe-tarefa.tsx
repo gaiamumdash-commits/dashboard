@@ -12,6 +12,7 @@ import type {
   MembroTenant,
   Prioridade,
   Tarefa,
+  Turno,
 } from "@/lib/ecc/tipos";
 import { CLASSE_COR_ETIQUETA, CLASSE_FUNDO_QUADRO, paraDatetimeLocal, tocarSomConcluido } from "@/lib/ecc/kanban";
 import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
@@ -39,6 +40,11 @@ import { CampoAlarme } from "@/components/campo-alarme";
 import { GerarContaAPagar } from "@/components/financeiro/gerar-conta-a-pagar";
 
 const PRIORIDADES: Prioridade[] = ["P1", "P2", "P3", "P4"];
+const TURNOS: { valor: Turno; rotulo: string }[] = [
+  { valor: "manha", rotulo: "🌅 Manhã" },
+  { valor: "tarde", rotulo: "🌤️ Tarde" },
+  { valor: "noite", rotulo: "🌙 Noite" },
+];
 const CORES_ETIQUETA: CorEtiqueta[] = ["purple", "teal", "yellow", "blue", "coral", "lime"];
 
 export function DetalheTarefa({
@@ -283,12 +289,12 @@ export function DetalheTarefa({
     });
   }
 
-  function moverPara(novaColunaId: string) {
+  function moverPara(novaColunaId: string, novoTurno: Turno | null = null) {
     if (colunasDoProjeto.find((c) => c.id === novaColunaId)?.concluido) {
       tocarSomConcluido();
     }
     iniciarTransicao(async () => {
-      await moverTarefa(tarefa.id, projetoId, novaColunaId);
+      await moverTarefa(tarefa.id, projetoId, novaColunaId, undefined, novoTurno);
       router.refresh();
     });
   }
@@ -347,7 +353,10 @@ export function DetalheTarefa({
             Coluna
             <select
               value={tarefa.coluna_id}
-              onChange={(e) => moverPara(e.target.value)}
+              onChange={(e) => {
+                const colunaEscolhida = colunasDoProjeto.find((c) => c.id === e.target.value);
+                moverPara(e.target.value, colunaEscolhida?.dividida_em_turnos ? "manha" : null);
+              }}
               className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
             >
               {colunasDoProjeto.map((coluna) => (
@@ -357,6 +366,23 @@ export function DetalheTarefa({
               ))}
             </select>
           </label>
+
+          {colunasDoProjeto.find((c) => c.id === tarefa.coluna_id)?.dividida_em_turnos && (
+            <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
+              Turno
+              <select
+                value={tarefa.turno ?? "manha"}
+                onChange={(e) => moverPara(tarefa.coluna_id, e.target.value as Turno)}
+                className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-2 py-1.5 text-sm text-gaiamum-text outline-none"
+              >
+                {TURNOS.map((t) => (
+                  <option key={t.valor} value={t.valor}>
+                    {t.rotulo}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
             Prioridade

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
-import type { Anexo, ContaAPagar } from "@/lib/ecc/tipos";
+import type { Anexo, ContaAPagar, FormaPagamento } from "@/lib/ecc/tipos";
 import { atualizarValorEVencimento, desmarcarComoPaga, marcarComoPaga } from "@/lib/ecc/financeiro";
 import { enviarAnexoContaAPagar } from "@/lib/ecc/anexos";
 import { AnexoArquivo } from "@/components/anexo-arquivo";
@@ -14,6 +14,13 @@ const ROTULO_CATEGORIA: Record<ContaAPagar["categoria"], string> = {
   consumo: "Consumo",
   investimento: "Investimento",
   despesa: "Despesa",
+};
+
+const ROTULO_FORMA_PAGAMENTO: Record<FormaPagamento, string> = {
+  dinheiro: "Dinheiro",
+  pix: "Pix",
+  debito: "Débito",
+  credito: "Crédito",
 };
 
 function hojeISO(): string {
@@ -62,14 +69,20 @@ function Linha({
   anexos,
   antecedenciaAlarme,
   caminhoRevalidar,
+  destacada,
 }: {
   conta: ContaAPagar;
   anexos: Anexo[];
   antecedenciaAlarme: number | null;
   caminhoRevalidar: string;
+  destacada: boolean;
 }) {
   const [editandoValor, setEditandoValor] = useState(false);
   const [editandoDataPagamento, setEditandoDataPagamento] = useState(false);
+  // Ao marcar como paga pela primeira vez, pede a forma de pagamento junto —
+  // pedido do Fabio, 2026-09-29 ("clicar na conta e dizer como paguei"),
+  // vindo da integração com o cartão de "Contas de hoje" do Kanban.
+  const [escolhendoFormaPagamento, setEscolhendoFormaPagamento] = useState(false);
   const [pendente, iniciarTransicao] = useTransition();
   const router = useRouter();
 
@@ -84,31 +97,36 @@ function Linha({
     setPagoOtimista(conta.pago);
   }
 
-  function alternarPago() {
-    const eraPago = pagoOtimista;
-    setPagoOtimista(!eraPago);
+  function confirmarPagamento(formaPagamento: FormaPagamento) {
+    setEscolhendoFormaPagamento(false);
+    setPagoOtimista(true);
+    iniciarTransicao(async () => {
+      try {
+        await marcarComoPaga(conta.id, hojeISO(), formaPagamento);
+        router.refresh();
+      } catch (err) {
+        setPagoOtimista(false);
+        toast.error(mensagemDeErro(err, "Falha ao marcar como paga."));
+      }
+    });
+  }
 
-    if (eraPago) {
-      iniciarTransicao(async () => {
-        try {
-          await desmarcarComoPaga(conta.id);
-          router.refresh();
-        } catch (err) {
-          setPagoOtimista(eraPago);
-          toast.error(mensagemDeErro(err, "Falha ao desmarcar como paga."));
-        }
-      });
-    } else {
-      iniciarTransicao(async () => {
-        try {
-          await marcarComoPaga(conta.id, hojeISO());
-          router.refresh();
-        } catch (err) {
-          setPagoOtimista(eraPago);
-          toast.error(mensagemDeErro(err, "Falha ao marcar como paga."));
-        }
-      });
+  function alternarPago() {
+    if (!pagoOtimista) {
+      setEscolhendoFormaPagamento(true);
+      return;
     }
+
+    setPagoOtimista(false);
+    iniciarTransicao(async () => {
+      try {
+        await desmarcarComoPaga(conta.id);
+        router.refresh();
+      } catch (err) {
+        setPagoOtimista(true);
+        toast.error(mensagemDeErro(err, "Falha ao desmarcar como paga."));
+      }
+    });
   }
 
   const vencida = !pagoOtimista && conta.data_vencimento < hojeISO();
@@ -120,7 +138,12 @@ function Linha({
       : "bg-gaiamum-surface-raised text-gaiamum-text-muted";
 
   return (
-    <div className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-4">
+    <div
+      id={`conta-${conta.id}`}
+      className={`rounded-2xl border bg-gaiamum-surface p-4 transition ${
+        destacada ? "border-gaiamum-primary ring-2 ring-gaiamum-primary" : "border-gaiamum-border"
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-medium text-gaiamum-text">{conta.nome}</span>
         <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusClasse}`}>
@@ -212,61 +235,130 @@ function Linha({
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-gaiamum-border pt-3">
-        <div className="flex flex-col">
-          <span className="text-sm text-gaiamum-text">Marcar como pago</span>
-          {conta.pago && conta.data_pagamento && !editandoDataPagamento && (
-            <button
-              type="button"
-              onClick={() => setEditandoDataPagamento(true)}
-              className="text-left text-xs text-gaiamum-primary hover:underline"
-              title="Clique pra corrigir a data de pagamento"
-            >
-              Pago em {formatarData(conta.data_pagamento)}
-            </button>
-          )}
-          {conta.pago && editandoDataPagamento && (
-            <input
-              type="date"
-              autoFocus
-              defaultValue={conta.data_pagamento ?? hojeISO()}
-              onBlur={(e) => {
-                setEditandoDataPagamento(false);
-                const novaData = e.currentTarget.value;
-                if (novaData) {
+      {escolhendoFormaPagamento ? (
+        <form
+          className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gaiamum-primary bg-gaiamum-surface-raised p-3"
+          action={(formData) => confirmarPagamento(formData.get("forma_pagamento") as FormaPagamento)}
+        >
+          <span className="text-xs text-gaiamum-text-muted">Como você pagou?</span>
+          <select
+            name="forma_pagamento"
+            autoFocus
+            required
+            defaultValue=""
+            className="rounded border border-gaiamum-primary bg-gaiamum-surface px-2 py-1 text-xs text-gaiamum-text outline-none"
+          >
+            <option value="" disabled>
+              Escolha...
+            </option>
+            {Object.entries(ROTULO_FORMA_PAGAMENTO).map(([valor, rotulo]) => (
+              <option key={valor} value={valor}>
+                {rotulo}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="text-xs font-medium text-gaiamum-primary hover:underline">
+            Confirmar pagamento
+          </button>
+          <button
+            type="button"
+            onClick={() => setEscolhendoFormaPagamento(false)}
+            className="text-xs text-gaiamum-text-muted hover:text-gaiamum-text"
+          >
+            Cancelar
+          </button>
+        </form>
+      ) : (
+        <div className="mt-3 flex items-center justify-between border-t border-gaiamum-border pt-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm text-gaiamum-text">Marcar como pago</span>
+            {conta.pago && conta.data_pagamento && !editandoDataPagamento && (
+              <button
+                type="button"
+                onClick={() => setEditandoDataPagamento(true)}
+                className="text-left text-xs text-gaiamum-primary hover:underline"
+                title="Clique pra corrigir a data de pagamento"
+              >
+                Pago em {formatarData(conta.data_pagamento)}
+              </button>
+            )}
+            {conta.pago && editandoDataPagamento && (
+              <input
+                type="date"
+                autoFocus
+                defaultValue={conta.data_pagamento ?? hojeISO()}
+                onBlur={(e) => {
+                  setEditandoDataPagamento(false);
+                  const novaData = e.currentTarget.value;
+                  if (novaData) {
+                    iniciarTransicao(async () => {
+                      try {
+                        await marcarComoPaga(conta.id, novaData);
+                        router.refresh();
+                      } catch (err) {
+                        toast.error(mensagemDeErro(err, "Falha ao corrigir data de pagamento."));
+                      }
+                    });
+                  }
+                }}
+                className="mt-1 rounded border border-gaiamum-primary bg-gaiamum-surface px-2 py-0.5 text-xs text-gaiamum-text outline-none"
+              />
+            )}
+            {conta.pago && (
+              <select
+                value={conta.forma_pagamento ?? ""}
+                onChange={(e) => {
+                  const forma = (e.target.value || null) as FormaPagamento | null;
                   iniciarTransicao(async () => {
                     try {
-                      await marcarComoPaga(conta.id, novaData);
+                      await marcarComoPaga(conta.id, conta.data_pagamento ?? hojeISO(), forma);
                       router.refresh();
                     } catch (err) {
-                      toast.error(mensagemDeErro(err, "Falha ao corrigir data de pagamento."));
+                      toast.error(mensagemDeErro(err, "Falha ao salvar forma de pagamento."));
                     }
                   });
-                }
-              }}
-              className="mt-1 rounded border border-gaiamum-primary bg-gaiamum-surface px-2 py-0.5 text-xs text-gaiamum-text outline-none"
-            />
-          )}
+                }}
+                className="w-fit rounded border border-gaiamum-border bg-transparent px-1 py-0.5 text-xs text-gaiamum-text-muted outline-none"
+                title="Como foi pago"
+              >
+                <option value="">Forma de pagamento…</option>
+                {Object.entries(ROTULO_FORMA_PAGAMENTO).map(([valor, rotulo]) => (
+                  <option key={valor} value={valor}>
+                    {rotulo}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <Interruptor ligado={pagoOtimista} onClick={alternarPago} disabled={pendente} />
         </div>
-        <Interruptor ligado={pagoOtimista} onClick={alternarPago} disabled={pendente} />
-      </div>
+      )}
     </div>
   );
 }
 
-export function ListaContas({
-  contas,
-  anexosPorConta,
-  alarmePorConta,
-  caminhoRevalidar,
-  mensagemVazio,
-}: {
+type PropsListaContas = {
   contas: ContaAPagar[];
   anexosPorConta: Record<string, Anexo[]>;
   alarmePorConta: Record<string, number>;
   caminhoRevalidar: string;
   mensagemVazio: string;
-}) {
+};
+
+/** `useSearchParams` só funciona dentro de um limite de Suspense no App
+ * Router (senão o build falha) — isolado aqui pra `ListaContas` não exigir
+ * que toda página que a usa lembre de envolver num `<Suspense>` externo. */
+function ListaContasComDestaque({ contas, anexosPorConta, alarmePorConta, caminhoRevalidar, mensagemVazio }: PropsListaContas) {
+  // Chegando de um clique na coluna "Contas de hoje" do Kanban
+  // (`?destacar=<id>`) — rola até o card certo e dá um destaque temporário,
+  // pra quem tem várias contas no mês não precisar procurar qual é.
+  const contaDestacada = useSearchParams().get("destacar");
+
+  useEffect(() => {
+    if (!contaDestacada) return;
+    document.getElementById(`conta-${contaDestacada}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [contaDestacada]);
+
   if (contas.length === 0) {
     return <p className="text-sm text-gaiamum-text-muted">{mensagemVazio}</p>;
   }
@@ -280,6 +372,39 @@ export function ListaContas({
           anexos={anexosPorConta[conta.id] ?? []}
           antecedenciaAlarme={alarmePorConta[conta.id] ?? null}
           caminhoRevalidar={caminhoRevalidar}
+          destacada={conta.id === contaDestacada}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function ListaContas(props: PropsListaContas) {
+  return (
+    <Suspense fallback={<ListaContasSemDestaque {...props} />}>
+      <ListaContasComDestaque {...props} />
+    </Suspense>
+  );
+}
+
+/** Fallback do Suspense acima — mesma lista, sem depender de `useSearchParams`.
+ * Client components resolvem search params de forma síncrona no navegador,
+ * então na prática este fallback quase nunca chega a ser visto. */
+function ListaContasSemDestaque({ contas, anexosPorConta, alarmePorConta, caminhoRevalidar, mensagemVazio }: PropsListaContas) {
+  if (contas.length === 0) {
+    return <p className="text-sm text-gaiamum-text-muted">{mensagemVazio}</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {contas.map((conta) => (
+        <Linha
+          key={conta.id}
+          conta={conta}
+          anexos={anexosPorConta[conta.id] ?? []}
+          antecedenciaAlarme={alarmePorConta[conta.id] ?? null}
+          caminhoRevalidar={caminhoRevalidar}
+          destacada={false}
         />
       ))}
     </div>

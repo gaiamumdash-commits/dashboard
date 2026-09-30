@@ -4,9 +4,10 @@ import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
-import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
+import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro, Turno } from "@/lib/ecc/tipos";
 import { calcularNovaOrdem, tocarSomConcluido } from "@/lib/ecc/kanban";
 import {
+  alternarDivisaoEmTurnos,
   criarColuna,
   criarTarefa,
   deletarTarefa,
@@ -15,6 +16,12 @@ import {
   renomearColuna,
   reordenarColunas,
 } from "@/lib/ecc/actions";
+
+const TURNOS: { valor: Turno; rotulo: string }[] = [
+  { valor: "manha", rotulo: "🌅 Manhã" },
+  { valor: "tarde", rotulo: "🌤️ Tarde" },
+  { valor: "noite", rotulo: "🌙 Noite" },
+];
 import { DetalheTarefa } from "@/components/kanban/detalhe-tarefa";
 import { CartaoTarefa } from "@/components/kanban/cartao-tarefa";
 import { BarraProgresso } from "@/components/ui/barra-progresso";
@@ -89,24 +96,31 @@ export function QuadroKanban({
   // Solto na área vazia da coluna (não em cima de um cartão específico) —
   // vai pro fim dela. `soltarSobreCartao` abaixo cobre o caso de reordenar
   // em cima de um cartão específico (inclusive dentro da mesma coluna).
-  function moverPara(tarefaId: string, novaColunaId: string) {
+  function moverPara(tarefaId: string, novaColunaId: string, novoTurno: Turno | null = null) {
     if (colunasIniciais.find((c) => c.id === novaColunaId)?.concluido) {
       tocarSomConcluido();
     }
     const tarefaAtual = tarefas.find((t) => t.id === tarefaId);
     const colunaAnterior = tarefaAtual?.coluna_id;
     const ordemAnterior = tarefaAtual?.ordem;
+    const turnoAnterior = tarefaAtual?.turno ?? null;
     const ordensDaColunaAlvo = tarefas
-      .filter((t) => t.coluna_id === novaColunaId && t.id !== tarefaId)
+      .filter((t) => t.coluna_id === novaColunaId && t.turno === novoTurno && t.id !== tarefaId)
       .map((t) => t.ordem);
     const novaOrdem = calcularNovaOrdem(ordensDaColunaAlvo.length > 0 ? Math.max(...ordensDaColunaAlvo) : null, null);
 
-    setTarefas((atual) => atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: novaColunaId, ordem: novaOrdem } : t)));
+    setTarefas((atual) =>
+      atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: novaColunaId, ordem: novaOrdem, turno: novoTurno } : t)),
+    );
     iniciarTransicao(() => {
-      moverTarefa(tarefaId, projetoId, novaColunaId, novaOrdem).catch((err) => {
+      moverTarefa(tarefaId, projetoId, novaColunaId, novaOrdem, novoTurno).catch((err) => {
         if (colunaAnterior) {
           setTarefas((atual) =>
-            atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: colunaAnterior, ordem: ordemAnterior ?? t.ordem } : t)),
+            atual.map((t) =>
+              t.id === tarefaId
+                ? { ...t, coluna_id: colunaAnterior, ordem: ordemAnterior ?? t.ordem, turno: turnoAnterior }
+                : t,
+            ),
           );
         }
         toast.error(mensagemDeErro(err, "Falha ao mover cartão."));
@@ -121,13 +135,14 @@ export function QuadroKanban({
     if (tarefaArrastadaId === tarefaAlvoId) return;
     const tarefaAlvo = tarefas.find((t) => t.id === tarefaAlvoId);
     if (!tarefaAlvo) return;
+    const turnoAlvo = tarefaAlvo.turno ?? null;
 
     if (colunasIniciais.find((c) => c.id === tarefaAlvo.coluna_id)?.concluido) {
       tocarSomConcluido();
     }
 
     const ordenadasDaColunaAlvo = tarefas
-      .filter((t) => t.coluna_id === tarefaAlvo.coluna_id && t.id !== tarefaArrastadaId)
+      .filter((t) => t.coluna_id === tarefaAlvo.coluna_id && t.turno === turnoAlvo && t.id !== tarefaArrastadaId)
       .sort((a, b) => a.ordem - b.ordem);
     const indiceAlvo = ordenadasDaColunaAlvo.findIndex((t) => t.id === tarefaAlvoId);
     if (indiceAlvo === -1) return;
@@ -141,16 +156,21 @@ export function QuadroKanban({
     const tarefaArrastada = tarefas.find((t) => t.id === tarefaArrastadaId);
     const colunaAnterior = tarefaArrastada?.coluna_id;
     const ordemAnterior = tarefaArrastada?.ordem;
+    const turnoAnterior = tarefaArrastada?.turno ?? null;
 
     setTarefas((atual) =>
-      atual.map((t) => (t.id === tarefaArrastadaId ? { ...t, coluna_id: tarefaAlvo.coluna_id, ordem: novaOrdem } : t)),
+      atual.map((t) =>
+        t.id === tarefaArrastadaId ? { ...t, coluna_id: tarefaAlvo.coluna_id, ordem: novaOrdem, turno: turnoAlvo } : t,
+      ),
     );
     iniciarTransicao(() => {
-      moverTarefa(tarefaArrastadaId, projetoId, tarefaAlvo.coluna_id, novaOrdem).catch((err) => {
+      moverTarefa(tarefaArrastadaId, projetoId, tarefaAlvo.coluna_id, novaOrdem, turnoAlvo).catch((err) => {
         if (colunaAnterior) {
           setTarefas((atual) =>
             atual.map((t) =>
-              t.id === tarefaArrastadaId ? { ...t, coluna_id: colunaAnterior, ordem: ordemAnterior ?? t.ordem } : t,
+              t.id === tarefaArrastadaId
+                ? { ...t, coluna_id: colunaAnterior, ordem: ordemAnterior ?? t.ordem, turno: turnoAnterior }
+                : t,
             ),
           );
         }
@@ -175,7 +195,7 @@ export function QuadroKanban({
   // de moverPara/excluir acima. Os ids nascem no cliente (crypto.randomUUID)
   // e vão junto pro insert, então o otimista e o real são a mesma linha, sem
   // precisar reconciliar depois. Se a Server Action falhar, desfaz.
-  function criarCartaoOtimista(colunaId: string, tituloBruto: string) {
+  function criarCartaoOtimista(colunaId: string, tituloBruto: string, turno: Turno | null = null) {
     const titulos = tituloBruto
       .split("\n")
       .map((linha) => linha.trim())
@@ -184,7 +204,7 @@ export function QuadroKanban({
 
     const ids = titulos.map(() => crypto.randomUUID());
     const agora = new Date().toISOString();
-    const ordensDaColuna = tarefas.filter((t) => t.coluna_id === colunaId).map((t) => t.ordem);
+    const ordensDaColuna = tarefas.filter((t) => t.coluna_id === colunaId && t.turno === turno).map((t) => t.ordem);
     const ordemBase = ordensDaColuna.length > 0 ? Math.max(...ordensDaColuna) : 0;
     const novas: Tarefa[] = titulos.map((titulo, indice) => ({
       id: ids[indice],
@@ -203,6 +223,7 @@ export function QuadroKanban({
       criado_em: agora,
       aguardando_de: null,
       valor_estimado: null,
+      turno,
     }));
 
     setTarefas((atual) => [...atual, ...novas]);
@@ -210,7 +231,7 @@ export function QuadroKanban({
     const formData = new FormData();
     formData.set("titulo", tituloBruto);
     iniciarTransicao(() => {
-      criarTarefa(projetoId, colunaId, formData, ids).catch((err) => {
+      criarTarefa(projetoId, colunaId, formData, ids, turno).catch((err) => {
         setTarefas((atual) => atual.filter((t) => !ids.includes(t.id)));
         toast.error(mensagemDeErro(err, "Falha ao criar tarefa."));
       });
@@ -249,6 +270,7 @@ export function QuadroKanban({
       ordem: colunasAbertas.length,
       concluido: false,
       criado_em: new Date().toISOString(),
+      dividida_em_turnos: false,
     };
     setColunas((atual) => [...colunasAbertas, novaColuna, ...atual.filter((c) => c.concluido)]);
     setCriandoColuna(false);
@@ -292,12 +314,15 @@ export function QuadroKanban({
   function moverArrastoToque(x: number, y: number) {
     setArrastoToque((atual) => (atual ? { ...atual, x, y } : atual));
     const elemento = document.elementFromPoint(x, y);
+    // Numa coluna dividida em turnos, cada sub-seção tem `data-turno` além
+    // de `data-coluna-id` (no mesmo elemento) — uma coluna normal só tem
+    // `data-coluna-id`. Buscar por `[data-coluna-id]` cobre os dois casos.
     const colunaEl = elemento?.closest<HTMLElement>("[data-coluna-id]");
     setColunaAlvoToqueId(colunaEl?.dataset.colunaId ?? null);
   }
 
   function soltarArrastoToque(x: number, y: number) {
-    // Recalcula a coluna-alvo na hora, em vez de reaproveitar
+    // Recalcula a coluna-alvo (e o turno) na hora, em vez de reaproveitar
     // `colunaAlvoToqueId` do estado: um arrasto rápido pode disparar
     // touchend antes do React re-renderizar o último touchmove (setState
     // fora de handler sintético é batched/assíncrono), o que deixaria essa
@@ -305,11 +330,34 @@ export function QuadroKanban({
     // não tem esse risco — só é definido uma vez, no início do arrasto.
     if (arrastoToque) {
       const elemento = document.elementFromPoint(x, y);
-      const colunaId = elemento?.closest<HTMLElement>("[data-coluna-id]")?.dataset.colunaId;
-      if (colunaId) moverPara(arrastoToque.tarefaId, colunaId);
+      const alvo = elemento?.closest<HTMLElement>("[data-coluna-id]");
+      if (alvo?.dataset.colunaId) {
+        moverPara(arrastoToque.tarefaId, alvo.dataset.colunaId, (alvo.dataset.turno as Turno | undefined) ?? null);
+      }
     }
     setArrastoToque(null);
     setColunaAlvoToqueId(null);
+  }
+
+  /** Liga/desliga a divisão de uma coluna em turnos — mesmo padrão otimista
+   * das demais ações de coluna. Ao desligar, limpa `turno` das tarefas dessa
+   * coluna no estado local também (a Server Action já faz isso no banco),
+   * senão os cartões só voltariam a aparecer juntos depois do próximo
+   * `router.refresh()` — decisão já tomada com o Fabio: nada se perde. */
+  function alternarDivisaoTurnosOtimista(colunaId: string, dividida: boolean) {
+    const tarefasAnteriores = tarefas;
+    setColunas((atual) => atual.map((c) => (c.id === colunaId ? { ...c, dividida_em_turnos: dividida } : c)));
+    if (!dividida) {
+      setTarefas((atual) => atual.map((t) => (t.coluna_id === colunaId ? { ...t, turno: null } : t)));
+    }
+
+    iniciarTransicao(() => {
+      alternarDivisaoEmTurnos(colunaId, projetoId, dividida).catch((err) => {
+        setColunas((atual) => atual.map((c) => (c.id === colunaId ? { ...c, dividida_em_turnos: !dividida } : c)));
+        if (!dividida) setTarefas(tarefasAnteriores);
+        toast.error(mensagemDeErro(err, "Falha ao atualizar a divisão em turnos."));
+      });
+    });
   }
 
   function apagarColuna(colunaId: string) {
@@ -338,6 +386,54 @@ export function QuadroKanban({
   function renderColuna(coluna: ColunaKanban, ehFixa: boolean) {
     const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id).sort((a, b) => a.ordem - b.ordem);
 
+    function renderCartoes(tarefasDoEscopo: Tarefa[]) {
+      return tarefasDoEscopo.map((tarefa) => {
+        const membrosDaTarefa = tarefaMembrosIniciais.filter((m) => m.tarefa_id === tarefa.id);
+        const souResponsavel = Boolean(usuarioAtualId && membrosDaTarefa.some((m) => m.user_id === usuarioAtualId));
+
+        return (
+          <CartaoTarefa
+            key={tarefa.id}
+            tarefa={tarefa}
+            coluna={coluna}
+            projetoId={projetoId}
+            checklistDaTarefa={checklistItensIniciais.filter((c) => c.tarefa_id === tarefa.id)}
+            anexosDaTarefa={anexosIniciais.filter((a) => a.entidade_id === tarefa.id)}
+            membrosDaTarefa={membrosDaTarefa}
+            membrosDoTenant={membrosDoTenant}
+            etiquetasDaTarefa={tarefaEtiquetasIniciais.filter((te) => te.tarefa_id === tarefa.id)}
+            etiquetasDoTenant={etiquetasDoTenant}
+            souResponsavel={souResponsavel}
+            podeExcluir={podeExcluirTarefa}
+            onAbrir={() => setTarefaAbertaId(tarefa.id)}
+            onExcluir={() => excluir(tarefa.id)}
+            aoIniciarArrastoToque={(x, y) => iniciarArrastoToque(tarefa.id, tarefa.titulo, x, y)}
+            aoMoverToque={moverArrastoToque}
+            aoSoltarToque={soltarArrastoToque}
+            emArrastoToque={arrastoToque?.tarefaId === tarefa.id}
+            aoSoltarSobre={(tarefaArrastadaId, posicao) => soltarSobreCartao(tarefaArrastadaId, tarefa.id, posicao)}
+          />
+        );
+      });
+    }
+
+    function renderInputNovoCartao(turno: Turno | null) {
+      return (
+        <input
+          name="titulo"
+          placeholder="+ Adicionar cartão"
+          title="💡 GTD: se leva menos de 2 minutos, resolva agora — nem precisa virar cartão."
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            criarCartaoOtimista(coluna.id, e.currentTarget.value, turno);
+            e.currentTarget.value = "";
+          }}
+          className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-gaiamum-text-muted outline-none transition hover:border-gaiamum-border focus:border-gaiamum-primary focus:bg-gaiamum-surface-raised focus:text-gaiamum-text"
+        />
+      );
+    }
+
     return (
       <div
         key={coluna.id}
@@ -349,8 +445,13 @@ export function QuadroKanban({
             soltarColuna(coluna.id);
             return;
           }
-          const tarefaId = e.dataTransfer.getData("text/tarefa-id");
-          if (tarefaId) moverPara(tarefaId, coluna.id);
+          // Numa coluna dividida, quem trata o drop de tarefa é a sub-seção
+          // do turno (abaixo, com `stopPropagation`) — aqui só sobra o caso
+          // de soltar na "moldura" da coluna, fora de qualquer turno.
+          if (!coluna.dividida_em_turnos) {
+            const tarefaId = e.dataTransfer.getData("text/tarefa-id");
+            if (tarefaId) moverPara(tarefaId, coluna.id);
+          }
         }}
         className={`flex min-h-[16rem] w-64 shrink-0 flex-col gap-2.5 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3 transition ${
           colunaArrastadaId === coluna.id ? "opacity-50" : ""
@@ -386,61 +487,68 @@ export function QuadroKanban({
               {coluna.nome} <span className="text-gaiamum-text">({tarefasDaColuna.length})</span>
             </h2>
           )}
-          {!ehFixa && podeExcluirTarefa && colunaEditandoId !== coluna.id && (
-            <button
-              type="button"
-              onClick={() => apagarColuna(coluna.id)}
-              className="shrink-0 text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-              title="Excluir coluna"
-            >
-              ✕
-            </button>
+          {!ehFixa && (
+            <div className="flex shrink-0 items-center gap-2">
+              {colunaEditandoId !== coluna.id && (
+                <button
+                  type="button"
+                  onClick={() => alternarDivisaoTurnosOtimista(coluna.id, !coluna.dividida_em_turnos)}
+                  className={`text-xs ${
+                    coluna.dividida_em_turnos
+                      ? "text-gaiamum-primary hover:text-gaiamum-primary-dark"
+                      : "text-gaiamum-text-muted hover:text-gaiamum-text"
+                  }`}
+                  title={coluna.dividida_em_turnos ? "Desfazer divisão em Manhã/Tarde/Noite" : "Dividir em Manhã/Tarde/Noite"}
+                >
+                  ▥
+                </button>
+              )}
+              {podeExcluirTarefa && colunaEditandoId !== coluna.id && (
+                <button
+                  type="button"
+                  onClick={() => apagarColuna(coluna.id)}
+                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
+                  title="Excluir coluna"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        {tarefasDaColuna.map((tarefa) => {
-          const membrosDaTarefa = tarefaMembrosIniciais.filter((m) => m.tarefa_id === tarefa.id);
-          const souResponsavel = Boolean(
-            usuarioAtualId && membrosDaTarefa.some((m) => m.user_id === usuarioAtualId),
-          );
-
-          return (
-            <CartaoTarefa
-              key={tarefa.id}
-              tarefa={tarefa}
-              coluna={coluna}
-              projetoId={projetoId}
-              checklistDaTarefa={checklistItensIniciais.filter((c) => c.tarefa_id === tarefa.id)}
-              anexosDaTarefa={anexosIniciais.filter((a) => a.entidade_id === tarefa.id)}
-              membrosDaTarefa={membrosDaTarefa}
-              membrosDoTenant={membrosDoTenant}
-              etiquetasDaTarefa={tarefaEtiquetasIniciais.filter((te) => te.tarefa_id === tarefa.id)}
-              etiquetasDoTenant={etiquetasDoTenant}
-              souResponsavel={souResponsavel}
-              podeExcluir={podeExcluirTarefa}
-              onAbrir={() => setTarefaAbertaId(tarefa.id)}
-              onExcluir={() => excluir(tarefa.id)}
-              aoIniciarArrastoToque={(x, y) => iniciarArrastoToque(tarefa.id, tarefa.titulo, x, y)}
-              aoMoverToque={moverArrastoToque}
-              aoSoltarToque={soltarArrastoToque}
-              emArrastoToque={arrastoToque?.tarefaId === tarefa.id}
-              aoSoltarSobre={(tarefaArrastadaId, posicao) => soltarSobreCartao(tarefaArrastadaId, tarefa.id, posicao)}
-            />
-          );
-        })}
-
-        <input
-          name="titulo"
-          placeholder="+ Adicionar cartão"
-          title="💡 GTD: se leva menos de 2 minutos, resolva agora — nem precisa virar cartão."
-          onKeyDown={(e) => {
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            criarCartaoOtimista(coluna.id, e.currentTarget.value);
-            e.currentTarget.value = "";
-          }}
-          className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-gaiamum-text-muted outline-none transition hover:border-gaiamum-border focus:border-gaiamum-primary focus:bg-gaiamum-surface-raised focus:text-gaiamum-text"
-        />
+        {coluna.dividida_em_turnos ? (
+          <div className="flex flex-col gap-3">
+            {TURNOS.map(({ valor, rotulo }) => {
+              const tarefasDoTurno = tarefasDaColuna.filter((t) => (t.turno ?? null) === valor);
+              return (
+                <div
+                  key={valor}
+                  data-coluna-id={coluna.id}
+                  data-turno={valor}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.stopPropagation();
+                    const tarefaId = e.dataTransfer.getData("text/tarefa-id");
+                    if (tarefaId) moverPara(tarefaId, coluna.id, valor);
+                  }}
+                  className="flex flex-col gap-2 rounded-lg border border-dashed border-gaiamum-border p-2"
+                >
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gaiamum-text-muted">
+                    {rotulo} <span className="text-gaiamum-text">({tarefasDoTurno.length})</span>
+                  </h3>
+                  {renderCartoes(tarefasDoTurno)}
+                  {renderInputNovoCartao(valor)}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <>
+            {renderCartoes(tarefasDaColuna)}
+            {renderInputNovoCartao(null)}
+          </>
+        )}
       </div>
     );
   }

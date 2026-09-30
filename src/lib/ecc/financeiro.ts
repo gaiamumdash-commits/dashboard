@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
-import type { CategoriaFinanceira } from "@/lib/ecc/tipos";
+import { ANTECEDENCIA_MIN_VESPERA_CONTA_A_PAGAR, FUSO_BRASIL } from "@/lib/ecc/kanban";
+import type { CategoriaFinanceira, ContaAPagar, FormaPagamento } from "@/lib/ecc/tipos";
 
 function campoObrigatorio(formData: FormData, nome: string): string {
   const valor = formData.get(nome);
@@ -22,6 +23,37 @@ async function exigirOwner(tenantId: string) {
 
 function primeiroDiaDoMes(dataISO: string): string {
   return `${dataISO.slice(0, 7)}-01`;
+}
+
+/** Cria automaticamente o alarme de "véspera" (ver `ANTECEDENCIA_MIN_VESPERA_CONTA_A_PAGAR`)
+ * pra uma conta a pagar recém-criada — pedido do Fabio, 2026-09-29: nenhuma
+ * conta deveria vencer "de surpresa", o alarme (e o e-mail que ele já dispara
+ * via `disparar-alarmes`, sistema existente) sai de fábrica em toda conta
+ * nova. Silencioso em erro: uma falha aqui não deve derrubar o lançamento da
+ * despesa, só fica sem o aviso automático (o Fabio ainda pode configurar um
+ * manualmente pelo `<CampoAlarme>`). */
+async function criarAlarmeVesperaAutomatico(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  contaId: string,
+) {
+  const user = await obterUsuarioAtual();
+  if (!user) return;
+
+  const { error } = await supabase.from("alarmes").upsert(
+    {
+      tenant_id: tenantId,
+      entidade_tipo: "conta_a_pagar",
+      entidade_id: contaId,
+      antecedencia_min: ANTECEDENCIA_MIN_VESPERA_CONTA_A_PAGAR,
+      criado_por: user.id,
+    },
+    { onConflict: "entidade_tipo,entidade_id" },
+  );
+
+  if (error) {
+    console.error(`Falha ao criar alarme automático da conta ${contaId}:`, error);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -87,24 +119,34 @@ export async function criarDespesaAvulsa(formData: FormData) {
   const valor = Number(campoObrigatorio(formData, "valor"));
   const categoria = campoObrigatorio(formData, "categoria") as CategoriaFinanceira;
   const dataVencimento = campoObrigatorio(formData, "data_vencimento");
+  // Opcional — na maioria das vezes só se sabe como vai pagar no momento de
+  // marcar como paga, não no lançamento (ver `marcarComoPaga`).
+  const formaPagamento = (formData.get("forma_pagamento") as string | null) || null;
 
   if (!Number.isFinite(valor) || valor <= 0) {
     throw new Error("Valor inválido.");
   }
 
-  const { error } = await supabase.from("contas_a_pagar").insert({
-    tenant_id: tenantId,
-    conta_fixa_id: null,
-    nome,
-    valor,
-    categoria,
-    mes_referencia: primeiroDiaDoMes(dataVencimento),
-    data_vencimento: dataVencimento,
-  });
+  const { data: contaCriada, error } = await supabase
+    .from("contas_a_pagar")
+    .insert({
+      tenant_id: tenantId,
+      conta_fixa_id: null,
+      nome,
+      valor,
+      categoria,
+      mes_referencia: primeiroDiaDoMes(dataVencimento),
+      data_vencimento: dataVencimento,
+      forma_pagamento: formaPagamento as FormaPagamento | null,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     throw new Error(`Falha ao lançar despesa: ${error.message}`);
   }
+
+  await criarAlarmeVesperaAutomatico(supabase, tenantId, contaCriada.id);
 
   revalidatePath("/financeiro");
   revalidatePath("/financeiro/avulsas");
@@ -128,16 +170,20 @@ export async function gerarContaAPagarDaTarefa(tarefaId: string, projetoId: stri
     throw new Error("Valor inválido.");
   }
 
-  const { error } = await supabase.from("contas_a_pagar").insert({
-    tenant_id: tenantId,
-    conta_fixa_id: null,
-    tarefa_id: tarefaId,
-    nome,
-    valor,
-    categoria,
-    mes_referencia: primeiroDiaDoMes(dataVencimento),
-    data_vencimento: dataVencimento,
-  });
+  const { data: contaCriada, error } = await supabase
+    .from("contas_a_pagar")
+    .insert({
+      tenant_id: tenantId,
+      conta_fixa_id: null,
+      tarefa_id: tarefaId,
+      nome,
+      valor,
+      categoria,
+      mes_referencia: primeiroDiaDoMes(dataVencimento),
+      data_vencimento: dataVencimento,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     if (error.code === "23505") {
@@ -145,6 +191,8 @@ export async function gerarContaAPagarDaTarefa(tarefaId: string, projetoId: stri
     }
     throw new Error(`Falha ao lançar despesa: ${error.message}`);
   }
+
+  await criarAlarmeVesperaAutomatico(supabase, tenantId, contaCriada.id);
 
   revalidatePath("/financeiro");
   revalidatePath("/financeiro/avulsas");
@@ -168,16 +216,20 @@ export async function gerarContaAPagarDaDecisao(decisaoId: string, projetoId: st
     throw new Error("Valor inválido.");
   }
 
-  const { error } = await supabase.from("contas_a_pagar").insert({
-    tenant_id: tenantId,
-    conta_fixa_id: null,
-    decisao_id: decisaoId,
-    nome,
-    valor,
-    categoria,
-    mes_referencia: primeiroDiaDoMes(dataVencimento),
-    data_vencimento: dataVencimento,
-  });
+  const { data: contaCriada, error } = await supabase
+    .from("contas_a_pagar")
+    .insert({
+      tenant_id: tenantId,
+      conta_fixa_id: null,
+      decisao_id: decisaoId,
+      nome,
+      valor,
+      categoria,
+      mes_referencia: primeiroDiaDoMes(dataVencimento),
+      data_vencimento: dataVencimento,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     if (error.code === "23505") {
@@ -185,6 +237,8 @@ export async function gerarContaAPagarDaDecisao(decisaoId: string, projetoId: st
     }
     throw new Error(`Falha ao lançar despesa: ${error.message}`);
   }
+
+  await criarAlarmeVesperaAutomatico(supabase, tenantId, contaCriada.id);
 
   revalidatePath("/financeiro");
   revalidatePath("/financeiro/avulsas");
@@ -219,14 +273,21 @@ export async function atualizarValorEVencimento(contaId: string, valor: number, 
   revalidatePath("/financeiro/avulsas");
 }
 
-export async function marcarComoPaga(contaId: string, dataPagamento: string) {
+export async function marcarComoPaga(contaId: string, dataPagamento: string, formaPagamento?: FormaPagamento | null) {
   const tenantId = await garantirWorkspace();
   await exigirOwner(tenantId);
   const supabase = await createClient();
 
   const { error } = await supabase
     .from("contas_a_pagar")
-    .update({ pago: true, data_pagamento: dataPagamento })
+    .update({
+      pago: true,
+      data_pagamento: dataPagamento,
+      // `undefined` (parâmetro não informado, ex.: correção rápida de data
+      // numa conta já paga) não sobrescreve o que já estava salvo; só `null`
+      // explícito limpa.
+      ...(formaPagamento !== undefined ? { forma_pagamento: formaPagamento } : {}),
+    })
     .eq("id", contaId);
 
   if (error) {
@@ -255,4 +316,33 @@ export async function desmarcarComoPaga(contaId: string) {
   revalidatePath("/financeiro");
   revalidatePath("/financeiro/fixas");
   revalidatePath("/financeiro/avulsas");
+}
+
+/** Contas a pagar (fixas ou avulsas) que vencem HOJE e ainda não foram
+ * pagas — usado pela coluna "Compromissos de hoje" do Kanban pra destacar,
+ * ao lado dos compromissos do Google, o que precisa ser resolvido no dia
+ * (pedido do Fabio, 2026-09-29). Financeiro é owner-only: quem não é owner
+ * do workspace nunca vê nada aqui (a RLS de `contas_a_pagar` já garante
+ * isso, mas checar o papel antes evita uma query owner-only inútil pra
+ * quem não vai ver resultado nenhum). */
+export async function listarContasDoDia(tenantId: string): Promise<ContaAPagar[]> {
+  if ((await obterPapelAtual(tenantId)) !== "owner") return [];
+
+  const supabase = await createClient();
+  const hojeISO = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO_BRASIL }).format(new Date());
+
+  const { data, error } = await supabase
+    .from("contas_a_pagar")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("data_vencimento", hojeISO)
+    .eq("pago", false)
+    .order("valor", { ascending: false });
+
+  if (error) {
+    console.error("Falha ao listar contas do dia:", error);
+    return [];
+  }
+
+  return (data as ContaAPagar[] | null) ?? [];
 }

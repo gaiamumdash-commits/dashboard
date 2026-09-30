@@ -131,6 +131,13 @@ export function paraUtcDoFuso(dataHoraLocal: string, fuso: string): Date {
   return new Date(2 * chuteUtc - comoNoFuso);
 }
 
+/** Antecedência (minutos) do alarme automático de "véspera" criado pra toda
+ * conta a pagar nova (avulsa ou gerada de conta fixa) — pedido do Fabio,
+ * 2026-09-29. A referência do alarme é meia-noite do dia do vencimento
+ * (ver `disparar-alarmes/route.ts`), então 360min (6h) faz o e-mail sair às
+ * 18h do dia anterior — a "véspera" de verdade, não de madrugada. */
+export const ANTECEDENCIA_MIN_VESPERA_CONTA_A_PAGAR = 360;
+
 export type UrgenciaPrazo = "atrasado" | "proximo" | "ok" | "sem_prazo";
 
 export const CLASSE_PRAZO: Record<UrgenciaPrazo, string> = {

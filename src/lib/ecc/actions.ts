@@ -37,6 +37,7 @@ import type {
   Prioridade,
   StatusProjeto,
   Tarefa,
+  Turno,
 } from "@/lib/ecc/tipos";
 
 function campoObrigatorio(formData: FormData, nome: string): string {
@@ -388,7 +389,13 @@ export async function convidarParaProjeto(projetoId: string, formData: FormData)
 // otimisticamente na tela (mesmo id aqui e lá, sem precisar reconciliar
 // depois) — mesma ordem de `titulos`. Sem `ids`, o Postgres gera sozinho
 // (default gen_random_uuid()).
-export async function criarTarefa(projetoId: string, colunaId: string, formData: FormData, ids?: string[]) {
+export async function criarTarefa(
+  projetoId: string,
+  colunaId: string,
+  formData: FormData,
+  ids?: string[],
+  turno?: Turno | null,
+) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
@@ -403,17 +410,14 @@ export async function criarTarefa(projetoId: string, colunaId: string, formData:
     throw new Error("Informe ao menos um título de tarefa.");
   }
 
-  // Ordem nova sempre vai pro fim da coluna — pega a maior ordem já usada
-  // ali e empilha a partir dela (1000 em 1000, mesmo espaçamento do backfill
-  // da migration 0042, dá espaço de sobra pra reordenar por arrasto depois
-  // sem precisar reindexar).
-  const { data: ultimaOrdem } = await supabase
-    .from("tarefas")
-    .select("ordem")
-    .eq("coluna_id", colunaId)
-    .order("ordem", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Ordem nova sempre vai pro fim da coluna (ou do turno dela, se a coluna
+  // estiver dividida em turnos — cada turno tem sua própria fila) — pega a
+  // maior ordem já usada ali e empilha a partir dela (1000 em 1000, mesmo
+  // espaçamento do backfill da migration 0042, dá espaço de sobra pra
+  // reordenar por arrasto depois sem precisar reindexar).
+  let query = supabase.from("tarefas").select("ordem").eq("coluna_id", colunaId);
+  query = turno ? query.eq("turno", turno) : query.is("turno", null);
+  const { data: ultimaOrdem } = await query.order("ordem", { ascending: false }).limit(1).maybeSingle();
   const ordemBase = ultimaOrdem?.ordem ?? 0;
 
   // Criação rápida: só o título agora, o resto (prioridade, tag, datas) o
@@ -426,6 +430,7 @@ export async function criarTarefa(projetoId: string, colunaId: string, formData:
     titulo,
     prioridade: "P3" as Prioridade,
     ordem: ordemBase + (indice + 1) * 1000,
+    turno: turno ?? null,
   }));
 
   const { error } = await supabase.from("tarefas").insert(linhas);
@@ -687,6 +692,7 @@ export async function moverTarefa(
   projetoId: string,
   novaColunaId: string,
   novaOrdem?: number,
+  novoTurno?: Turno | null,
 ) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
@@ -704,19 +710,15 @@ export async function moverTarefa(
 
   let ordem = novaOrdem;
   if (ordem === undefined) {
-    const { data: ultimaOrdem } = await supabase
-      .from("tarefas")
-      .select("ordem")
-      .eq("coluna_id", novaColunaId)
-      .order("ordem", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    let query = supabase.from("tarefas").select("ordem").eq("coluna_id", novaColunaId);
+    query = novoTurno ? query.eq("turno", novoTurno) : query.is("turno", null);
+    const { data: ultimaOrdem } = await query.order("ordem", { ascending: false }).limit(1).maybeSingle();
     ordem = (ultimaOrdem?.ordem ?? 0) + 1000;
   }
 
   const { error } = await supabase
     .from("tarefas")
-    .update({ coluna_id: novaColunaId, ordem })
+    .update({ coluna_id: novaColunaId, ordem, turno: novoTurno ?? null })
     .eq("id", tarefaId);
 
   if (error) {
@@ -778,6 +780,40 @@ export async function renomearColuna(colunaId: string, projetoId: string, formDa
 
   if (error) {
     throw new Error(`Falha ao renomear coluna: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+/** Liga/desliga a divisão de uma coluna em 3 turnos (Manhã/Tarde/Noite) —
+ * pedido do Fabio, 2026-09-29, pra organizar o dia dentro de uma coluna
+ * qualquer sem precisar criar 3 colunas novas. Ao desligar, os cartões
+ * voltam todos pra coluna normal (decisão já tomada com o Fabio): só perdem
+ * a marcação de turno, nada se perde e é reversível a qualquer momento. */
+export async function alternarDivisaoEmTurnos(colunaId: string, projetoId: string, dividida: boolean) {
+  const supabase = await createClient();
+
+  const { data: coluna } = await supabase
+    .from("colunas_kanban")
+    .select("concluido")
+    .eq("id", colunaId)
+    .maybeSingle();
+
+  if (coluna?.concluido) {
+    throw new Error('A coluna "Concluído" é fixa e não pode ser dividida em turnos.');
+  }
+
+  const { error } = await supabase.from("colunas_kanban").update({ dividida_em_turnos: dividida }).eq("id", colunaId);
+
+  if (error) {
+    throw new Error(`Falha ao atualizar a divisão em turnos: ${error.message}`);
+  }
+
+  if (!dividida) {
+    const { error: erroLimpeza } = await supabase.from("tarefas").update({ turno: null }).eq("coluna_id", colunaId);
+    if (erroLimpeza) {
+      throw new Error(`Falha ao desfazer a divisão em turnos: ${erroLimpeza.message}`);
+    }
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
