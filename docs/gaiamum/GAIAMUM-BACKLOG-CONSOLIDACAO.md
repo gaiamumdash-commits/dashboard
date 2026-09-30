@@ -1,7 +1,8 @@
 # Gaiamum — Backlog de Consolidação (P0/P1/P2)
 
 **Criado:** 2026-09-30. Fonte: `Gaiamum-Prompt-Consolidacao-Inteligente-v1.txt` (prompt de execução), seções 5 e 6.
-**Atualizado:** 2026-09-30, sessão de validação — quase todo o P0 passou de "IMPLEMENTADO NÃO VALIDADO" para "IMPLEMENTADO E TESTADO" depois que o Docker Desktop foi localizado e um Postgres de teste isolado foi criado e usado de verdade. Ver `GAIAMUM-RELATORIO-INCREMENTO-P0.md` seções 4-9 para o detalhe completo. Um achado de segurança NOVO (fora do escopo do P0) foi descoberto nesta validação — ver P1-E abaixo, adicionado por causa disso.
+**Atualizado (validação):** Docker Desktop localizado, Postgres de teste isolado criado — quase todo o P0 passou de "IMPLEMENTADO NÃO VALIDADO" para "IMPLEMENTADO E TESTADO". Achado de segurança NOVO descoberto (`membros_do_tenant()`), fora do escopo original.
+**Atualizado (fechamento):** achado de segurança **corrigido e testado** (migration 0047 + 12 testes) — reclassificado de "P1-E proposto" para P0 fechado, item 5.5 abaixo. Os 3 crons foram **executados de ponta a ponta** contra dado sintético no ambiente isolado (autenticação, repetição, concorrência real, timezone, rastreabilidade) — reclassificado de "validação parcial" para testado. Ver `GAIAMUM-RELATORIO-INCREMENTO-P0.md` para o detalhe completo e a pendência honesta que resta (falha real de infraestrutura dos crons não reproduzida).
 
 Estado de cada item usa exatamente 4 rótulos, sem meio-termo:
 - **IMPLEMENTADO E TESTADO** — código existe, roda, e há teste automatizado que passou de verdade nesta sessão.
@@ -29,7 +30,7 @@ Estado de cada item usa exatamente 4 rótulos, sem meio-termo:
 | Item | Estado | Evidência |
 |---|---|---|
 | Logger estruturado (JSON, id de correlação, operação, severidade, contexto sem dado sensível) | **IMPLEMENTADO E TESTADO** | `src/lib/observabilidade.ts`, 5 testes unitários verdes |
-| Aplicado nos 3 crons (`disparar-alarmes`, `gerar-contas-fixas`, `reengajamento-lab`) | **IMPLEMENTADO — validação parcial** | Código compila, builda, revisão estática de todos os call sites confirma ausência de dado sensível nos logs; **nenhum disparo real de endpoint de cron** foi feito contra dado de negócio real (alarme vencido, conta do mês) nesta sessão — ver relatório P0, matriz seção 9 |
+| Aplicado nos 3 crons (`disparar-alarmes`, `gerar-contas-fixas`, `reengajamento-lab`) | **IMPLEMENTADO E TESTADO** | Os 3 endpoints disparados de verdade via HTTP contra dado sintético persistido no Postgres de teste: autenticação (401/200), execução normal, repetição sem duplicar, concorrência real (2 requests simultâneos, exatamente 1 processa), timezone/corte confirmado no banco, rastreabilidade via `idExecucao`/`idCorrelacao` cruzados entre resposta HTTP e log do console — ver relatório P0 seção 5. Falha real de infraestrutura (erro 500 genuíno) não reproduzida — pendência honesta, seção 5.4 do relatório |
 | Aplicado em mutations críticas fora dos crons (Kanban, Financeiro, Equipe) | **PROPOSTO** | Fora do escopo mínimo desta rodada — essas Server Actions já lançam `Error` com mensagem específica tratada caso a caso; instrumentar tudo de uma vez era desproporcional ao risco atual (ver Blueprint, decisão registrada) |
 | Serviço externo de observabilidade (Sentry ou equivalente) | **PROPOSTO** | Vetado explicitamente nesta rodada pelo prompt de consolidação ("não criar conta/assinatura paga"); ver questão de decisão no relatório do P0 |
 
@@ -54,11 +55,11 @@ Estado de cada item usa exatamente 4 rótulos, sem meio-termo:
 | Criar meta depois de ter pulado continua funcionando | **IMPLEMENTADO E TESTADO** | Confirmado via UI real + teste de integração |
 | Reconciliação de usuários antigos sem apagar dado | **IMPLEMENTADO** (por desenho, não por migração de dado) | Coluna nova é `nullable` sem default — ninguém preexistente teve estado alterado |
 
-### 5.5 Achado de segurança novo, fora do escopo original (descoberto durante a validação)
+### 5.5 Pendência de segurança do fechamento do P0 — descoberta e CORRIGIDA nesta sessão
 
 | Item | Estado | Evidência |
 |---|---|---|
-| `membros_do_tenant()` vaza e-mail de todo o workspace pra membro com `escopo: 'projeto'` | **ACHADO CONFIRMADO, NÃO CORRIGIDO** (fora do escopo deste P0) | `tests/integration/rls-limites-entre-projetos.test.ts` — teste que prova o vazamento contra Postgres real; ver P1-E abaixo para a correção proposta |
+| `membros_do_tenant()` vazava e-mail de todo o workspace pra membro com `escopo: 'projeto'` — descoberto durante a validação (fora do escopo original do P0), reclassificado e tratado como pendência de segurança do fechamento | **IMPLEMENTADO E TESTADO** | Migration `0047_restringe_membros_do_tenant_por_escopo.sql` — a function agora filtra por quem chama, preservando acesso completo (owner/escopo completo) e colegas de projeto compartilhado, nunca o resto do workspace. 12 testes em `rls-limites-entre-projetos.test.ts` cobrindo os 5 cenários pedidos: convidado do projeto A não enumera e-mails do B; consulta direta à RPC respeita a mesma restrição da interface; owner e gestores mantêm acesso legítimo; seletor de responsáveis continua funcionando dentro do projeto; nenhum acesso entre tenants foi aberto |
 
 ---
 
@@ -88,12 +89,8 @@ Evolui o Freeze/consolidação já existente (`enviarConsolidacaoProjeto`), com 
 **Critério de aceite:** prévia consistente com o banco; envio explícito (nunca automático nesta etapa); gestor nunca recebe resumo financeiro owner-only.
 **Depende de:** definir se "o que mudou" precisa de uma tabela de snapshot nova (schema) ou se dá pra inferir sem persistir histórico — decisão de arquitetura a tomar antes de codar.
 
-### P1-E — Corrigir vazamento de e-mail em `membros_do_tenant()` (achado de segurança, descoberto na validação do P0)
-**Estado: PROPOSTO — recomendo priorizar sobre P1-A/B/C/D.**
-`membros_do_tenant()` (migration 0002) devolve todos os membros (user_id + e-mail + papel) de um tenant pra qualquer chamador com membership ali, sem checar `escopo`. Quem tem `escopo: 'projeto'` (convidado só pra 1 quadro) recebe a lista completa, inclusive o e-mail do owner — divergência real do design documentado.
-**Correção mínima sugerida:** adicionar `and tem_acesso_completo(t_id)` ao `where` da function (mesmo padrão já usado em `metas_smart`/`eventos_agenda`), OU criar uma segunda function restrita (`membros_do_tenant_com_acesso_completo`) se `membros_do_tenant()` tiver outros chamadores legítimos que precisem do comportamento atual — checar todos os call sites de `listarMembros()`/`membros_do_tenant` antes de mudar.
-**Critério de aceite:** membro com `escopo: 'projeto'` não recebe mais e-mail de ninguém fora do próprio projeto via essa RPC; owner e membros de `escopo: 'completo'` continuam vendo a lista normalmente; teste de integração `rls-limites-entre-projetos.test.ts` passa a esperar bloqueio, não vazamento.
-**Depende de:** nada tecnicamente bloqueante — é uma migration pequena e um teste já existe (só precisa inverter a expectativa depois de corrigir).
+### ~~P1-E — Corrigir vazamento de e-mail em `membros_do_tenant()`~~ — CONCLUÍDO, movido para o P0
+**Estado: IMPLEMENTADO E TESTADO, ver P0 seção 5.5 acima e `GAIAMUM-RELATORIO-INCREMENTO-P0.md` seção 4.** Não é mais um item de P1 — foi reclassificado como pendência de segurança do fechamento do P0 e corrigido nesta mesma branch (migration `0047`), não deixado para depois.
 
 ---
 

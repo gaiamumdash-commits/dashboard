@@ -3,104 +3,107 @@ import { TEM_BANCO_DE_TESTE, clienteServico, criarUsuarioDeTeste, apagarUsuarioD
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * "Testar também limites de projeto dentro do mesmo tenant" — pedido
- * explícito da validação do P0. Diferente de rls-isolamento.test.ts (que
- * cobre 2 tenants distintos), aqui os dois usuários estão no MESMO
- * tenant: um convidado só pra um projeto específico (`escopo: 'projeto'`,
- * `projeto_membros`), o outro dono de um segundo projeto do mesmo
- * workspace. Prova que `tem_acesso_ao_projeto()` (migrations 0003/0004)
- * realmente restringe por projeto, não só por tenant.
+ * "Testar também limites de projeto dentro do mesmo tenant" (P0) — e, na
+ * rodada de fechamento (2026-09-30), a correção do vazamento real
+ * encontrado aqui: `membros_do_tenant()` (migration 0047) devolvia e-mail
+ * de todo o workspace pra qualquer um com `escopo: 'projeto'`. Este
+ * arquivo agora PROVA a correção (antes documentava o achado) e cobre os
+ * 5 cenários pedidos explicitamente no fechamento do P0:
+ *
+ * 1. Convidado do projeto A não enumera pessoas/e-mails do projeto B.
+ * 2. Consulta direta à RPC respeita as mesmas restrições da interface.
+ * 3. Administrador (owner) e gestores mantêm os acessos legítimos.
+ * 4. Seletores de responsáveis continuam funcionando (dentro do projeto).
+ * 5. Nenhuma alteração permite acesso entre tenants.
  */
-describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — limites entre projetos do mesmo tenant", () => {
+describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — limites entre projetos do mesmo tenant + correção de membros_do_tenant()", () => {
   let service: SupabaseClient;
   let owner: { userId: string; email: string; cliente: SupabaseClient };
-  let membroDoProjeto1: { userId: string; email: string; cliente: SupabaseClient };
+  let membroProjetoA: { userId: string; email: string; cliente: SupabaseClient };
+  let gestorProjetoA: { userId: string; email: string; cliente: SupabaseClient };
+  let membroProjetoB: { userId: string; email: string; cliente: SupabaseClient };
   let tenantId: string;
-  let projeto1Id: string;
-  let projeto2Id: string;
-  let tarefaDoProjeto2: string;
+  let projetoAId: string;
+  let projetoBId: string;
+  let tarefaDoProjetoBId: string;
 
   beforeAll(async () => {
     service = clienteServico();
     owner = await criarUsuarioDeTeste(service, "limites-owner");
-    membroDoProjeto1 = await criarUsuarioDeTeste(service, "limites-membro-p1");
+    membroProjetoA = await criarUsuarioDeTeste(service, "limites-membro-a");
+    gestorProjetoA = await criarUsuarioDeTeste(service, "limites-gestor-a");
+    membroProjetoB = await criarUsuarioDeTeste(service, "limites-membro-b");
     tenantId = await criarTenantDeTeste(service, owner.userId);
 
-    // Membro entra com escopo 'projeto' — convite pra um quadro específico,
-    // não pro workspace inteiro (migration 0003, Grupo 11).
-    await service.from("memberships").insert({
-      user_id: membroDoProjeto1.userId,
-      tenant_id: tenantId,
-      papel: "member",
-      escopo: "projeto",
-    });
+    // Os 3 convidados entram com escopo 'projeto' (convite de quadro
+    // específico, migration 0003 Grupo 11) — nenhum deles deveria ver
+    // "Equipe do workspace inteiro".
+    await service.from("memberships").insert([
+      { user_id: membroProjetoA.userId, tenant_id: tenantId, papel: "member", escopo: "projeto" },
+      { user_id: gestorProjetoA.userId, tenant_id: tenantId, papel: "member", escopo: "projeto" },
+      { user_id: membroProjetoB.userId, tenant_id: tenantId, papel: "member", escopo: "projeto" },
+    ]);
 
-    const { data: p1 } = await service
-      .from("projetos")
-      .insert({ tenant_id: tenantId, nome: "Projeto 1 — do membro" })
-      .select("id")
-      .single();
-    projeto1Id = p1!.id as string;
-    await service.from("projeto_membros").insert({
-      tenant_id: tenantId,
-      projeto_id: projeto1Id,
-      user_id: membroDoProjeto1.userId,
-      papel: "usuario",
-    });
+    const { data: a } = await service.from("projetos").insert({ tenant_id: tenantId, nome: "Projeto A" }).select("id").single();
+    projetoAId = a!.id as string;
+    const { data: b } = await service.from("projetos").insert({ tenant_id: tenantId, nome: "Projeto B" }).select("id").single();
+    projetoBId = b!.id as string;
 
-    const { data: p2 } = await service
-      .from("projetos")
-      .insert({ tenant_id: tenantId, nome: "Projeto 2 — sem o membro" })
-      .select("id")
-      .single();
-    projeto2Id = p2!.id as string;
-    // Owner também precisa estar em projeto_membros? Não — owner tem
-    // acesso via current_papel = 'owner' em tem_acesso_ao_projeto(), sem
-    // precisar de linha em projeto_membros.
+    await service.from("projeto_membros").insert([
+      { tenant_id: tenantId, projeto_id: projetoAId, user_id: membroProjetoA.userId, papel: "usuario" },
+      { tenant_id: tenantId, projeto_id: projetoAId, user_id: gestorProjetoA.userId, papel: "gestor" },
+      { tenant_id: tenantId, projeto_id: projetoBId, user_id: membroProjetoB.userId, papel: "usuario" },
+    ]);
 
-    const { data: coluna2 } = await service
+    const { data: colunaB } = await service
       .from("colunas_kanban")
-      .insert({ tenant_id: tenantId, projeto_id: projeto2Id, nome: "Em Aberto", ordem: 0 })
+      .insert({ tenant_id: tenantId, projeto_id: projetoBId, nome: "Em Aberto", ordem: 0 })
       .select("id")
       .single();
-    const { data: tarefa2 } = await service
+    const { data: tarefaB } = await service
       .from("tarefas")
       .insert({
         tenant_id: tenantId,
-        projeto_id: projeto2Id,
-        coluna_id: coluna2!.id,
-        titulo: "Tarefa do projeto 2",
+        projeto_id: projetoBId,
+        coluna_id: colunaB!.id,
+        titulo: "Tarefa do projeto B",
         prioridade: "P3",
         ordem: 1000,
       })
       .select("id")
       .single();
-    tarefaDoProjeto2 = tarefa2!.id as string;
+    tarefaDoProjetoBId = tarefaB!.id as string;
   });
 
   afterAll(async () => {
     await apagarUsuarioDeTeste(service, owner.userId);
-    await apagarUsuarioDeTeste(service, membroDoProjeto1.userId);
+    await apagarUsuarioDeTeste(service, membroProjetoA.userId);
+    await apagarUsuarioDeTeste(service, gestorProjetoA.userId);
+    await apagarUsuarioDeTeste(service, membroProjetoB.userId);
     await service.from("tenants").delete().eq("id", tenantId);
   });
 
-  it("membro do Projeto 1 enxerga o próprio projeto", async () => {
-    const { data } = await membroDoProjeto1.cliente.from("projetos").select("id").eq("id", projeto1Id);
+  // ---------------------------------------------------------------------
+  // RLS de tabela (pré-existente, reconfirmado) — projeto/tarefa
+  // ---------------------------------------------------------------------
+
+  it("membro do Projeto A enxerga o próprio projeto", async () => {
+    const { data } = await membroProjetoA.cliente.from("projetos").select("id").eq("id", projetoAId);
     expect(data).toHaveLength(1);
   });
 
-  it("membro do Projeto 1 NÃO enxerga o Projeto 2 do MESMO tenant", async () => {
-    const { data, error } = await membroDoProjeto1.cliente.from("projetos").select("id").eq("id", projeto2Id);
+  it("membro do Projeto A NÃO enxerga o Projeto B do MESMO tenant", async () => {
+    const { data, error } = await membroProjetoA.cliente.from("projetos").select("id").eq("id", projetoBId);
     expect(error).toBeNull();
     expect(data).toEqual([]);
   });
 
-  it("membro do Projeto 1 NÃO lê tarefa do Projeto 2, mesmo sabendo o UUID exato", async () => {
-    const { data } = await membroDoProjeto1.cliente.from("tarefas").select("*").eq("id", tarefaDoProjeto2);
+  it("membro do Projeto A NÃO lê tarefa do Projeto B, mesmo sabendo o UUID exato", async () => {
+    const { data } = await membroProjetoA.cliente.from("tarefas").select("*").eq("id", tarefaDoProjetoBId);
     expect(data).toEqual([]);
   });
 
-  it("membro com escopo 'projeto' não enxerga Metas SMART do workspace (só acesso completo vê)", async () => {
+  it("membro com escopo 'projeto' não enxerga Metas SMART do workspace", async () => {
     await service.from("metas_smart").insert({
       tenant_id: tenantId,
       horizonte: "medio_prazo",
@@ -111,33 +114,103 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — limites entre projetos do mesmo te
       relevant: "x",
       time_bound: "x",
     });
-    const { data } = await membroDoProjeto1.cliente.from("metas_smart").select("id").eq("tenant_id", tenantId);
+    const { data } = await membroProjetoA.cliente.from("metas_smart").select("id").eq("tenant_id", tenantId);
     expect(data).toEqual([]);
   });
 
-  it("ACHADO REAL (2026-09-30, descoberto nesta validação): membros_do_tenant() vaza e-mail de todo o workspace pra quem tem só escopo 'projeto'", async () => {
-    // membros_do_tenant() (migration 0002, usada por listarMembros() em
-    // equipe.ts) faz `t_id in (select current_tenant_ids())` — e
-    // current_tenant_ids() devolve QUALQUER tenant onde o chamador tem
-    // membership, sem checar `escopo`. Resultado real, confirmado contra
-    // Postgres de verdade: quem foi convidado só pra 1 projeto consegue
-    // chamar essa RPC e recebe user_id + e-mail + papel de TODO MUNDO do
-    // workspace, inclusive o owner — mesmo o design pretendido sendo "não
-    // vê Equipe do workspace inteiro, só o(s) quadro(s) dele" (comentário
-    // da própria migration 0003, Grupo 11). Não é a mesma exposição que
-    // Financeiro/Metas SMART (RLS de tabela bloqueia esses dois
-    // corretamente, ver outros testes), mas é vazamento real de e-mail —
-    // achado de segurança FORA do escopo deste P0 (que não mexeu em
-    // equipe.ts), reportado para decisão do Product Owner, não corrigido
-    // aqui pra não expandir o escopo da validação.
-    const { data, error } = await membroDoProjeto1.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+  // ---------------------------------------------------------------------
+  // 1. Convidado do projeto A não enumera pessoas/e-mails do projeto B
+  // 2. Consulta direta à RPC respeita as mesmas restrições da interface
+  // ---------------------------------------------------------------------
+
+  it("[CORREÇÃO] membro do Projeto A, chamando a RPC DIRETO (como faria um client malicioso), não recebe o e-mail do membro exclusivo do Projeto B", async () => {
+    const { data, error } = await membroProjetoA.cliente.rpc("membros_do_tenant", { t_id: tenantId });
     expect(error).toBeNull();
     const emails = ((data ?? []) as { email: string }[]).map((m) => m.email);
-    expect(emails).toContain(owner.email); // confirma o vazamento, não o esconde.
+    expect(emails).not.toContain(membroProjetoB.email);
   });
 
-  it("owner continua enxergando os dois projetos normalmente", async () => {
-    const { data } = await owner.cliente.from("projetos").select("id").eq("tenant_id", tenantId);
-    expect(data).toHaveLength(2);
+  it("[CORREÇÃO] membro do Projeto B não recebe o e-mail dos membros exclusivos do Projeto A", async () => {
+    const { data, error } = await membroProjetoB.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    expect(error).toBeNull();
+    const emails = ((data ?? []) as { email: string }[]).map((m) => m.email);
+    expect(emails).not.toContain(membroProjetoA.email);
+    expect(emails).not.toContain(gestorProjetoA.email);
+  });
+
+  it("[CORREÇÃO] membro do Projeto A CONTINUA vendo colegas do MESMO projeto (não é um bloqueio total)", async () => {
+    const { data } = await membroProjetoA.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    const emails = ((data ?? []) as { email: string }[]).map((m) => m.email);
+    expect(emails).toContain(gestorProjetoA.email); // colega no mesmo Projeto A.
+    expect(emails).toContain(membroProjetoA.email); // o próprio.
+  });
+
+  // ---------------------------------------------------------------------
+  // 3. Administrador (owner) e gestores mantêm os acessos legítimos
+  // ---------------------------------------------------------------------
+
+  it("owner continua vendo TODOS os membros do workspace (acesso completo preservado)", async () => {
+    const { data } = await owner.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    const emails = ((data ?? []) as { email: string }[]).map((m) => m.email);
+    expect(emails).toEqual(
+      expect.arrayContaining([owner.email, membroProjetoA.email, gestorProjetoA.email, membroProjetoB.email]),
+    );
+  });
+
+  it("qualquer membro com escopo='projeto' continua vendo o e-mail do owner (pode precisar @mencionar/atribuir a ele)", async () => {
+    const { data: viaA } = await membroProjetoA.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    const { data: viaB } = await membroProjetoB.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    expect(((viaA ?? []) as { email: string }[]).map((m) => m.email)).toContain(owner.email);
+    expect(((viaB ?? []) as { email: string }[]).map((m) => m.email)).toContain(owner.email);
+  });
+
+  it("gestor do Projeto A (papel='gestor' em projeto_membros) mantém acesso legítimo aos colegas do projeto que administra", async () => {
+    const { data } = await gestorProjetoA.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    const emails = ((data ?? []) as { email: string }[]).map((m) => m.email);
+    expect(emails).toContain(membroProjetoA.email);
+    expect(emails).not.toContain(membroProjetoB.email);
+  });
+
+  // ---------------------------------------------------------------------
+  // 4. Seletores de responsáveis continuam funcionando
+  // ---------------------------------------------------------------------
+
+  it("[REGRESSÃO] listarMembrosComAcessoAoProjeto (seletor de responsável/@menção) continua funcionando pro membro do Projeto A, dentro do próprio projeto", async () => {
+    // Reproduz a MESMA lógica de src/lib/ecc/equipe.ts:listarMembrosComAcessoAoProjeto
+    // — agora alimentada pela function corrigida — pra confirmar que o
+    // filtro final continua devolvendo exatamente quem tem acesso ao
+    // Projeto A (sem depender da função real, que exige contexto de
+    // cookies/Next fora do alcance de um teste de integração puro).
+    const { data: membrosDoTenant } = await membroProjetoA.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    const { data: projetoMembros } = await service.from("projeto_membros").select("user_id").eq("projeto_id", projetoAId);
+    const { data: memberships } = await service.from("memberships").select("user_id, escopo").eq("tenant_id", tenantId);
+
+    const idsEscopoCompleto = new Set((memberships ?? []).filter((m) => m.escopo === "completo").map((m) => m.user_id));
+    const idsProjetoMembros = new Set((projetoMembros ?? []).map((m) => m.user_id));
+
+    const selecionaveis = ((membrosDoTenant ?? []) as { user_id: string; email: string; papel: string }[]).filter(
+      (m) => m.papel === "owner" || idsEscopoCompleto.has(m.user_id) || idsProjetoMembros.has(m.user_id),
+    );
+
+    const emails = selecionaveis.map((m) => m.email);
+    expect(emails).toEqual(expect.arrayContaining([membroProjetoA.email, gestorProjetoA.email, owner.email]));
+    expect(emails).not.toContain(membroProjetoB.email); // nunca aparece como opção de responsável no Projeto A.
+  });
+
+  // ---------------------------------------------------------------------
+  // 5. Nenhuma alteração permite acesso entre tenants
+  // ---------------------------------------------------------------------
+
+  it("[REGRESSÃO] membro de escopo='projeto' de OUTRO tenant não recebe nada ao chamar a RPC com o t_id deste tenant", async () => {
+    const outroUsuario = await criarUsuarioDeTeste(service, "limites-outro-tenant");
+    const outroTenant = await criarTenantDeTeste(service, outroUsuario.userId);
+    // outroUsuario é owner do PRÓPRIO tenant, mas não tem membership
+    // nenhuma neste tenantId — current_tenant_ids() já deveria bloquear.
+    const { data, error } = await outroUsuario.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    expect(error).toBeNull();
+    expect(data).toEqual([]); // nada — current_tenant_ids() nem inclui este tenant.
+
+    await apagarUsuarioDeTeste(service, outroUsuario.userId);
+    await service.from("tenants").delete().eq("id", outroTenant);
   });
 });

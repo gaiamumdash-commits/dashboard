@@ -10,7 +10,22 @@
 
 ---
 
-## Estado confirmado (2026-09-30, sessão nova #54 — última atualização)
+## Estado confirmado (2026-09-30, sessão nova #55 — última atualização)
+
+**Resumo em uma linha**: fechamento do P0 — o achado de segurança da sessão #54 (`membros_do_tenant()` vazando e-mail do workspace) foi **corrigido no banco** (migration `0047`, não só na aplicação) e provado contra os 5 cenários pedidos (12 testes novos); os **3 crons foram executados de ponta a ponta** pela primeira vez (autenticação, execução normal, repetição, concorrência real, timezone, rastreabilidade — nunca só revisão de código); **98 testes passando** no total. Branch `consolidacao/p0-confiabilidade-metas` **continua não publicada**; nenhum e-mail real chegou a ser enviado (Resend nunca configurado no ambiente de teste).
+
+- **Correção de segurança**: mapeei os 4 consumidores reais de `membros_do_tenant()`/`listarMembros()` antes de mexer (2 deles — seletor de responsável no Kanban e "Equipe do quadro" — **precisavam continuar funcionando** para quem tem `escopo: 'projeto'`, então a correção não podia ser um bloqueio total). A function SQL agora filtra por quem chama: acesso completo (owner/escopo completo) continua vendo todo mundo; `escopo: 'projeto'` só vê colegas que compartilham projeto com ele, mais o(s) owner(s) do tenant. 12 testes provam: convidado do projeto A não enumera e-mail do projeto B; a RPC chamada direto (não via app) respeita a mesma regra; owner/gestor mantêm acesso; seletor de responsáveis continua funcionando dentro do projeto; nenhum acesso entre tenants foi aberto.
+- **Os 3 crons executados de verdade** contra dado sintético persistido no mesmo Postgres de teste: `disparar-alarmes` (401 sem auth, disparo correto, dado órfão ignorado sem erro, timezone conferido byte a byte no `disparado_para_referencia`, 2 chamadas simultâneas reais → exatamente 1 dispara), `gerar-contas-fixas` (idem, mais o alarme de véspera automático confirmado), `reengajamento-lab` (idem). `RESEND_API_KEY` deliberadamente ausente no ambiente — nenhum e-mail real foi sequer tentado. **Honestamente registrado**: não consegui reproduzir uma falha real de infraestrutura (erro 500 genuíno) sem corromper o banco de teste de propósito — ficou como pendência declarada, não escondida.
+- **98 testes passando** (era 92): +12 do achado de segurança, -6 do teste antigo que documentava o vazamento (agora prova a correção).
+- **`tsc`/`lint`/`build` limpos** (39 rotas, mesmos 3 warnings de sempre).
+- **Ambiente UltraQuadras ("platform") nunca tocado** — nem o container Docker dele, nem nenhum arquivo. `.env.local` de produção do Gaiamum também nunca tocado (env vars só de processo).
+- **Nada publicado**: mesma branch local, sem push, sem PR, sem migration em produção.
+- **Pendências restantes pro P0 ser considerado 100% fechado** (todas sobre produção/CI remoto, não sobre a lógica): (1) falha real de infraestrutura dos crons não reproduzida; (2) CI nunca rodou no GitHub remoto (branch não publicada); (3) migrations 0045-0047 nunca aplicadas em produção (falta a checagem de duplicata em `metas_smart`); (4) fluxo de IA real (voz/explicação) não clicado na UI.
+- **Próximo passo**: decisão do Fabio sobre publicar a branch (resolve a pendência 2) e/ou aplicar as migrations em produção (resolve a 3, depois da checagem de duplicata).
+
+---
+
+## Estado confirmado (2026-09-30, sessão nova #54)
 
 **Resumo em uma linha**: validação real do P0 da sessão #53 — Docker Desktop foi localizado (estava em outro caminho) e usado pra criar um Postgres de teste 100% isolado (portas 573xx, sem tocar o ambiente Docker do projeto "platform"); as 2 migrations novas foram aplicadas e **92 testes passaram de verdade** (63 unitários + 29 de integração contra banco real, com login comum, não `service_role`); as jornadas principais (criar meta, editar meta, pular onboarding, criar depois de pular, mobile) foram executadas via Playwright numa instância real do app. Um desvio de especificação foi corrigido (update explícito em vez de upsert genérico) e **um achado de segurança novo, fora do escopo do P0**, foi descoberto e documentado (não corrigido). Branch `consolidacao/p0-confiabilidade-metas` **continua não publicada**.
 
