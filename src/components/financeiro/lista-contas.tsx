@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { Anexo, ContaAPagar, FormaPagamento } from "@/lib/ecc/tipos";
+import { hojeISOBrasil } from "@/lib/ecc/kanban";
 import { atualizarValorEVencimento, desmarcarComoPaga, marcarComoPaga } from "@/lib/ecc/financeiro";
 import { enviarAnexoContaAPagar } from "@/lib/ecc/anexos";
 import { AnexoArquivo } from "@/components/anexo-arquivo";
@@ -23,8 +24,14 @@ const ROTULO_FORMA_PAGAMENTO: Record<FormaPagamento, string> = {
   credito: "Crédito",
 };
 
+// Achado real (2026-09-29): antes chamava `new Date().toISOString().slice(0,10)`
+// direto — isso é UTC, não o fuso de Brasília. Entre 21h e meia-noite de
+// Brasília já é "amanhã" em UTC, então uma conta que vence hoje aparecia como
+// "Vencido" nessas ~3h todo dia, e marcar como paga nesse intervalo gravava a
+// data de amanhã. `hojeISOBrasil()` calcula certo em qualquer fuso do
+// navegador de quem está usando.
 function hojeISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hojeISOBrasil();
 }
 
 function formatarData(dataISO: string): string {

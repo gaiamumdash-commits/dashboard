@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { ContaAPagar } from "@/lib/ecc/tipos";
+import { hojeISOBrasil } from "@/lib/ecc/kanban";
 import { atualizarValorEVencimentoLab, desmarcarComoPagaLab, marcarComoPagaLab } from "@/lib/ecc/lab/financeiro";
 
 const ROTULO_CATEGORIA: Record<ContaAPagar["categoria"], string> = {
@@ -13,8 +14,11 @@ const ROTULO_CATEGORIA: Record<ContaAPagar["categoria"], string> = {
   despesa: "Despesa",
 };
 
+// Mesmo achado real corrigido na versão de produção (`lista-contas.tsx`):
+// UTC em vez do fuso de Brasília fazia "Vencido" aparecer errado entre 21h e
+// meia-noite de Brasília.
 function hojeISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hojeISOBrasil();
 }
 
 function formatarData(dataISO: string): string {

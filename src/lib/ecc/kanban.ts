@@ -86,6 +86,26 @@ export function primeiroDiaDoMesAtual(): string {
   return `${ano}-${mes}-01`;
 }
 
+/** "YYYY-MM-DD" de hoje, sempre no fuso de Brasília — funciona tanto no
+ * servidor (Vercel roda em UTC) quanto no navegador de quem estiver em
+ * outro fuso. Usar sempre no lugar de `new Date().toISOString().slice(0, 10)`
+ * pra "hoje": esse padrão usa UTC, e entre 21h e meia-noite de Brasília já é
+ * "amanhã" em UTC — achado real (2026-09-29): fazia o Financeiro mostrar
+ * "Vencido" numa conta que vence hoje, e gravar a data de pagamento errada,
+ * durante essas ~3h todo dia. */
+export function hojeISOBrasil(): string {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO_BRASIL,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const ano = partes.find((p) => p.type === "year")!.value;
+  const mes = partes.find((p) => p.type === "month")!.value;
+  const dia = partes.find((p) => p.type === "day")!.value;
+  return `${ano}-${mes}-${dia}`;
+}
+
 /** `toLocaleString("pt-BR", ...)` fixado no fuso de Brasília — usar sempre
  * que a formatação rodar em código server-side (Server Action, lib de
  * e-mail), onde o fuso "local" do processo é UTC, não o do usuário. */
