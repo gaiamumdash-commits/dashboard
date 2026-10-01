@@ -189,6 +189,49 @@ export function urgenciaDoPrazo(
   return "ok";
 }
 
+/**
+ * Qual coluna está "em foco" durante a rolagem horizontal do quadro no
+ * celular (uma coluna por vez, com scroll-snap) — a mais próxima do centro
+ * do container visível. Função pura (recebe posições já medidas do DOM, não
+ * mede nada sozinha) pra dar pra testar sem precisar montar um DOM de
+ * verdade. `null` quando não há nenhuma coluna (quadro vazio).
+ */
+export function encontrarColunaEmFoco(
+  colunas: Array<{ id: string; offsetLeft: number; largura: number }>,
+  centroVisivel: number,
+): string | null {
+  if (colunas.length === 0) return null;
+  let melhorId = colunas[0].id;
+  let melhorDistancia = Infinity;
+  for (const coluna of colunas) {
+    const centroDaColuna = coluna.offsetLeft + coluna.largura / 2;
+    const distancia = Math.abs(centroDaColuna - centroVisivel);
+    if (distancia < melhorDistancia) {
+      melhorDistancia = distancia;
+      melhorId = coluna.id;
+    }
+  }
+  return melhorId;
+}
+
+/**
+ * Velocidade (px/frame) do auto-scroll durante um arrasto de cartão por
+ * toque, quando o dedo está perto de uma borda (topo/fundo da tela pra
+ * rolagem vertical, laterais pra trocar de coluna). `distanciaDaBorda`
+ * negativa ou maior que `zonaAtivacao` = fora da zona, sem rolagem (0).
+ * Quanto mais perto da borda (distância menor), mais rápido — rolagem
+ * suave em vez de "liga/desliga" abrupto.
+ */
+export function calcularVelocidadeAutoScroll(
+  distanciaDaBorda: number,
+  zonaAtivacao: number,
+  velocidadeMaxima: number,
+): number {
+  if (distanciaDaBorda < 0 || distanciaDaBorda >= zonaAtivacao || zonaAtivacao <= 0) return 0;
+  const proporcao = (zonaAtivacao - distanciaDaBorda) / zonaAtivacao;
+  return Math.ceil(proporcao * velocidadeMaxima);
+}
+
 /** Ordem fracionária do cartão solto entre `ordemAntes` e `ordemDepois`
  * (qualquer um pode faltar — extremo da coluna) — mesma técnica de posição
  * fracionária usada por Trello/Notion internamente: inserir um cartão vira

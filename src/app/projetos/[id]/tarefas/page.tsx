@@ -111,13 +111,30 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
   const tarefasComContaGerada = (contasGeradas ?? []).map((c) => c.tarefa_id as string);
 
   return (
-    <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
+    // `overflow-x-hidden` — rede de segurança contra rolagem horizontal da
+    // PÁGINA INTEIRA (achado real de teste, Playwright 390px): mesmo com
+    // `min-w-0` no <main>, um container flex-column cujo filho tem conteúdo
+    // intrinsecamente largo (o quadro Kanban, com várias colunas lado a
+    // lado) pode esticar além do pai em alguns casos de cálculo de
+    // cross-axis do flexbox — isso faz a página toda ganhar uma 2ª barra de
+    // rolagem horizontal, competindo com a do próprio quadro
+    // (`overflow-x-auto`, que continua funcionando normalmente aqui dentro,
+    // já que overflow aninhado funciona mesmo com o pai cortando o excesso).
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-gaiamum-bg sm:flex-row">
       <MenuLateral
         temMetasSmart={Boolean(totalMetasSmart && totalMetasSmart > 0)}
         acessoCompleto={acessoCompleto}
         souOwner={papelAtual === "owner"}
       />
-      <main className="mx-auto max-w-6xl flex-1 px-4 py-10">
+      {/* `min-w-0` — achado real de teste (Playwright, 390px), 2026-09-30:
+          sem isso, este `<main>` (flex-1 dentro do flex-col/sm:flex-row
+          acima) crescia pra caber o conteúdo largo do Kanban em vez de ser
+          limitado pelo pai, e a PÁGINA INTEIRA ganhava rolagem horizontal —
+          o quadro então tinha DOIS scrolls horizontais competindo (o da
+          página e o do próprio `overflow-x-auto` do quadro). Provavelmente
+          já acontecia antes desta rodada (as colunas de 256px fixas também
+          somavam mais que 390px), só menos perceptível. */}
+      <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-10">
         <div className={`-mx-4 -mt-10 mb-8 h-2 sm:-mx-4 ${CLASSE_FUNDO_QUADRO[(projeto as Projeto).cor_fundo]}`} />
 
         <Link href="/projetos" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">

@@ -330,23 +330,43 @@ export function DetalheTarefa({
   }
 
   return (
+    // No celular ocupa a tela inteira (pedido explícito do Fabio, "detalhes
+    // usam tela inteira, com fechamento visível") — sem padding, sem
+    // centralizar, altura em `dvh` (não `vh`) pra não sobrar espaço morto
+    // quando o teclado virtual encolhe a viewport visível. No desktop
+    // (`sm:`) preservado exatamente como era: modal centralizado, max-w-lg.
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 py-10"
+      className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto bg-black/50 sm:items-start sm:overflow-y-auto sm:p-4 sm:py-10"
       onClick={aoFechar}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6"
+        className="flex min-h-[100dvh] w-full flex-col bg-gaiamum-surface sm:min-h-0 sm:max-w-lg sm:rounded-2xl sm:border sm:border-gaiamum-border"
       >
-        <div className="flex items-start justify-between gap-3">
+        {/* Cabeçalho fixo no topo, com a área segura do notch/status bar —
+            "fechamento visível" mesmo com o conteúdo rolado pra baixo. */}
+        <div
+          className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-gaiamum-border bg-gaiamum-surface px-4 pb-3 sm:static sm:border-b-0 sm:px-6 sm:pb-0"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
+        >
           <h2 className="text-lg font-semibold text-gaiamum-text">{tarefa.titulo}</h2>
           <div className="flex shrink-0 items-center gap-2">
             {pendente && <span className="text-xs text-gaiamum-text-muted">Salvando…</span>}
-            <button type="button" onClick={aoFechar} className="text-gaiamum-text-muted hover:text-gaiamum-text">
+            <button
+              type="button"
+              onClick={aoFechar}
+              aria-label="Fechar"
+              className="rounded-full p-1 text-xl leading-none text-gaiamum-text-muted hover:bg-gaiamum-surface-raised hover:text-gaiamum-text sm:text-base sm:hover:bg-transparent"
+            >
               ✕
             </button>
           </div>
         </div>
+
+        <div
+          className="flex-1 px-4 pb-6 sm:px-6 sm:pb-6"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)" }}
+        >
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
@@ -766,6 +786,7 @@ export function DetalheTarefa({
               </div>
             ))}
           </div>
+        </div>
         </div>
       </div>
     </div>

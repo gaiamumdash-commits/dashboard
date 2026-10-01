@@ -14,10 +14,22 @@ import { createServiceClient } from "@/lib/supabase/service";
  *   final, protege o orçamento mesmo se os dois limites acima forem
  *   insuficientes com a base de usuários crescendo.
  *
- * Contagem atômica no Postgres (ver migration 0046, `ia_registrar_tentativa`)
- * — funciona corretamente entre instâncias serverless concorrentes, ao
- * contrário de um contador em memória do processo (que reseta a cada cold
- * start e não é compartilhado entre instâncias).
+ * Cada `ia_registrar_tentativa` (migration 0046) É atômica individualmente
+ * (upsert com lock de linha, funciona corretamente entre instâncias
+ * serverless concorrentes) — mas a VERIFICAÇÃO CONJUNTA das 3 camadas não é
+ * transacional: não existe uma transação única que reverta as 3 se uma
+ * bloquear. É por isso que a ordem de checagem importa (ver comentário em
+ * `verificarRateLimitIA` abaixo).
+ *
+ * IMPORTANTE sobre o que este rate limit garante e o que NÃO garante
+ * (achado da revisão do P0, 2026-09-30): os limites são contadores POR
+ * MINUTO (usuário) e POR HORA (workspace/global) — eles controlam
+ * FREQUÊNCIA (rajada), não um orçamento diário/mensal. Nada aqui impede que
+ * um workspace fique consumindo, por exemplo, 20 chamadas/hora 24h por dia
+ * — isso é ~480 chamadas/dia, sem teto diário algum. Um teto de orçamento
+ * diário/mensal real exigiria uma 4ª camada (janela de 24h/mês) e decisão
+ * de produto sobre o que fazer quando o mês acaba (resetar? bloquear até o
+ * próximo ciclo?) — fora do escopo desta rodada, ver Backlog.
  *
  * Configurável por variável de ambiente (sem precisar de redeploy de
  * código pra ajustar) — os valores default são conservadores de propósito
@@ -58,6 +70,34 @@ export function inicioDaHora(agora: Date = new Date()): string {
  * acontece), então errar pro lado de bloquear nunca gasta dinheiro à toa;
  * o contrário (fail-open) poderia deixar passar uma rajada sem limite
  * justamente quando o sistema de controle está com problema.
+ *
+ * SEQUENCIAL, não paralelo — achado real da revisão do P0 (2026-09-30):
+ * a 1ª versão disparava as 3 RPCs com `Promise.all`, ou seja, TODAS
+ * incrementavam o contador antes de qualquer uma delas ser checada. Isso
+ * permitia que um único usuário martelando o botão (sempre bloqueado no
+ * limite por minuto dele) ainda consumisse, a cada tentativa rejeitada, 1
+ * unidade da cota de WORKSPACE e 1 da cota GLOBAL — cotas compartilhadas
+ * com todos os outros usuários/tenants. Em volume suficiente (a cada
+ * minuto ele pode tentar de novo, já que a janela de usuário reseta), isso
+ * esgotava a cota de workspace/global sem nenhuma chamada real de IA
+ * acontecer, derrubando o serviço pra gente legítima. Checar em ORDEM de
+ * granularidade crescente (usuário → workspace → global), parando no
+ * primeiro bloqueio ou erro, resolve isso: uma tentativa só chega a
+ * consumir cota de workspace/global depois de já ter passado pelo limite
+ * (mais restrito) do próprio usuário que a fez.
+ *
+ * Efeito colateral aceito, documentado: se o usuário passa no limite dele
+ * mas o WORKSPACE bloqueia, a tentativa dele já consumiu 1 unidade da
+ * cota de USUÁRIO mesmo sem chamada real de IA ter acontecido — isso é
+ * esperado (é a cota dele mesmo sendo gasta pela ação dele mesmo, não uma
+ * cota compartilhada com terceiros) e não representa esgotamento cruzado.
+ *
+ * Falha parcial: se uma camada retorna erro, a checagem para ali (fail-
+ * closed) e as camadas seguintes (mais amplas) NUNCA são chamadas — não
+ * tenta "continuar mesmo assim". As camadas anteriores (mais restritas),
+ * se já tinham sido chamadas com sucesso, já registraram a tentativa
+ * normalmente (não há rollback — cada RPC é atômica isoladamente, mas o
+ * conjunto não é uma transação).
  */
 export async function verificarRateLimitIA(params: {
   userId: string;
@@ -66,56 +106,51 @@ export async function verificarRateLimitIA(params: {
   const service = createServiceClient();
   const agora = new Date();
 
-  const [porUsuario, porWorkspace, global] = await Promise.all([
-    service.rpc("ia_registrar_tentativa", {
-      p_escopo: "usuario",
-      p_chave: params.userId,
-      p_janela: inicioDoMinuto(agora),
-      p_limite: LIMITE_POR_USUARIO_MINUTO,
-    }),
-    service.rpc("ia_registrar_tentativa", {
-      p_escopo: "workspace",
-      p_chave: params.tenantId,
-      p_janela: inicioDaHora(agora),
-      p_limite: LIMITE_POR_WORKSPACE_HORA,
-    }),
-    service.rpc("ia_registrar_tentativa", {
-      p_escopo: "global",
-      p_chave: "global",
-      p_janela: inicioDaHora(agora),
-      p_limite: LIMITE_GLOBAL_HORA,
-    }),
-  ]);
+  const camadas = [
+    {
+      escopo: "usuario",
+      chave: params.userId,
+      janela: inicioDoMinuto(agora),
+      limite: LIMITE_POR_USUARIO_MINUTO,
+      motivoBloqueio: `Muitos pedidos de IA em pouco tempo — espere um minuto e tente de novo (limite: ${LIMITE_POR_USUARIO_MINUTO}/minuto).`,
+    },
+    {
+      escopo: "workspace",
+      chave: params.tenantId,
+      janela: inicioDaHora(agora),
+      limite: LIMITE_POR_WORKSPACE_HORA,
+      motivoBloqueio: "Seu workspace atingiu o limite de uso de IA nesta hora — tente novamente mais tarde.",
+    },
+    {
+      escopo: "global",
+      chave: "global",
+      janela: inicioDaHora(agora),
+      limite: LIMITE_GLOBAL_HORA,
+      motivoBloqueio: "O Gaiamum atingiu o limite de uso de IA no momento — tente novamente em instantes.",
+    },
+  ] as const;
 
-  if (porUsuario.error || porWorkspace.error || global.error) {
-    console.error("[verificarRateLimitIA] falha ao checar limite — bloqueando por segurança:", {
-      erroUsuario: porUsuario.error?.message,
-      erroWorkspace: porWorkspace.error?.message,
-      erroGlobal: global.error?.message,
+  for (const camada of camadas) {
+    const { data, error } = await service.rpc("ia_registrar_tentativa", {
+      p_escopo: camada.escopo,
+      p_chave: camada.chave,
+      p_janela: camada.janela,
+      p_limite: camada.limite,
     });
-    return {
-      permitido: false,
-      motivo: "Não foi possível verificar o limite de uso da IA agora — tente de novo em instantes.",
-    };
-  }
 
-  if (!porUsuario.data) {
-    return {
-      permitido: false,
-      motivo: `Muitos pedidos de IA em pouco tempo — espere um minuto e tente de novo (limite: ${LIMITE_POR_USUARIO_MINUTO}/minuto).`,
-    };
-  }
-  if (!porWorkspace.data) {
-    return {
-      permitido: false,
-      motivo: "Seu workspace atingiu o limite de uso de IA nesta hora — tente novamente mais tarde.",
-    };
-  }
-  if (!global.data) {
-    return {
-      permitido: false,
-      motivo: "O Gaiamum atingiu o limite de uso de IA no momento — tente novamente em instantes.",
-    };
+    if (error) {
+      console.error(`[verificarRateLimitIA] falha ao checar limite (${camada.escopo}) — bloqueando por segurança:`, {
+        erro: error.message,
+      });
+      return {
+        permitido: false,
+        motivo: "Não foi possível verificar o limite de uso da IA agora — tente de novo em instantes.",
+      };
+    }
+
+    if (!data) {
+      return { permitido: false, motivo: camada.motivoBloqueio };
+    }
   }
 
   return { permitido: true };

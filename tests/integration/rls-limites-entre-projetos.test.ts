@@ -164,6 +164,43 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — limites entre projetos do mesmo te
     expect(((viaB ?? []) as { email: string }[]).map((m) => m.email)).toContain(owner.email);
   });
 
+  /**
+   * [EXPOSIÇÃO RESIDUAL, ACEITA E DOCUMENTADA — revisão do P0, 2026-09-30]
+   * O teste acima já provava que o owner aparece pra qualquer convidado de
+   * projeto — mas o relatório do P0 chegou a chamar a correção da migration
+   * 0047 de "nenhuma exposição residual", o que é impreciso: continua
+   * havendo exposição do e-mail do(s) owner(s) do tenant a QUALQUER membro
+   * com escopo='projeto', mesmo quando esse owner nunca participou daquele
+   * projeto especificamente (nem está em `projeto_membros` dele). Este
+   * teste isola exatamente esse cenário com um 2º owner que não tem
+   * nenhuma linha em `projeto_membros` — nem no Projeto A nem no B — pra
+   * deixar claro que a regra é "todo owner, sempre", não "só o owner que
+   * participa deste projeto".
+   *
+   * Isso é uma decisão de produto ACEITA, não um bug: um owner tem acesso
+   * completo/RLS a qualquer projeto do tenant, logo pode legitimamente
+   * receber atribuição ou ser @mencionado em qualquer quadro — esconder o
+   * e-mail dele quebraria essa funcionalidade sem reduzir nenhum acesso
+   * real (ele já pode entrar em qualquer projeto quando quiser). A
+   * "exposição dispensável" seria mostrar e-mail de MEMBER de outro
+   * projeto (isso a migration 0047 corrigiu); mostrar e-mail de OWNER
+   * continua sendo exposição NECESSÁRIA para a função de atribuição/menção
+   * existir, não uma sobra do vazamento original.
+   */
+  it("[DOCUMENTA EXPOSIÇÃO ACEITA] um 2º owner do tenant, sem NENHUMA linha em projeto_membros de nenhum projeto, ainda aparece (com e-mail) pra convidados de escopo='projeto' dos dois projetos", async () => {
+    const segundoOwner = await criarUsuarioDeTeste(service, "limites-segundo-owner");
+    await service.from("memberships").insert({ user_id: segundoOwner.userId, tenant_id: tenantId, papel: "owner", escopo: "completo" });
+
+    const { data: viaA } = await membroProjetoA.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+    const { data: viaB } = await membroProjetoB.cliente.rpc("membros_do_tenant", { t_id: tenantId });
+
+    expect(((viaA ?? []) as { email: string }[]).map((m) => m.email)).toContain(segundoOwner.email);
+    expect(((viaB ?? []) as { email: string }[]).map((m) => m.email)).toContain(segundoOwner.email);
+
+    await service.from("memberships").delete().eq("user_id", segundoOwner.userId).eq("tenant_id", tenantId);
+    await apagarUsuarioDeTeste(service, segundoOwner.userId);
+  });
+
   it("gestor do Projeto A (papel='gestor' em projeto_membros) mantém acesso legítimo aos colegas do projeto que administra", async () => {
     const { data } = await gestorProjetoA.cliente.rpc("membros_do_tenant", { t_id: tenantId });
     const emails = ((data ?? []) as { email: string }[]).map((m) => m.email);

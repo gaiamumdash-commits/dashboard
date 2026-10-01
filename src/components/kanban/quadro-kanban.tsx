@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro, Turno } from "@/lib/ecc/tipos";
-import { calcularNovaOrdem, tocarSomConcluido } from "@/lib/ecc/kanban";
+import { calcularNovaOrdem, calcularVelocidadeAutoScroll, encontrarColunaEmFoco, tocarSomConcluido } from "@/lib/ecc/kanban";
 import {
   alternarDivisaoEmTurnos,
   criarColuna,
@@ -25,6 +25,17 @@ const TURNOS: { valor: Turno; rotulo: string }[] = [
 import { DetalheTarefa } from "@/components/kanban/detalhe-tarefa";
 import { CartaoTarefa } from "@/components/kanban/cartao-tarefa";
 import { BarraProgresso } from "@/components/ui/barra-progresso";
+
+// Zonas de auto-scroll durante um arrasto de cartão por TOQUE — pedido do
+// Fabio (2026-09-30): "rolagem automática perto do topo/rodapé" e "alcançar
+// outras colunas durante o arrasto por navegação nas bordas". Constantes
+// isoladas aqui pra ficar fácil recalibrar sem caçar números mágicos no meio
+// da lógica — a velocidade em si é calculada por `calcularVelocidadeAutoScroll`
+// (função pura, testada em kanban.test.ts).
+const ZONA_AUTO_SCROLL_VERTICAL_PX = 90;
+const VELOCIDADE_MAX_VERTICAL_PX = 16;
+const ZONA_AUTO_SCROLL_HORIZONTAL_PX = 56;
+const VELOCIDADE_MAX_HORIZONTAL_PX = 10;
 
 export function QuadroKanban({
   projetoId,
@@ -70,14 +81,28 @@ export function QuadroKanban({
   const [criandoColuna, setCriandoColuna] = useState(false);
   // Arrasto de cartão por toque (celular/tablet) — implementação paralela ao
   // `draggable` nativo acima, que só reage a mouse. Ver comentário em
-  // CartaoTarefa.tsx pra detalhe da técnica (segurar ~300ms confirma
-  // arrasto). `x`/`y` seguem o dedo pro "fantasma" abaixo; a coluna-alvo é
-  // recalculada a cada movimento via `elementFromPoint`.
+  // CartaoTarefa.tsx pra detalhe da técnica (alça dedicada ou segurar
+  // ~300ms confirmam arrasto). `x`/`y` seguem o dedo pro "fantasma" abaixo;
+  // a coluna-alvo e o cartão-alvo (pra reordenar na posição exata, não só
+  // "cair no fim da coluna") são recalculados a cada movimento via
+  // `elementFromPoint`.
   const [arrastoToque, setArrastoToque] = useState<{ tarefaId: string; titulo: string; x: number; y: number } | null>(null);
   const [colunaAlvoToqueId, setColunaAlvoToqueId] = useState<string | null>(null);
+  const [alvoCartaoToque, setAlvoCartaoToque] = useState<{ tarefaId: string; posicao: "antes" | "depois" } | null>(null);
   const [, iniciarTransicao] = useTransition();
   const router = useRouter();
   const inputNovaColunaRef = useRef<HTMLInputElement>(null);
+
+  // Layout mobile (celular em pé/deitado) — uma coluna por vez, com
+  // scroll-snap horizontal. Ver seção 3 do prompt de consolidação
+  // (2026-09-30): cabeçalho com nome/contagem/posição, seletor de coluna
+  // como alternativa ao gesto, "Visão geral" em retrato e paisagem.
+  const quadroRef = useRef<HTMLDivElement>(null);
+  const [colunaFocoId, setColunaFocoId] = useState<string | null>(colunasIniciais.find((c) => !c.concluido)?.id ?? null);
+  const [visaoGeralAberta, setVisaoGeralAberta] = useState(false);
+  // Posição de rolagem do quadro antes de abrir o modal de detalhe — pra
+  // fechar "voltar pra mesma coluna/posição", pedido explícito do Fabio.
+  const [posicaoAntesDoModal, setPosicaoAntesDoModal] = useState<{ left: number; top: number } | null>(null);
 
   // Mantém o estado local em dia com o que o servidor manda depois de um
   // router.refresh() (ex.: ao fechar o modal de detalhe da tarefa, que edita
@@ -94,9 +119,10 @@ export function QuadroKanban({
   }
 
   // Solto na área vazia da coluna (não em cima de um cartão específico) —
-  // vai pro fim dela. `soltarSobreCartao` abaixo cobre o caso de reordenar
-  // em cima de um cartão específico (inclusive dentro da mesma coluna).
-  function moverPara(tarefaId: string, novaColunaId: string, novoTurno: Turno | null = null) {
+  // vai pro fim dela (ou início, via "Mover para..." / extremidade
+  // explícita). `soltarSobreCartao` abaixo cobre o caso de reordenar em
+  // cima de um cartão específico (inclusive dentro da mesma coluna).
+  function moverPara(tarefaId: string, novaColunaId: string, novoTurno: Turno | null = null, extremidade: "inicio" | "fim" = "fim") {
     if (colunasIniciais.find((c) => c.id === novaColunaId)?.concluido) {
       tocarSomConcluido();
     }
@@ -107,7 +133,9 @@ export function QuadroKanban({
     const ordensDaColunaAlvo = tarefas
       .filter((t) => t.coluna_id === novaColunaId && t.turno === novoTurno && t.id !== tarefaId)
       .map((t) => t.ordem);
-    const novaOrdem = calcularNovaOrdem(ordensDaColunaAlvo.length > 0 ? Math.max(...ordensDaColunaAlvo) : null, null);
+    const minOrdem = ordensDaColunaAlvo.length > 0 ? Math.min(...ordensDaColunaAlvo) : null;
+    const maxOrdem = ordensDaColunaAlvo.length > 0 ? Math.max(...ordensDaColunaAlvo) : null;
+    const novaOrdem = extremidade === "inicio" ? calcularNovaOrdem(null, minOrdem) : calcularNovaOrdem(maxOrdem, null);
 
     setTarefas((atual) =>
       atual.map((t) => (t.id === tarefaId ? { ...t, coluna_id: novaColunaId, ordem: novaOrdem, turno: novoTurno } : t)),
@@ -311,33 +339,131 @@ export function QuadroKanban({
     setArrastoToque({ tarefaId, titulo, x, y });
   }
 
-  function moverArrastoToque(x: number, y: number) {
-    setArrastoToque((atual) => (atual ? { ...atual, x, y } : atual));
+  /** Recalcula, a partir de um ponto da tela, a coluna-alvo e (se o ponto
+   * está em cima de outro cartão) o cartão-alvo + posição antes/depois —
+   * mesma indicação visual que o D&D nativo (`onDragOver` em
+   * CartaoTarefa.tsx) já mostra, agora também durante arrasto por toque
+   * ("mostrar claramente destino e posição de inserção antes de soltar"). */
+  function calcularAlvoNoPonto(x: number, y: number, tarefaArrastadaId: string) {
     const elemento = document.elementFromPoint(x, y);
     // Numa coluna dividida em turnos, cada sub-seção tem `data-turno` além
     // de `data-coluna-id` (no mesmo elemento) — uma coluna normal só tem
     // `data-coluna-id`. Buscar por `[data-coluna-id]` cobre os dois casos.
     const colunaEl = elemento?.closest<HTMLElement>("[data-coluna-id]");
-    setColunaAlvoToqueId(colunaEl?.dataset.colunaId ?? null);
+    const cartaoEl = elemento?.closest<HTMLElement>("[data-tarefa-id]");
+
+    let alvoCartao: { tarefaId: string; posicao: "antes" | "depois" } | null = null;
+    if (cartaoEl && cartaoEl.dataset.tarefaId && cartaoEl.dataset.tarefaId !== tarefaArrastadaId) {
+      const rect = cartaoEl.getBoundingClientRect();
+      alvoCartao = { tarefaId: cartaoEl.dataset.tarefaId, posicao: y < rect.top + rect.height / 2 ? "antes" : "depois" };
+    }
+
+    return { colunaId: colunaEl?.dataset.colunaId ?? null, turno: (colunaEl?.dataset.turno as Turno | undefined) ?? null, alvoCartao };
   }
 
-  function soltarArrastoToque(x: number, y: number) {
-    // Recalcula a coluna-alvo (e o turno) na hora, em vez de reaproveitar
-    // `colunaAlvoToqueId` do estado: um arrasto rápido pode disparar
-    // touchend antes do React re-renderizar o último touchmove (setState
-    // fora de handler sintético é batched/assíncrono), o que deixaria essa
-    // decisão lendo uma coluna-alvo desatualizada. `arrastoToque.tarefaId`
-    // não tem esse risco — só é definido uma vez, no início do arrasto.
-    if (arrastoToque) {
-      const elemento = document.elementFromPoint(x, y);
-      const alvo = elemento?.closest<HTMLElement>("[data-coluna-id]");
-      if (alvo?.dataset.colunaId) {
-        moverPara(arrastoToque.tarefaId, alvo.dataset.colunaId, (alvo.dataset.turno as Turno | undefined) ?? null);
-      }
+  // `tarefaId` chega explícito por parâmetro (fechado no closure estável do
+  // próprio CartaoTarefa, igual já era feito em `iniciarArrastoToque`) — NÃO
+  // reaproveita `arrastoToque.tarefaId` do estado. Achado real de teste
+  // automatizado (2026-09-30): como `setArrastoToque` é assíncrono/batched,
+  // um 1º touchmove disparado muito perto do touchstart (sem o React ter
+  // tido chance de re-renderizar entre os dois) via ler `arrastoToque` do
+  // closure como ainda `null` — a função silenciosamente não fazia nada.
+  // Isso não é só uma garantia teórica: foi reproduzido via simulação de
+  // toque antes desta correção. Receber o id por parâmetro elimina
+  // completamente essa classe de bug (stale closure), em vez de só torná-la
+  // menos provável.
+  function moverArrastoToque(tarefaId: string, x: number, y: number) {
+    setArrastoToque((atual) => (atual ? { ...atual, x, y } : atual));
+    const { colunaId, alvoCartao } = calcularAlvoNoPonto(x, y, tarefaId);
+    setColunaAlvoToqueId(colunaId);
+    setAlvoCartaoToque(alvoCartao);
+  }
+
+  function soltarArrastoToque(tarefaId: string, x: number, y: number) {
+    const { colunaId, turno, alvoCartao } = calcularAlvoNoPonto(x, y, tarefaId);
+    if (alvoCartao) {
+      soltarSobreCartao(tarefaId, alvoCartao.tarefaId, alvoCartao.posicao);
+    } else if (colunaId) {
+      moverPara(tarefaId, colunaId, turno);
     }
     setArrastoToque(null);
     setColunaAlvoToqueId(null);
+    setAlvoCartaoToque(null);
   }
+
+  // Auto-scroll durante o arrasto por toque — "rolagem automática perto do
+  // topo e do rodapé" (vertical, dentro da coluna ou da página, conforme
+  // qual delas realmente rola) e "alcançar outras colunas por navegação nas
+  // bordas" (horizontal, rola o quadro inteiro, nunca troca de coluna
+  // sozinho — só desloca a visão; a troca de verdade só acontece ao soltar).
+  useEffect(() => {
+    if (!arrastoToque) return;
+    let ativo = true;
+    // Posição atual do dedo, mantida por um listener PRÓPRIO deste efeito
+    // (não um ref do componente compartilhado com o resto do código) — o
+    // loop de rAF abaixo precisa ler a posição mais recente a cada frame,
+    // mesmo com o dedo parado perto da borda (sem nenhum touchmove novo
+    // disparando), o que só um valor mutável fora do ciclo de render
+    // resolve sem recriar o loop a cada movimento.
+    const posicaoAtual = { x: arrastoToque.x, y: arrastoToque.y };
+    function aoMoverDocumento(e: TouchEvent) {
+      const toque = e.touches[0];
+      if (toque) {
+        posicaoAtual.x = toque.clientX;
+        posicaoAtual.y = toque.clientY;
+      }
+    }
+    document.addEventListener("touchmove", aoMoverDocumento, { passive: true });
+
+    function rolarVerticalNoPonto(x: number, y: number, delta: number) {
+      const elementoNoPonto = document.elementFromPoint(x, y);
+      const colunaEl = elementoNoPonto?.closest<HTMLElement>("[data-coluna-id]");
+      if (colunaEl) {
+        const estilo = window.getComputedStyle(colunaEl);
+        const rolavel = (estilo.overflowY === "auto" || estilo.overflowY === "scroll") && colunaEl.scrollHeight > colunaEl.clientHeight;
+        if (rolavel) {
+          colunaEl.scrollBy({ top: delta });
+          return;
+        }
+      }
+      window.scrollBy({ top: delta });
+    }
+
+    function tick() {
+      if (!ativo) return;
+      const { x, y } = posicaoAtual;
+      const alturaJanela = window.innerHeight;
+      const larguraJanela = window.innerWidth;
+
+      const velocidadeCima = calcularVelocidadeAutoScroll(y, ZONA_AUTO_SCROLL_VERTICAL_PX, VELOCIDADE_MAX_VERTICAL_PX);
+      const velocidadeBaixo = calcularVelocidadeAutoScroll(
+        alturaJanela - y,
+        ZONA_AUTO_SCROLL_VERTICAL_PX,
+        VELOCIDADE_MAX_VERTICAL_PX,
+      );
+      if (velocidadeCima > 0) rolarVerticalNoPonto(x, y, -velocidadeCima);
+      else if (velocidadeBaixo > 0) rolarVerticalNoPonto(x, y, velocidadeBaixo);
+
+      const velocidadeEsquerda = calcularVelocidadeAutoScroll(x, ZONA_AUTO_SCROLL_HORIZONTAL_PX, VELOCIDADE_MAX_HORIZONTAL_PX);
+      const velocidadeDireita = calcularVelocidadeAutoScroll(
+        larguraJanela - x,
+        ZONA_AUTO_SCROLL_HORIZONTAL_PX,
+        VELOCIDADE_MAX_HORIZONTAL_PX,
+      );
+      if (velocidadeEsquerda > 0) quadroRef.current?.scrollBy({ left: -velocidadeEsquerda });
+      else if (velocidadeDireita > 0) quadroRef.current?.scrollBy({ left: velocidadeDireita });
+
+      frameId = requestAnimationFrame(tick);
+    }
+
+    let frameId = requestAnimationFrame(tick);
+    return () => {
+      ativo = false;
+      cancelAnimationFrame(frameId);
+      document.removeEventListener("touchmove", aoMoverDocumento);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só liga/desliga o loop conforme o arrasto começa/termina; a posição corrente vem do listener local de touchmove, não de `arrastoToque`.
+  }, [Boolean(arrastoToque)]);
 
   /** Liga/desliga a divisão de uma coluna em turnos — mesmo padrão otimista
    * das demais ações de coluna. Ao desligar, limpa `turno` das tarefas dessa
@@ -372,16 +498,89 @@ export function QuadroKanban({
     });
   }
 
+  function abrirModal(tarefaId: string) {
+    setTarefaAbertaId(tarefaId);
+  }
+
   function fecharModal() {
     setTarefaAbertaId(null);
     router.refresh();
   }
 
+  // Guarda/restaura a rolagem do quadro ao abrir/fechar o modal de detalhe
+  // — "fechar retorna à mesma coluna e posição aproximada", pedido
+  // explícito do Fabio. Um useEffect (não uma função chamada a partir de um
+  // callback passado como prop) é o lugar certo pra ler/gravar `.current`
+  // de um ref — o acesso só acontece depois que `tarefaAbertaId` já mudou,
+  // nunca durante o render em si.
+  useEffect(() => {
+    if (tarefaAbertaId) {
+      const container = quadroRef.current;
+      setPosicaoAntesDoModal(container ? { left: container.scrollLeft, top: window.scrollY } : null);
+      return;
+    }
+    if (!posicaoAntesDoModal) return;
+    const { left, top } = posicaoAntesDoModal;
+    // Depois do próximo paint (senão o router.refresh() do fechar pode
+    // remontar o conteúdo e zerar a rolagem de novo).
+    const frameId = requestAnimationFrame(() => {
+      quadroRef.current?.scrollTo({ left });
+      window.scrollTo({ top });
+    });
+    return () => cancelAnimationFrame(frameId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reage à troca de aberto/fechado; `posicaoAntesDoModal` é lido, não deve reexecutar sozinho.
+  }, [tarefaAbertaId]);
+
+  // Qual coluna está "em foco" durante a rolagem horizontal do quadro no
+  // celular — recalculado a cada scroll (throttle simples via rAF) e ao
+  // montar. Alimenta o cabeçalho mobile (nome/contagem/posição) e o
+  // seletor de coluna.
+  useEffect(() => {
+    const container = quadroRef.current;
+    if (!container) return;
+    let pendente = false;
+
+    function atualizar() {
+      pendente = false;
+      const el = quadroRef.current;
+      if (!el) return;
+      const cartoesDeColuna = Array.from(el.querySelectorAll<HTMLElement>("[data-coluna-card]"));
+      const medidas = cartoesDeColuna.map((c) => ({
+        id: c.dataset.colunaCard!,
+        offsetLeft: c.offsetLeft,
+        largura: c.offsetWidth,
+      }));
+      const centroVisivel = el.scrollLeft + el.clientWidth / 2;
+      const focoId = encontrarColunaEmFoco(medidas, centroVisivel);
+      if (focoId) setColunaFocoId(focoId);
+    }
+
+    function aoRolar() {
+      if (pendente) return;
+      pendente = true;
+      requestAnimationFrame(atualizar);
+    }
+
+    atualizar();
+    container.addEventListener("scroll", aoRolar, { passive: true });
+    return () => container.removeEventListener("scroll", aoRolar);
+  }, [colunas]);
+
+  function irParaColuna(colunaId: string) {
+    const el = quadroRef.current?.querySelector<HTMLElement>(`[data-coluna-card="${colunaId}"]`);
+    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    setColunaFocoId(colunaId);
+  }
+
   const tarefaAberta = tarefas.find((t) => t.id === tarefaAbertaId) ?? null;
   const colunasAbertas = colunas.filter((c) => !c.concluido);
   const colunaFixa = colunas.find((c) => c.concluido) ?? null;
+  const todasAsColunasNaOrdem = colunaFixa ? [...colunasAbertas, colunaFixa] : colunasAbertas;
   const tarefasConcluidas = colunaFixa ? tarefas.filter((t) => t.coluna_id === colunaFixa.id).length : 0;
   const percentualConcluido = tarefas.length > 0 ? Math.round((tarefasConcluidas / tarefas.length) * 100) : 0;
+  const indiceFoco = Math.max(0, todasAsColunasNaOrdem.findIndex((c) => c.id === colunaFocoId));
+  const colunaEmFoco = todasAsColunasNaOrdem[indiceFoco] ?? null;
+  const contagemColunaFoco = colunaEmFoco ? tarefas.filter((t) => t.coluna_id === colunaEmFoco.id).length : 0;
 
   function renderColuna(coluna: ColunaKanban, ehFixa: boolean) {
     const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id).sort((a, b) => a.ordem - b.ordem);
@@ -396,6 +595,7 @@ export function QuadroKanban({
             key={tarefa.id}
             tarefa={tarefa}
             coluna={coluna}
+            colunasDoProjeto={todasAsColunasNaOrdem}
             projetoId={projetoId}
             checklistDaTarefa={checklistItensIniciais.filter((c) => c.tarefa_id === tarefa.id)}
             anexosDaTarefa={anexosIniciais.filter((a) => a.entidade_id === tarefa.id)}
@@ -405,13 +605,15 @@ export function QuadroKanban({
             etiquetasDoTenant={etiquetasDoTenant}
             souResponsavel={souResponsavel}
             podeExcluir={podeExcluirTarefa}
-            onAbrir={() => setTarefaAbertaId(tarefa.id)}
+            onAbrir={() => abrirModal(tarefa.id)}
             onExcluir={() => excluir(tarefa.id)}
             aoIniciarArrastoToque={(x, y) => iniciarArrastoToque(tarefa.id, tarefa.titulo, x, y)}
-            aoMoverToque={moverArrastoToque}
-            aoSoltarToque={soltarArrastoToque}
+            aoMoverToque={(x, y) => moverArrastoToque(tarefa.id, x, y)}
+            aoSoltarToque={(x, y) => soltarArrastoToque(tarefa.id, x, y)}
             emArrastoToque={arrastoToque?.tarefaId === tarefa.id}
             aoSoltarSobre={(tarefaArrastadaId, posicao) => soltarSobreCartao(tarefaArrastadaId, tarefa.id, posicao)}
+            indicadorDrop={alvoCartaoToque?.tarefaId === tarefa.id ? alvoCartaoToque.posicao : null}
+            aoMoverPara={(colunaId, turno, extremidade) => moverPara(tarefa.id, colunaId, turno, extremidade)}
           />
         );
       });
@@ -438,6 +640,7 @@ export function QuadroKanban({
       <div
         key={coluna.id}
         data-coluna-id={coluna.id}
+        data-coluna-card={coluna.id}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           const colunaArrastada = e.dataTransfer.getData("text/coluna-id");
@@ -453,11 +656,20 @@ export function QuadroKanban({
             if (tarefaId) moverPara(tarefaId, coluna.id);
           }
         }}
-        className={`flex min-h-[16rem] w-64 shrink-0 flex-col gap-2.5 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3 transition ${
+        // Largura: 85vw (quase a tela toda) só em retrato estreito (<640px);
+        // a partir de 640px (`sm:`) — que já cobre celular DEITADO, não só
+        // desktop — volta a 256px fixo, permitindo várias colunas lado a
+        // lado ("ao deitar, aproveitar a largura pra mostrar mais colunas").
+        // Altura: limitada com scroll PRÓPRIO até 1024px (`lg:`) — cobre
+        // tanto retrato quanto paisagem de celular/tablet (telas baixas,
+        // onde a página inteira rolar seria pior); só acima de 1024px
+        // (desktop real) a coluna volta a crescer livremente como sempre
+        // (comportamento desktop existente, inalterado).
+        className={`flex w-[85vw] max-w-sm shrink-0 snap-center flex-col gap-2.5 overflow-y-auto rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3 transition max-h-[calc(100dvh-13rem)] sm:w-64 sm:snap-align-none lg:h-fit lg:max-h-none lg:overflow-visible ${
           colunaArrastadaId === coluna.id ? "opacity-50" : ""
         } ${colunaAlvoToqueId === coluna.id ? "ring-2 ring-gaiamum-primary" : ""}`}
       >
-        <div className="flex items-center justify-between gap-2">
+        <div className="sticky top-0 z-10 -mx-3 -mt-3 flex items-center justify-between gap-2 bg-gaiamum-surface px-3 pt-3 pb-1.5 lg:static lg:mx-0 lg:mt-0 lg:px-0 lg:pt-0">
           {colunaEditandoId === coluna.id ? (
             <input
               name="nome"
@@ -554,9 +766,102 @@ export function QuadroKanban({
   }
 
   return (
-    <>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {colunaCompromissos}
+    // `min-w-0` é a correção de um achado real de teste (Playwright,
+    // 390px): sem isso, um container flex filho com `overflow-x-auto`
+    // (o quadro abaixo) não é limitado pelo pai — ele cresce pra caber TODO
+    // o conteúdo (todas as colunas lado a lado) e é a PÁGINA INTEIRA que
+    // ganha rolagem horizontal, exatamente o que o Fabio pediu pra evitar
+    // ("evitar rolagem horizontal acidental da página inteira"). Comum em
+    // layouts flex — o filho só respeita a largura do pai com `min-width:0`
+    // explícito (o padrão do flexbox é `min-width: auto`, que deixa o
+    // conteúdo ditar o tamanho mínimo).
+    <div className="min-w-0">
+      {/* Cabeçalho de navegação — celular (colunas empilhadas por
+          scroll-snap) e também celular/tablet EM PAISAGEM. "Mostrar título,
+          contagem e indicação da coluna atual", "seletor de coluna como
+          alternativa ao gesto", "Visão geral em retrato e paisagem" —
+          pedidos explícitos do Fabio, 2026-09-30.
+          Critério de visibilidade NÃO é só a largura (`sm:`): um celular
+          deitado facilmente ultrapassa 640px de largura (ex.: 844px) e cairia
+          no breakpoint "desktop", escondendo a barra — mas continua sendo
+          touch, não mouse. Por isso soma `pointer: coarse` (toque) como
+          critério independente de largura: mostra em qualquer tela pequena
+          OU em qualquer dispositivo de toque, e só esconde de verdade num
+          desktop real (ponteiro fino) com tela grande — "considere
+          dispositivos híbridos: largura da tela e capacidade de entrada são
+          coisas diferentes", dito explicitamente no pedido. Evita regressão
+          em notebook/tablet touch: a barra aparece a mais ali, sem remover
+          nada do comportamento desktop existente (colunas continuam w-64,
+          lado a lado, arrasto nativo). */}
+      {todasAsColunasNaOrdem.length > 0 && (
+        <div className="mb-2 hidden items-center gap-2 max-[1023px]:flex [@media(pointer:coarse)]:flex">
+          <button
+            type="button"
+            onClick={() => irParaColuna(todasAsColunasNaOrdem[Math.max(0, indiceFoco - 1)].id)}
+            disabled={indiceFoco <= 0}
+            aria-label="Coluna anterior"
+            className="shrink-0 rounded-lg border border-gaiamum-border px-2.5 py-1.5 text-gaiamum-text-muted disabled:opacity-30"
+          >
+            ‹
+          </button>
+
+          <label className="flex min-w-0 flex-1 flex-col items-center">
+            <span className="sr-only">Escolher coluna</span>
+            <select
+              value={colunaEmFoco?.id ?? ""}
+              onChange={(e) => irParaColuna(e.target.value)}
+              className="w-full truncate rounded-lg border border-transparent bg-transparent text-center text-sm font-semibold text-gaiamum-text outline-none"
+            >
+              {todasAsColunasNaOrdem.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome} ({tarefas.filter((t) => t.coluna_id === c.id).length})
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] text-gaiamum-text-muted">
+              Coluna {indiceFoco + 1} de {todasAsColunasNaOrdem.length} · {contagemColunaFoco} cartão(ões)
+            </span>
+          </label>
+
+          <button
+            type="button"
+            onClick={() => irParaColuna(todasAsColunasNaOrdem[Math.min(todasAsColunasNaOrdem.length - 1, indiceFoco + 1)].id)}
+            disabled={indiceFoco >= todasAsColunasNaOrdem.length - 1}
+            aria-label="Próxima coluna"
+            className="shrink-0 rounded-lg border border-gaiamum-border px-2.5 py-1.5 text-gaiamum-text-muted disabled:opacity-30"
+          >
+            ›
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVisaoGeralAberta(true)}
+            className="shrink-0 rounded-lg border border-gaiamum-border px-2.5 py-1.5 text-xs font-medium text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-primary"
+          >
+            ⊞ Visão geral
+          </button>
+        </div>
+      )}
+
+      {/* "O usuário deseja também usar pinça para afastar e enxergar o
+          quadro" — avaliado (ver relatório do incremento): um gesto de
+          pinça custom aqui competiria com o zoom nativo do navegador e com
+          a rolagem/arrasto já existentes, risco de regressão desproporcional
+          ao ganho. O botão "Visão geral" acima cobre a mesma necessidade
+          (ver tudo de uma vez) de forma robusta; zoom nativo do navegador
+          continua livre (nada aqui captura gesto de pinça). Pinça dedicada
+          fica documentada como melhoria futura, não implementada agora. */}
+
+      <div ref={quadroRef} className="flex min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto pb-2 scroll-smooth sm:snap-none">
+        {/* `key` + `display:contents` (não afeta o layout flex) — achado
+            incidental pré-existente (não introduzido nesta rodada): React
+            exige key quando um elemento solto é intercalado com uma lista
+            `.map()` como filhos irmãos do mesmo pai; faltava aqui. */}
+        {colunaCompromissos && (
+          <div key="coluna-compromissos" className="contents">
+            {colunaCompromissos}
+          </div>
+        )}
         {colunasAbertas.map((coluna) => renderColuna(coluna, false))}
 
         {criandoColuna ? (
@@ -619,6 +924,56 @@ export function QuadroKanban({
         </div>
       )}
 
+      {visaoGeralAberta && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center"
+          onClick={() => setVisaoGeralAberta(false)}
+          style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-gaiamum-border bg-gaiamum-surface p-4 sm:rounded-2xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">Visão geral do quadro</h2>
+              <button type="button" onClick={() => setVisaoGeralAberta(false)} className="text-gaiamum-text-muted hover:text-gaiamum-text">
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {todasAsColunasNaOrdem.map((c) => {
+                const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === c.id).sort((a, b) => a.ordem - b.ordem);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setVisaoGeralAberta(false);
+                      irParaColuna(c.id);
+                    }}
+                    className={`flex flex-col gap-1 rounded-lg border p-2 text-left transition hover:border-gaiamum-primary ${
+                      colunaFocoId === c.id ? "border-gaiamum-primary" : "border-gaiamum-border"
+                    }`}
+                  >
+                    <span className="truncate text-xs font-semibold text-gaiamum-text">
+                      {c.nome} ({tarefasDaColuna.length})
+                    </span>
+                    <span className="flex flex-col gap-0.5">
+                      {tarefasDaColuna.slice(0, 3).map((t) => (
+                        <span key={t.id} className="truncate text-[11px] text-gaiamum-text-muted">
+                          {t.titulo}
+                        </span>
+                      ))}
+                      {tarefasDaColuna.length === 0 && <span className="text-[11px] text-gaiamum-text-muted">Vazia</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {tarefaAberta && (
         <DetalheTarefa
           tarefa={tarefaAberta}
@@ -640,6 +995,6 @@ export function QuadroKanban({
           aoFechar={fecharModal}
         />
       )}
-    </>
+    </div>
   );
 }

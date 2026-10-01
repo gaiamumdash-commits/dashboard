@@ -70,4 +70,37 @@ describe("verificarRateLimitIA — bloqueio por limite e fail-closed (RPC mockad
     const r = await verificarRateLimitIA({ userId: "u1", tenantId: "t1" });
     expect(r.permitido).toBe(false);
   });
+
+  /**
+   * Achado real da revisão do P0 (2026-09-30): a 1ª versão chamava as 3
+   * RPCs em paralelo (Promise.all) — uma tentativa bloqueada no limite de
+   * USUÁRIO ainda incrementava a cota de WORKSPACE e GLOBAL, compartilhada
+   * com todo mundo. Corrigido para sequencial com curto-circuito: os 2
+   * testes abaixo prova que uma tentativa rejeitada na camada mais
+   * restrita nunca chega a chamar as camadas mais amplas.
+   */
+  it("CORREÇÃO: bloqueio por USUÁRIO não chega a consumir cota de workspace/global (nunca chama as RPCs seguintes)", async () => {
+    rpcMock.mockImplementation(async (_nome: string, args: { p_escopo: string }) => ({
+      data: args.p_escopo !== "usuario",
+      error: null,
+    }));
+    const r = await verificarRateLimitIA({ userId: "u1", tenantId: "t1" });
+    expect(r.permitido).toBe(false);
+    // Só a 1ª camada (usuário) foi chamada — workspace/global nunca sofrem o
+    // incremento de uma tentativa que já ia ser rejeitada de qualquer forma.
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith("ia_registrar_tentativa", expect.objectContaining({ p_escopo: "usuario" }));
+  });
+
+  it("CORREÇÃO: bloqueio por WORKSPACE não chega a chamar a camada GLOBAL", async () => {
+    rpcMock.mockImplementation(async (_nome: string, args: { p_escopo: string }) => ({
+      data: args.p_escopo !== "workspace",
+      error: null,
+    }));
+    const r = await verificarRateLimitIA({ userId: "u1", tenantId: "t1" });
+    expect(r.permitido).toBe(false);
+    // Usuário (permitiu) + workspace (bloqueou) = 2 chamadas; global nunca chamado.
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(rpcMock).not.toHaveBeenCalledWith("ia_registrar_tentativa", expect.objectContaining({ p_escopo: "global" }));
+  });
 });

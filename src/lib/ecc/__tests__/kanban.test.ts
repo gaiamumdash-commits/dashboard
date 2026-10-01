@@ -5,6 +5,8 @@ import {
   corAvatarPorEmail,
   hojeISOBrasil,
   paraUtcDoFuso,
+  encontrarColunaEmFoco,
+  calcularVelocidadeAutoScroll,
 } from "@/lib/ecc/kanban";
 
 describe("urgenciaDoPrazo", () => {
@@ -90,5 +92,62 @@ describe("paraUtcDoFuso", () => {
   it("converte 14:00 de Brasília (UTC-3) para 17:00 UTC", () => {
     const utc = paraUtcDoFuso("2026-09-30T14:00", "America/Sao_Paulo");
     expect(utc.toISOString()).toBe("2026-09-30T17:00:00.000Z");
+  });
+});
+
+// Kanban mobile (2026-09-30): coluna em foco durante o swipe horizontal e
+// velocidade do auto-scroll durante um arrasto de cartão por toque.
+describe("encontrarColunaEmFoco", () => {
+  const colunas = [
+    { id: "a", offsetLeft: 0, largura: 300 },
+    { id: "b", offsetLeft: 300, largura: 300 },
+    { id: "c", offsetLeft: 600, largura: 300 },
+  ];
+
+  it("escolhe a 1ª coluna quando o centro visível está sobre ela", () => {
+    expect(encontrarColunaEmFoco(colunas, 150)).toBe("a");
+  });
+
+  it("escolhe a coluna do meio quando o centro visível está sobre ela", () => {
+    expect(encontrarColunaEmFoco(colunas, 450)).toBe("b");
+  });
+
+  it("escolhe a última coluna quando o centro visível está além dela (fim do scroll)", () => {
+    expect(encontrarColunaEmFoco(colunas, 950)).toBe("c");
+  });
+
+  it("no ponto exato de fronteira entre duas colunas, escolhe uma das duas de forma determinística (a 1ª encontrada)", () => {
+    // Fronteira exata entre "a" (centro 150) e "b" (centro 450) é 300 —
+    // distância igual (150) pras duas; o "menor que" no laço mantém a 1ª.
+    expect(encontrarColunaEmFoco(colunas, 300)).toBe("a");
+  });
+
+  it("devolve null pra lista vazia (quadro sem colunas)", () => {
+    expect(encontrarColunaEmFoco([], 100)).toBeNull();
+  });
+});
+
+describe("calcularVelocidadeAutoScroll", () => {
+  it("não rola quando a distância da borda é maior que a zona de ativação", () => {
+    expect(calcularVelocidadeAutoScroll(200, 90, 18)).toBe(0);
+  });
+
+  it("não rola quando já passou da borda (distância negativa)", () => {
+    expect(calcularVelocidadeAutoScroll(-5, 90, 18)).toBe(0);
+  });
+
+  it("rola na velocidade máxima quando colado na borda (distância 0)", () => {
+    expect(calcularVelocidadeAutoScroll(0, 90, 18)).toBe(18);
+  });
+
+  it("rola mais devagar quanto mais longe da borda, dentro da zona", () => {
+    const pertoDaBorda = calcularVelocidadeAutoScroll(10, 90, 18);
+    const longeDaBorda = calcularVelocidadeAutoScroll(80, 90, 18);
+    expect(pertoDaBorda).toBeGreaterThan(longeDaBorda);
+    expect(longeDaBorda).toBeGreaterThan(0);
+  });
+
+  it("zona de ativação zero ou negativa nunca rola (evita divisão por zero)", () => {
+    expect(calcularVelocidadeAutoScroll(0, 0, 18)).toBe(0);
   });
 });

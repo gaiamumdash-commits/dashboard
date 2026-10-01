@@ -55,6 +55,8 @@ O índice único `(tenant_id, horizonte)` impede duas linhas com o mesmo par —
 
 ## 4. Correção de segurança: `membros_do_tenant()` vazava e-mail do workspace inteiro
 
+> **Correção desta seção, feita na rodada de experiência mobile (2026-09-30/10-01)**: o Backlog e este relatório chamaram o resultado da migration 0047 de "nenhuma exposição residual" — impreciso. A function corrigida ainda devolve e-mail do(s) owner(s) do tenant para QUALQUER membro com `escopo: 'projeto'`, mesmo quando esse owner nunca participou daquele projeto especificamente (não está em `projeto_membros` dele). Isso é diferente do vazamento original (que expunha e-mail de QUALQUER membro do workspace, não só owners) — e é uma exposição **necessária**, não um descuido: o owner tem acesso RLS completo a qualquer projeto do tenant por natureza, logo pode legitimamente ser @mencionado ou receber atribuição em qualquer quadro, e o mecanismo de @menção desta aplicação grava o e-mail literal no texto (não um ID opaco) — esconder o e-mail do owner quebraria essa funcionalidade sem reduzir nenhum acesso real. Teste novo cobrindo exatamente esse cenário (2º owner sem nenhuma linha em `projeto_membros`, ainda visível com e-mail para convidados de projeto dos dois quadros): `tests/integration/rls-limites-entre-projetos.test.ts`, caso `[DOCUMENTA EXPOSIÇÃO ACEITA]`. Nenhuma mudança de código nesta função — ver `GAIAMUM-RELATORIO-INCREMENTO-MOBILE-E-AJUSTES-P0.md` seção 4 para a análise completa e o porquê de não ser proporcional corrigir isso sem redesenhar o mecanismo de menção.
+
 ### 4.1 Mapeamento de consumidores (feito antes de qualquer alteração)
 
 | Consumidor | Onde roda | Precisa de acesso a quem? |
@@ -145,7 +147,7 @@ Migrations aplicadas neste banco isolado, em ordem: 0001-0044 (schema já existe
 | Onboarding — pular persiste, criar depois funciona, sem loop | ✅ | ✅ | `onboarding-pulado.test.ts` + UI real | Nenhuma |
 | Rate limit de IA — 3 camadas, atômico, fail-closed, bloqueio impede chamada ao provedor | ✅ | ✅ | `rate-limit-concorrencia.test.ts`, `ia-rate-limit-mock.test.ts`, `bloqueio-nao-chama-provedor.test.ts` | Nenhuma |
 | Isolamento entre tenants / limites entre projetos / financeiro owner-only | — (pré-existente) | ✅ | `rls-isolamento.test.ts`, `rls-limites-entre-projetos.test.ts`, `rls-financeiro-owner-only.test.ts` | Nenhuma |
-| **`membros_do_tenant()` — vazamento corrigido no banco** | ✅ | ✅ | Migration 0047 + 12 testes cobrindo os 5 cenários pedidos | Nenhuma |
+| **`membros_do_tenant()` — vazamento corrigido no banco** | ✅ | ✅ | Migration 0047 + 13 testes (12 originais + 1 novo, seção 4) | **Exposição residual ACEITA, não "zero"**: e-mail do(s) owner(s) continua visível a qualquer convidado de projeto, mesmo sem projeto compartilhado — necessário para @menção/atribuição ao owner funcionar, não um vazamento (ver seção 4) |
 | Logger estruturado — formato, correlação, sem dado sensível | ✅ | ✅ | `observabilidade.test.ts` + revisão estática dos 6 call sites | Nenhuma |
 | **Cron `disparar-alarmes` — autenticação, execução, repetição, concorrência, timezone, rastreabilidade** | ✅ | ✅ | Execução real via HTTP, seção 5.1 | Falha real de infraestrutura não reproduzida (seção 5.4) |
 | **Cron `gerar-contas-fixas` — idem** | ✅ | ✅ | Seção 5.2 | Idem |
