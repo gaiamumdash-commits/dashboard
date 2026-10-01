@@ -10,7 +10,22 @@
 
 ---
 
-## Estado confirmado (2026-10-01, sessão nova #58 — última atualização)
+## Estado confirmado (2026-10-01, sessão nova #59 — última atualização)
+
+**Resumo em uma linha**: rodada 2, no mesmo dia, em resposta ao teste real do Fabio — Concluído não aceita mais criação direta de cartão (trigger no banco, migration 0050), dividir em turnos não esconde mais cartões existentes (todos entram em "Manhã"), achado real corrigido no ajuste de paisagem (menu lateral de desktop usava só largura, roubava espaço do quadro em celular deitado), e o app rodando acessível pela rede Wi-Fi local pro Fabio testar no celular físico de verdade — **produção nunca foi tocada**.
+
+- **Causa raiz do "não apareceu nada"**: a branch `consolidacao/p0-confiabilidade-metas` nunca tinha sido publicada — `main` seguia num commit anterior a todo o incremento da rodada 1. O Fabio testou produção antiga sem saber. Não era bug.
+- **Concluído não aceita criação direta** (migration `0050`): trigger `tarefas_bloqueia_criacao_em_concluido` rejeita INSERT direto nessa coluna no nível do banco (vale até contornando a Server Action); UPDATE (mover cartão existente) continua liberado. 3 camadas: interface, Server Action, trigger.
+- **Dividir em turnos não esconde mais cartões**: corrige o P2-C da rodada 1 (ficou só em backlog). Decisão do Fabio: sem 4º bloco "sem turno" — todo cartão sem turno entra em "Manhã" ao dividir, pessoa reorganiza depois.
+- **Achado real: paisagem não ativava de verdade**. O quadro kanban já tratava celular deitado pela largura (`sm:`, 640px) — isso já funcionava. Mas `MenuLateral` (240px fixos) usava o MESMO critério só de largura, sem considerar toque vs. mouse, então também aparecia em celular deitado, roubando um quarto da largura. Corrigido: menu de desktop só com `(min-width:640px) and (pointer:fine)`. **Validação parcial, honesta**: confirmado nos 2 extremos possíveis de testar aqui (retrato esconde; desktop+mouse mostra); o caso real "largura+toque" não pôde ser emulado nesta sessão (Playwright aqui sempre reporta `pointer:fine`) — só o teste físico do Fabio fecha isso.
+- **Publicação**: `git push` foi rejeitado (token do `gh` CLI sem escopo `workflow`, por causa do `.github/workflows/ci.yml` de uma sessão anterior — precisaria de login novo do Fabio no navegador). Deploy direto via Vercel CLI funcionou, mas revelou que o ambiente "Preview" da Vercel usa o MESMO banco de produção (sem banco de Homologação isolado configurado ainda) — publicar ali quebraria o app (migrations novas não existem em produção). Descartado. **Caminho adotado**: `next dev` rodando nesta máquina, acessível pela rede Wi-Fi em `http://192.168.0.18:3000`, com o Supabase local de teste (as migrations novas aplicadas lá). 2 achados de ambiente documentados no relatório: `.env.local` aponta pra produção por padrão (precisa sobrescrever env vars), e Next.js bloqueia recursos de dev de origem não-localhost por padrão (`allowedDevOrigins` adicionado em `next.config.ts`).
+- **115 → 120 testes** (+5: 3 de Concluído sem criação, 2 de divisão de turnos). Nova migration `0050`, aplicada só no Postgres de teste isolado.
+- **Pedido do Fabio nesta rodada**: "a partir de agora, faça até o fim sem perguntar, com bom senso de segurança/correção/economia" — registrado como padrão de trabalho desta sessão. Ação que ficou de fora mesmo assim (linha vermelha, não "aprovação de rotina"): aplicar migration em banco de produção — isso contraria uma instrução explícita anterior do próprio Fabio ("não aplique migrations em produção") e é pouco reversível; perguntado explicitamente antes de prosseguir, e ele escolheu a rede local em vez disso.
+- **Nada publicado em produção, nenhuma migration aplicada fora do Postgres de teste isolado.**
+
+---
+
+## Estado confirmado (2026-10-01, sessão nova #58)
 
 **Resumo em uma linha**: 7 ajustes do Kanban pós-mobile implementados e validados (turnos só na coluna "Hoje" — nova identidade de sistema, migration 0048 —, altura das colunas nivelada via CSS Grid nativo, ordem de colunas/botão "+" corrigidos, barra de navegação horizontal dupla no desktop, revisão de privacidade corrigida de verdade — migration 0049, resolução privilegiada de notificação —, e o arrasto mobile validado com 1 achado real corrigido: auto-scroll vertical era relativo à janela, não à coluna, então nunca disparava de verdade) + 1 pedido adicional no meio da sessão (botão de ocultar/mostrar a coluna "Concluído", pra ela parar de "puxar" a altura de todo o quadro). Tudo na mesma branch `consolidacao/p0-confiabilidade-metas`, **ainda não publicada**. Detalhe completo em `docs/gaiamum/GAIAMUM-RELATORIO-INCREMENTO-AJUSTES-KANBAN-POS-MOBILE.md`.
 
