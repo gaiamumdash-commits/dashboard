@@ -116,9 +116,16 @@ export type ColunaKanban = {
   concluido: boolean;
   criado_em: string;
   // Coluna organizada em 3 sub-seções (Manhã/Tarde/Noite) — as tarefas dela
-  // ganham `Tarefa.turno`. Nunca `true` numa coluna `concluido` (bloqueado
-  // tanto na Server Action quanto por regra de negócio).
+  // ganham `Tarefa.turno`. Só pode ser `true` na coluna `hoje` (bloqueado
+  // tanto na Server Action quanto por CHECK constraint no banco, migration
+  // 0048) — nunca numa coluna `concluido` (regra pré-existente, inalterada).
   dividida_em_turnos: boolean;
+  // Identidade de sistema (migration 0048) — NÃO depende do nome/título da
+  // coluna, ao contrário de uma comparação de string. No máximo 1 por
+  // projeto (índice único). Controla quem pode dividir em turnos e onde
+  // uma coluna nova nasce (logo depois dela — ver `criarColuna`). Pode ser
+  // movida/renomeada livremente, diferente de `concluido`.
+  hoje: boolean;
 };
 
 export type CategoriaFinanceira = "consumo" | "investimento" | "despesa";
@@ -211,10 +218,17 @@ export type Membership = {
   criado_em: string;
 };
 
+/** `email` é `null` quando o chamador não tem direito a vê-lo (migration
+ * 0049) — hoje só acontece pro(s) owner(s) do tenant, vistos por um
+ * convidado de `escopo: 'projeto'` sem compartilhar nenhum projeto com
+ * eles. `nome_exibicao` (parte local do e-mail) está SEMPRE presente —
+ * identificação/seleção na interface (avatar, seletor, @menção) deve usar
+ * `email ?? nome_exibicao`, nunca assumir que `email` existe. */
 export type MembroTenant = {
   user_id: string;
-  email: string;
+  email: string | null;
   papel: Papel;
+  nome_exibicao: string;
 };
 
 export type StatusConvite = "pendente" | "aceito" | "cancelado";

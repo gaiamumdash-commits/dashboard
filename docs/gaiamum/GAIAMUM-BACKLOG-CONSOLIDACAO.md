@@ -3,6 +3,7 @@
 **Criado:** 2026-09-30. Fonte: `Gaiamum-Prompt-Consolidacao-Inteligente-v1.txt` (prompt de execução), seções 5 e 6.
 **Atualizado (validação):** Docker Desktop localizado, Postgres de teste isolado criado — quase todo o P0 passou de "IMPLEMENTADO NÃO VALIDADO" para "IMPLEMENTADO E TESTADO". Achado de segurança NOVO descoberto (`membros_do_tenant()`), fora do escopo original.
 **Atualizado (fechamento):** achado de segurança **corrigido e testado** (migration 0047 + 12 testes) — reclassificado de "P1-E proposto" para P0 fechado, item 5.5 abaixo. Os 3 crons foram **executados de ponta a ponta** contra dado sintético no ambiente isolado (autenticação, repetição, concorrência real, timezone, rastreabilidade) — reclassificado de "validação parcial" para testado. Ver `GAIAMUM-RELATORIO-INCREMENTO-P0.md` para o detalhe completo e a pendência honesta que resta (falha real de infraestrutura dos crons não reproduzida).
+**Atualizado (ajustes pós-mobile, 2026-10-01):** P1-F (experiência mobile) teve 7 ajustes adicionais implementados e validados — turnos restritos à coluna "Hoje" (nova identidade de sistema, migrations 0048), altura das colunas nivelada via CSS Grid, ordem de colunas/botão "+" corrigidos, barra de navegação horizontal dupla, achado real de bug corrigido no auto-scroll do arrasto mobile, e a revisão de privacidade (item P1-H abaixo, antes só proposta, agora corrigida de verdade com migration 0049). Pedido adicional do Fabio na mesma sessão — botão "👁 Mostrar / 🙈 Ocultar" exclusivo da coluna Concluído, que recolhe os cartões concluídos (e a própria coluna) pra não dominar a altura nivelada das demais — também implementado e testado, ver item P1-I abaixo. Ver `GAIAMUM-RELATORIO-INCREMENTO-AJUSTES-KANBAN-POS-MOBILE.md`.
 
 Estado de cada item usa exatamente 4 rótulos, sem meio-termo:
 - **IMPLEMENTADO E TESTADO** — código existe, roda, e há teste automatizado que passou de verdade nesta sessão.
@@ -100,9 +101,20 @@ Evolui o Freeze/consolidação já existente (`enviarConsolidacaoProjeto`), com 
 **Critério de aceite:** falha de envio usa `registrarErro()` com o mesmo `idCorrelacao` da execução do cron; documentação deixa de equiparar "processado" a "entregue".
 **Depende de:** nada tecnicamente bloqueante — trocar os `console.error` dos helpers de e-mail (`notificacoes.ts`) por `registrarErro()`, passando o `idCorrelacao` do chamador.
 
+### ~~P1-H — Revisão de privacidade de membros (exposição de e-mail ao owner)~~ — CONCLUÍDO (2026-10-01)
+**Estado: IMPLEMENTADO E TESTADO.** Reavaliação mais rigorosa do item fechado na sessão anterior (que só havia documentado a exposição como "necessária" sem provar isso de fato). Corrigido com 2 migrations (`0048` indiretamente, `0049` diretamente): `membros_do_tenant()` só devolve e-mail completo pra quem já tinha direito a ele (acesso completo, ou projeto compartilhado); um novo campo `nome_exibicao` (sempre presente) substitui o e-mail na identificação/seleção/@menção. **Achado mais grave, corrigido junto**: a resolução de e-mail pra NOTIFICAÇÃO real (`registrarAtividade`, `enviarConsolidacaoProjeto`) usava a mesma function pública limitada por escopo de quem disparou a ação — um convidado de projeto podia falhar em notificar o owner por um cartão atribuído a ele. Nova function privilegiada `emails_para_notificacao` (EXECUTE revogado de anon/authenticated) resolve isso de forma sempre completa, nunca dependente do que a interface mostra pra quem agiu. Ver `GAIAMUM-RELATORIO-INCREMENTO-AJUSTES-KANBAN-POS-MOBILE.md` seção 4.
+
+### P1-I — Botão "Mostrar/Ocultar" exclusivo da coluna Concluído — CONCLUÍDO (2026-10-01)
+**Estado: IMPLEMENTADO E TESTADO.** Pedido adicional do Fabio no meio da sessão (apelidado por ele de "toca"): com o nivelamento de altura por CSS Grid (item 2 do incremento pós-mobile), a coluna Concluído — que só cresce com o tempo — passou a puxar a altura de todas as outras colunas junto, tirando o foco do que ainda falta fazer. Botão novo no cabeçalho da coluna Concluído (`🙈 Ocultar` / `👁 Mostrar`, só aparece quando há cartões concluídos) alterna um estado local (`concluidosOcultos`, iniciado `true`) que troca a lista de cartões por um resumo clicável ("N cartão(ões) oculto(s) — toque pra ver"), recolhendo a coluna e, por consequência, a altura nivelada de todo o quadro. Puramente de interface (não apaga nem arquiva dado nenhum — é só exibição); testado com Playwright incluindo arrastar um cartão pra dentro da coluna recolhida e a interação com o grid de altura nivelada. Ver `GAIAMUM-RELATORIO-INCREMENTO-AJUSTES-KANBAN-POS-MOBILE.md` seção 2.7.
+
 ---
 
 ## P2 — Direção documentada, NÃO implementada nesta sessão
+
+### P2-C — Cartões sem turno somem ao dividir uma coluna em turnos pela 1ª vez
+**Estado: PROPOSTO.** Achado incidental (2026-10-01, não corrigido, fora do escopo do pedido que o originou): quando uma coluna já populada é dividida em Manhã/Tarde/Noite, cartões com `turno = null` não aparecem em nenhum dos 3 sub-blocos (o filtro é `turno === valor`, nunca `turno === null`). O dado não é perdido (sobrevive reload, reaparece se a divisão for desfeita), mas a experiência confunde — parece que os cartões sumiram.
+**Critério de aceite:** cartões sem turno continuam visíveis de alguma forma (ex.: um 4º sub-bloco "Sem turno") quando a coluna é dividida, ou a ação de dividir pede pra classificar os existentes antes.
+**Depende de:** decisão de UX sobre o comportamento esperado — não tecnicamente bloqueante.
 
 ### P2-A — Financeiro por projeto
 **Estado: PROPOSTO.**

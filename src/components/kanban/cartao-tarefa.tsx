@@ -439,7 +439,7 @@ export function CartaoTarefa({
             <div className="mt-2 flex -space-x-1.5">
               {membrosDaTarefa.map((tm) => {
                 const membro = membrosDoTenant.find((m) => m.user_id === tm.user_id);
-                return <AvatarIniciais key={tm.id} email={membro?.email ?? "?"} />;
+                return <AvatarIniciais key={tm.id} email={membro?.email ?? null} nomeExibicao={membro?.nome_exibicao} />;
               })}
             </div>
           )}

@@ -10,6 +10,7 @@ import {
   alternarDivisaoEmTurnos,
   criarColuna,
   criarTarefa,
+  definirColunaHoje,
   deletarTarefa,
   excluirColuna,
   moverTarefa,
@@ -79,6 +80,17 @@ export function QuadroKanban({
   const [colunaEditandoId, setColunaEditandoId] = useState<string | null>(null);
   const [colunaArrastadaId, setColunaArrastadaId] = useState<string | null>(null);
   const [criandoColuna, setCriandoColuna] = useState(false);
+  // Pedido do Fabio (2026-10-01): a coluna "Concluído" cresce sem parar ao
+  // longo de um projeto, empurrando a altura de TODAS as colunas (que agora
+  // nivelam pela maior — ver o `grid` abaixo) e tirando o foco do que ainda
+  // falta fazer. Botão exclusivo dela: oculta os cartões (só pra essa
+  // coluna encolher), sem apagar nada — um toque mostra tudo de novo pra
+  // conferência. Estado só de interface (nunca persiste no banco, nem
+  // precisa — é um "esconder da vista" temporário, não uma preferência de
+  // longo prazo), por isso começa OCULTO em toda visita nova à página: é
+  // exatamente o comportamento padrão que resolve "a tela fica enorme com
+  // o tempo".
+  const [concluidosOcultos, setConcluidosOcultos] = useState(true);
   // Arrasto de cartão por toque (celular/tablet) — implementação paralela ao
   // `draggable` nativo acima, que só reage a mouse. Ver comentário em
   // CartaoTarefa.tsx pra detalhe da técnica (alça dedicada ou segurar
@@ -100,6 +112,13 @@ export function QuadroKanban({
   const quadroRef = useRef<HTMLDivElement>(null);
   const [colunaFocoId, setColunaFocoId] = useState<string | null>(colunasIniciais.find((c) => !c.concluido)?.id ?? null);
   const [visaoGeralAberta, setVisaoGeralAberta] = useState(false);
+  // Barra de navegação horizontal SUPERIOR (desktop/visão ampla) — pedido
+  // de 2026-10-01: hoje só existe a barra nativa embaixo das colunas, que
+  // exige descer até o fim pra alcançar. `larguraTotalQuadro` espelha o
+  // `scrollWidth` real do quadro, pro "fantasma" dentro da barra ter a
+  // largura certa pra rolar proporcionalmente.
+  const barraSuperiorRef = useRef<HTMLDivElement>(null);
+  const [larguraTotalQuadro, setLarguraTotalQuadro] = useState(0);
   // Posição de rolagem do quadro antes de abrir o modal de detalhe — pra
   // fechar "voltar pra mesma coluna/posição", pedido explícito do Fabio.
   const [posicaoAntesDoModal, setPosicaoAntesDoModal] = useState<{ left: number; top: number } | null>(null);
@@ -287,6 +306,11 @@ export function QuadroKanban({
     });
   }
 
+  // Nova coluna nasce logo DEPOIS de "Hoje" (regra definitiva, 2026-10-01)
+  // — nunca no fim do quadro. Fallback (projeto antigo, sem "Hoje" ainda):
+  // nasce na 1ª posição. Mesma lógica da Server Action `criarColuna`,
+  // espelhada aqui só pro otimista aparecer na posição certa na hora, sem
+  // esperar o servidor confirmar.
   function criarColunaOtimista(nome: string) {
     if (!nome.trim()) return;
     const id = crypto.randomUUID();
@@ -299,8 +323,13 @@ export function QuadroKanban({
       concluido: false,
       criado_em: new Date().toISOString(),
       dividida_em_turnos: false,
+      hoje: false,
     };
-    setColunas((atual) => [...colunasAbertas, novaColuna, ...atual.filter((c) => c.concluido)]);
+    const indiceHoje = colunasAbertas.findIndex((c) => c.hoje);
+    const posicaoAlvo = indiceHoje === -1 ? 0 : indiceHoje + 1;
+    const abertasComNova = [...colunasAbertas];
+    abertasComNova.splice(posicaoAlvo, 0, novaColuna);
+    setColunas([...abertasComNova, ...colunas.filter((c) => c.concluido)]);
     setCriandoColuna(false);
 
     const formData = new FormData();
@@ -415,34 +444,46 @@ export function QuadroKanban({
     }
     document.addEventListener("touchmove", aoMoverDocumento, { passive: true });
 
-    function rolarVerticalNoPonto(x: number, y: number, delta: number) {
+    // Coluna rolável no ponto (x, y), se houver — `null` quando o dedo não
+    // está sobre nenhuma coluna com scroll próprio.
+    function colunaRolavelNoPonto(x: number, y: number): HTMLElement | null {
       const elementoNoPonto = document.elementFromPoint(x, y);
       const colunaEl = elementoNoPonto?.closest<HTMLElement>("[data-coluna-id]");
-      if (colunaEl) {
-        const estilo = window.getComputedStyle(colunaEl);
-        const rolavel = (estilo.overflowY === "auto" || estilo.overflowY === "scroll") && colunaEl.scrollHeight > colunaEl.clientHeight;
-        if (rolavel) {
-          colunaEl.scrollBy({ top: delta });
-          return;
-        }
-      }
-      window.scrollBy({ top: delta });
+      if (!colunaEl) return null;
+      const estilo = window.getComputedStyle(colunaEl);
+      const rolavel = (estilo.overflowY === "auto" || estilo.overflowY === "scroll") && colunaEl.scrollHeight > colunaEl.clientHeight;
+      return rolavel ? colunaEl : null;
     }
 
     function tick() {
       if (!ativo) return;
       const { x, y } = posicaoAtual;
-      const alturaJanela = window.innerHeight;
       const larguraJanela = window.innerWidth;
 
-      const velocidadeCima = calcularVelocidadeAutoScroll(y, ZONA_AUTO_SCROLL_VERTICAL_PX, VELOCIDADE_MAX_VERTICAL_PX);
-      const velocidadeBaixo = calcularVelocidadeAutoScroll(
-        alturaJanela - y,
-        ZONA_AUTO_SCROLL_VERTICAL_PX,
-        VELOCIDADE_MAX_VERTICAL_PX,
-      );
-      if (velocidadeCima > 0) rolarVerticalNoPonto(x, y, -velocidadeCima);
-      else if (velocidadeBaixo > 0) rolarVerticalNoPonto(x, y, velocidadeBaixo);
+      // Achado real de teste (2026-10-01): a zona de auto-scroll vertical
+      // precisa ser relativa ao TOPO/RODAPÉ DA COLUNA, não da janela — o
+      // cabeçalho fixo da página (título do projeto, navegação, barra de
+      // colunas no mobile) ocupa boa parte do topo da tela, então "90px do
+      // topo da JANELA" podia cair inteiramente dentro da área do
+      // cabeçalho, sem nunca alcançar a coluna de verdade — levar um
+      // cartão pro topo de uma coluna longa simplesmente não rolava nunca.
+      // Quando o dedo não está sobre nenhuma coluna rolável (raro — ex.:
+      // arrastando sobre a página, fora de qualquer coluna), cai no
+      // fallback relativo à janela (comportamento anterior, preservado).
+      const colunaRolavel = colunaRolavelNoPonto(x, y);
+      if (colunaRolavel) {
+        const rect = colunaRolavel.getBoundingClientRect();
+        const velocidadeCima = calcularVelocidadeAutoScroll(y - rect.top, ZONA_AUTO_SCROLL_VERTICAL_PX, VELOCIDADE_MAX_VERTICAL_PX);
+        const velocidadeBaixo = calcularVelocidadeAutoScroll(rect.bottom - y, ZONA_AUTO_SCROLL_VERTICAL_PX, VELOCIDADE_MAX_VERTICAL_PX);
+        if (velocidadeCima > 0) colunaRolavel.scrollBy({ top: -velocidadeCima });
+        else if (velocidadeBaixo > 0) colunaRolavel.scrollBy({ top: velocidadeBaixo });
+      } else {
+        const alturaJanela = window.innerHeight;
+        const velocidadeCima = calcularVelocidadeAutoScroll(y, ZONA_AUTO_SCROLL_VERTICAL_PX, VELOCIDADE_MAX_VERTICAL_PX);
+        const velocidadeBaixo = calcularVelocidadeAutoScroll(alturaJanela - y, ZONA_AUTO_SCROLL_VERTICAL_PX, VELOCIDADE_MAX_VERTICAL_PX);
+        if (velocidadeCima > 0) window.scrollBy({ top: -velocidadeCima });
+        else if (velocidadeBaixo > 0) window.scrollBy({ top: velocidadeBaixo });
+      }
 
       const velocidadeEsquerda = calcularVelocidadeAutoScroll(x, ZONA_AUTO_SCROLL_HORIZONTAL_PX, VELOCIDADE_MAX_HORIZONTAL_PX);
       const velocidadeDireita = calcularVelocidadeAutoScroll(
@@ -482,6 +523,35 @@ export function QuadroKanban({
         setColunas((atual) => atual.map((c) => (c.id === colunaId ? { ...c, dividida_em_turnos: !dividida } : c)));
         if (!dividida) setTarefas(tarefasAnteriores);
         toast.error(mensagemDeErro(err, "Falha ao atualizar a divisão em turnos."));
+      });
+    });
+  }
+
+  /** Marca uma coluna como "Hoje" — mesmo padrão otimista das demais ações
+   * de coluna. Desmarca a anterior (se houver) e desliga a divisão em
+   * turnos dela no estado local também, espelhando o que a Server Action
+   * faz no banco (ela deixaria de satisfazer o CHECK constraint, migration
+   * 0048, se continuasse dividida sem ser mais a Hoje). */
+  function definirColunaHojeOtimista(colunaId: string) {
+    const colunasAnteriores = colunas;
+    const tarefasAnteriores = tarefas;
+    const hojeAnteriorId = colunas.find((c) => c.hoje)?.id;
+    setColunas((atual) =>
+      atual.map((c) => {
+        if (c.id === colunaId) return { ...c, hoje: true };
+        if (c.id === hojeAnteriorId) return { ...c, hoje: false, dividida_em_turnos: false };
+        return c;
+      }),
+    );
+    if (hojeAnteriorId) {
+      setTarefas((atual) => atual.map((t) => (t.coluna_id === hojeAnteriorId ? { ...t, turno: null } : t)));
+    }
+
+    iniciarTransicao(() => {
+      definirColunaHoje(colunaId, projetoId).catch((err) => {
+        setColunas(colunasAnteriores);
+        setTarefas(tarefasAnteriores);
+        toast.error(mensagemDeErro(err, 'Falha ao definir a coluna "Hoje".'));
       });
     });
   }
@@ -565,6 +635,58 @@ export function QuadroKanban({
     container.addEventListener("scroll", aoRolar, { passive: true });
     return () => container.removeEventListener("scroll", aoRolar);
   }, [colunas]);
+
+  // Recalcula a extensão da barra superior sempre que o conteúdo do quadro
+  // muda de largura — "recalcule a extensão ao adicionar/reordenar colunas
+  // ou redimensionar" (2026-10-01). `scrollWidth` não dispara ResizeObserver
+  // sozinho num container com `overflow-x-auto` (o elemento em si não muda
+  // de tamanho, só o conteúdo dele) — por isso o recálculo depende de
+  // `colunas`/`tarefas` (cobre criar/mover/excluir cartão e coluna) MAIS um
+  // listener de `resize` da janela (cobre redimensionar a tela).
+  useEffect(() => {
+    function recalcularLargura() {
+      const largura = quadroRef.current?.scrollWidth ?? 0;
+      setLarguraTotalQuadro(largura);
+    }
+    recalcularLargura();
+    window.addEventListener("resize", recalcularLargura);
+    return () => window.removeEventListener("resize", recalcularLargura);
+  }, [colunas, tarefas]);
+
+  // Sincroniza a barra superior com a rolagem real do quadro, nos dois
+  // sentidos — "a barra superior deve ser alcançável sem descer até o fim".
+  // `sincronizando` evita o loop óbvio (rolar uma dispara o scroll da
+  // outra, que disparia de volta a 1ª, indefinidamente).
+  useEffect(() => {
+    const quadro = quadroRef.current;
+    const barra = barraSuperiorRef.current;
+    if (!quadro || !barra) return;
+    let sincronizando = false;
+
+    function aoRolarQuadro() {
+      if (sincronizando) {
+        sincronizando = false;
+        return;
+      }
+      sincronizando = true;
+      barra!.scrollLeft = quadro!.scrollLeft;
+    }
+    function aoRolarBarra() {
+      if (sincronizando) {
+        sincronizando = false;
+        return;
+      }
+      sincronizando = true;
+      quadro!.scrollLeft = barra!.scrollLeft;
+    }
+
+    quadro.addEventListener("scroll", aoRolarQuadro, { passive: true });
+    barra.addEventListener("scroll", aoRolarBarra, { passive: true });
+    return () => {
+      quadro.removeEventListener("scroll", aoRolarQuadro);
+      barra.removeEventListener("scroll", aoRolarBarra);
+    };
+  }, []);
 
   function irParaColuna(colunaId: string) {
     const el = quadroRef.current?.querySelector<HTMLElement>(`[data-coluna-card="${colunaId}"]`);
@@ -660,16 +782,26 @@ export function QuadroKanban({
         // a partir de 640px (`sm:`) — que já cobre celular DEITADO, não só
         // desktop — volta a 256px fixo, permitindo várias colunas lado a
         // lado ("ao deitar, aproveitar a largura pra mostrar mais colunas").
-        // Altura: limitada com scroll PRÓPRIO até 1024px (`lg:`) — cobre
-        // tanto retrato quanto paisagem de celular/tablet (telas baixas,
-        // onde a página inteira rolar seria pior); só acima de 1024px
-        // (desktop real) a coluna volta a crescer livremente como sempre
-        // (comportamento desktop existente, inalterado).
-        className={`flex w-[85vw] max-w-sm shrink-0 snap-center flex-col gap-2.5 overflow-y-auto rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3 transition max-h-[calc(100dvh-13rem)] sm:w-64 sm:snap-align-none lg:h-fit lg:max-h-none lg:overflow-visible ${
+        // Altura: SEMPRE limitada com scroll próprio, via `style.maxHeight`
+        // (não um arbitrary value do Tailwind baseado em `var()` — isso
+        // confunde o scanner do Tailwind/Lightning CSS e gera warning de
+        // build) —
+        // o NIVELAMENTO entre colunas ("todas na altura da maior", pedido
+        // de 2026-10-01) não é calculado em JS, é o container pai
+        // (`display:grid`, `items-stretch` a partir de `sm:`) esticando
+        // cada coluna até a altura da linha — puramente CSS, recalculado
+        // automaticamente pelo navegador a cada render (criar/mover/excluir
+        // cartão), sem nenhum código adicional de recálculo. Essa coluna
+        // continua com overflow-y-auto própria pra nunca ultrapassar o teto
+        // de altura, mesmo esticada — é esse teto que vira "a altura
+        // nivelada" quando pelo menos 1 coluna tem conteúdo suficiente pra
+        // alcançá-lo (ver `--altura-maxima-coluna-kanban` em globals.css).
+        className={`flex w-[85vw] max-w-sm shrink-0 snap-center flex-col gap-2.5 overflow-y-auto rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3 transition sm:w-64 sm:snap-align-none ${
           colunaArrastadaId === coluna.id ? "opacity-50" : ""
         } ${colunaAlvoToqueId === coluna.id ? "ring-2 ring-gaiamum-primary" : ""}`}
+        style={{ maxHeight: "var(--altura-maxima-coluna-kanban)" }}
       >
-        <div className="sticky top-0 z-10 -mx-3 -mt-3 flex items-center justify-between gap-2 bg-gaiamum-surface px-3 pt-3 pb-1.5 lg:static lg:mx-0 lg:mt-0 lg:px-0 lg:pt-0">
+        <div className="sticky top-0 z-10 -mx-3 -mt-3 flex items-center justify-between gap-2 bg-gaiamum-surface px-3 pt-3 pb-1.5">
           {colunaEditandoId === coluna.id ? (
             <input
               name="nome"
@@ -697,11 +829,34 @@ export function QuadroKanban({
               title={ehFixa ? undefined : "Arraste pra reordenar, clique pra renomear"}
             >
               {coluna.nome} <span className="text-gaiamum-text">({tarefasDaColuna.length})</span>
+              {coluna.hoje && (
+                <span
+                  className="ml-1 rounded-full bg-gaiamum-primary/15 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-gaiamum-primary"
+                  title="Coluna Hoje — só ela pode ser dividida em turnos, e é onde novas colunas nascem"
+                >
+                  📌 Hoje
+                </span>
+              )}
             </h2>
           )}
           {!ehFixa && (
             <div className="flex shrink-0 items-center gap-2">
-              {colunaEditandoId !== coluna.id && (
+              {colunaEditandoId !== coluna.id && !coluna.hoje && (
+                <button
+                  type="button"
+                  onClick={() => definirColunaHojeOtimista(coluna.id)}
+                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-primary"
+                  title='Marcar esta como a coluna "Hoje" — só ela pode dividir em turnos, e é onde novas colunas nascem'
+                >
+                  Definir Hoje
+                </button>
+              )}
+              {/* "Somente a coluna Hoje deve oferecer a ação de dividir em
+                  turnos" (2026-10-01) — regra aplicada aqui (esconde o
+                  controle) E no servidor (`alternarDivisaoEmTurnos` rejeita
+                  a chamada; o CHECK constraint da migration 0048 rejeita a
+                  escrita direta no banco mesmo contornando a Server Action). */}
+              {colunaEditandoId !== coluna.id && coluna.hoje && (
                 <button
                   type="button"
                   onClick={() => alternarDivisaoTurnosOtimista(coluna.id, !coluna.dividida_em_turnos)}
@@ -726,6 +881,25 @@ export function QuadroKanban({
                 </button>
               )}
             </div>
+          )}
+          {/* Exclusivo da coluna "Concluído" (pedido do Fabio, 2026-10-01):
+              ela só cresce ao longo de um projeto — some os cartões (sem
+              apagar nada) pra ela parar de "puxar" a altura das outras
+              colunas e devolver o foco pro que ainda falta fazer; um toque
+              mostra tudo de novo. */}
+          {ehFixa && tarefasDaColuna.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setConcluidosOcultos((atual) => !atual)}
+              className="shrink-0 text-xs text-gaiamum-text-muted hover:text-gaiamum-primary"
+              title={
+                concluidosOcultos
+                  ? "Mostrar os cartões concluídos (só pra conferência)"
+                  : "Ocultar os cartões concluídos de novo"
+              }
+            >
+              {concluidosOcultos ? "👁 Mostrar" : "🙈 Ocultar"}
+            </button>
           )}
         </div>
 
@@ -755,6 +929,14 @@ export function QuadroKanban({
               );
             })}
           </div>
+        ) : ehFixa && concluidosOcultos && tarefasDaColuna.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setConcluidosOcultos(false)}
+            className="rounded-lg border border-dashed border-gaiamum-border py-3 text-xs text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-primary"
+          >
+            {tarefasDaColuna.length} cartão(ões) oculto(s) — toque pra ver
+          </button>
         ) : (
           <>
             {renderCartoes(tarefasDaColuna)}
@@ -843,6 +1025,41 @@ export function QuadroKanban({
         </div>
       )}
 
+      {/* Barra de navegação horizontal SUPERIOR — pedido de 2026-10-01:
+          "hoje o usuário precisa descer até o final das colunas para
+          alcançar a barra horizontal". Só a partir de `lg:` (1024px) —
+          abaixo disso já existe a barra de navegação por toque (acima),
+          que cobre a mesma necessidade; mostrar as duas juntas seria
+          redundante. Sincronizada nos 2 sentidos com a rolagem real do
+          quadro (efeito acima). Setas "‹ ›" ao lado são um controle visível
+          sempre presente — "se barras nativas ficarem ocultas pelo sistema
+          operacional [overlay scrollbar, comum no macOS], ofereça controles
+          visíveis de navegação como alternativa": não dependem de a
+          scrollbar nativa desta barra estar visível pra funcionar. */}
+      {todasAsColunasNaOrdem.length > 0 && (
+        <div className="mb-2 hidden items-center gap-2 lg:flex">
+          <button
+            type="button"
+            onClick={() => quadroRef.current?.scrollBy({ left: -288, behavior: "smooth" })}
+            aria-label="Rolar colunas para a esquerda"
+            className="shrink-0 rounded-lg border border-gaiamum-border px-2 py-1 text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-primary"
+          >
+            ‹
+          </button>
+          <div ref={barraSuperiorRef} className="min-w-0 flex-1 overflow-x-auto" style={{ height: 14 }}>
+            <div style={{ width: larguraTotalQuadro, height: 1 }} />
+          </div>
+          <button
+            type="button"
+            onClick={() => quadroRef.current?.scrollBy({ left: 288, behavior: "smooth" })}
+            aria-label="Rolar colunas para a direita"
+            className="shrink-0 rounded-lg border border-gaiamum-border px-2 py-1 text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-primary"
+          >
+            ›
+          </button>
+        </div>
+      )}
+
       {/* "O usuário deseja também usar pinça para afastar e enxergar o
           quadro" — avaliado (ver relatório do incremento): um gesto de
           pinça custom aqui competiria com o zoom nativo do navegador e com
@@ -852,8 +1069,31 @@ export function QuadroKanban({
           continua livre (nada aqui captura gesto de pinça). Pinça dedicada
           fica documentada como melhoria futura, não implementada agora. */}
 
-      <div ref={quadroRef} className="flex min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto pb-2 scroll-smooth sm:snap-none">
-        {/* `key` + `display:contents` (não afeta o layout flex) — achado
+      {/* `display:grid` + `grid-auto-flow:column` (não `flex`) — pedido de
+          2026-10-01: "todas as colunas devem ter altura nivelada pela
+          coluna com maior conteúdo renderizado" no desktop/visão ampla.
+          `items-stretch` (ativo a partir de `sm:`, mesmo breakpoint que já
+          decide "mostrar múltiplas colunas lado a lado") faz o PRÓPRIO
+          motor de layout do navegador esticar cada coluna até a altura da
+          maior da mesma linha — sem nenhum cálculo em JS, recalculado
+          automaticamente a cada render (criar/mover/excluir/filtrar
+          cartão). Cada coluna mantém seu teto de altura + scroll próprio
+          (ver `renderColuna`), então o nivelamento converge pro teto
+          disponível quando alguma coluna o atinge, e por "a mais alta
+          delas" quando nenhuma atinge — nunca mais que isso, preservando
+          área de drop utilizável nas vazias sem forçar um espaço vazio
+          artificial quando não há necessidade.
+          No celular em retrato (`items-start`, abaixo de `sm:`) o
+          nivelamento fica DESLIGADO de propósito: só 1 coluna é visível por
+          vez ali (scroll-snap), então "nivelar com a maior do quadro
+          inteiro" obrigaria uma coluna curta a carregar altura vazia de
+          uma coluna que nem está na tela — pedido explícito pra evitar
+          isso. */}
+      <div
+        ref={quadroRef}
+        className="grid min-w-0 auto-cols-[85vw] grid-flow-col items-start justify-start gap-3 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory sm:auto-cols-[16rem] sm:items-stretch sm:snap-none"
+      >
+        {/* `key` + `display:contents` (não afeta o layout de grid) — achado
             incidental pré-existente (não introduzido nesta rodada): React
             exige key quando um elemento solto é intercalado com uma lista
             `.map()` como filhos irmãos do mesmo pai; faltava aqui. */}
@@ -863,9 +1103,18 @@ export function QuadroKanban({
           </div>
         )}
         {colunasAbertas.map((coluna) => renderColuna(coluna, false))}
+        {colunaFixa && renderColuna(colunaFixa, true)}
 
+        {/* "Concluído é sempre a última coluna de trabalho. O botão
+            Adicionar coluna fica DEPOIS de Concluído. Esse botão é um
+            controle, não uma coluna reordenável." (2026-10-01) — por isso
+            vem depois de `colunaFixa` aqui (antes vinha antes dela), nunca
+            participa de `colunasAbertas`/`reordenarColunas`, e o
+            posicionamento DELE não decide onde a nova coluna nasce (isso é
+            responsabilidade de `criarColunaOtimista`/`criarColuna`, que
+            sempre inserem logo depois de "Hoje"). */}
         {criandoColuna ? (
-          <div className="flex h-fit w-56 shrink-0 flex-col gap-2 rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3">
+          <div className="flex h-fit w-56 shrink-0 flex-col gap-2 self-start rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3">
             <input
               ref={inputNovaColunaRef}
               autoFocus
@@ -899,14 +1148,12 @@ export function QuadroKanban({
           <button
             type="button"
             onClick={() => setCriandoColuna(true)}
-            title="Nova coluna"
+            title="Nova coluna (nasce logo depois de Hoje, não aqui no fim)"
             className="h-9 w-9 shrink-0 self-start rounded-xl border border-dashed border-gaiamum-border text-lg leading-none text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-primary"
           >
             +
           </button>
         )}
-
-        {colunaFixa && renderColuna(colunaFixa, true)}
       </div>
 
       {tarefas.length > 0 && (

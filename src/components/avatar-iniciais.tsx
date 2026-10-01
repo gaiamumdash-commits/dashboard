@@ -5,14 +5,26 @@ const CLASSE_TAMANHO: Record<"sm" | "md", string> = {
   md: "h-6 w-6 text-[10px]",
 };
 
-export function AvatarIniciais({ email, tamanho = "md" }: { email: string; tamanho?: "sm" | "md" }) {
-  const cor = corAvatarPorEmail(email);
+/** `email` pode ser `null` (revisão de privacidade, 2026-10-01 — convidado
+ * de projeto vendo o owner sem compartilhar projeto, migration 0049);
+ * `nomeExibicao` é o fallback nesse caso. Passar pelo menos um dos dois. */
+export function AvatarIniciais({
+  email,
+  nomeExibicao,
+  tamanho = "md",
+}: {
+  email: string | null;
+  nomeExibicao?: string;
+  tamanho?: "sm" | "md";
+}) {
+  const identificador = email ?? nomeExibicao ?? "?";
+  const cor = corAvatarPorEmail(identificador);
   return (
     <span
-      title={email}
+      title={email ?? nomeExibicao}
       className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${CLASSE_TAMANHO[tamanho]} ${CLASSE_FUNDO_QUADRO[cor]} ${TEXTO_SOBRE_FUNDO_QUADRO[cor]}`}
     >
-      {email.slice(0, 2).toUpperCase()}
+      {identificador.slice(0, 2).toUpperCase()}
     </span>
   );
 }

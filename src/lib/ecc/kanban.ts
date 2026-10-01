@@ -1,4 +1,4 @@
-import type { CorEtiqueta, Tarefa } from "@/lib/ecc/tipos";
+import type { CorEtiqueta, MembroTenant, Tarefa } from "@/lib/ecc/tipos";
 
 /** Fonte única das 6 cores fixas — reaproveitada pro fallback de cor
  * automática de etiqueta (etiquetas.ts) e pro hash de cor de avatar
@@ -38,12 +38,22 @@ export const TEXTO_SOBRE_FUNDO_QUADRO: Record<CorEtiqueta, string> = {
   lime: "text-black",
 };
 
-/** Cor determinística por e-mail — pra bolinha de iniciais não ficar toda
- * da mesma cor quando reaproveitada em vários lugares (menção, dropdown,
- * membros do cartão). */
+/** Cor determinística por e-mail (ou outra string estável) — pra bolinha de
+ * iniciais não ficar toda da mesma cor quando reaproveitada em vários
+ * lugares (menção, dropdown, membros do cartão). */
 export function corAvatarPorEmail(email: string): CorEtiqueta {
   const soma = Array.from(email).reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return CORES_ETIQUETA[soma % CORES_ETIQUETA.length];
+}
+
+/** Fonte única de verdade pra "qual string identifica este membro na
+ * interface" — revisão de privacidade, 2026-10-01: `email` pode ser `null`
+ * (convidado de projeto vendo o owner sem compartilhar projeto, migration
+ * 0049), e `nome_exibicao` (parte local do e-mail, sempre presente) é o
+ * fallback. Usada pra @menção, avatar e qualquer exibição/comparação que
+ * hoje usaria `membro.email` direto — nunca ler `.email` cru fora daqui. */
+export function identificacaoDoMembro(membro: MembroTenant): string {
+  return membro.email ?? membro.nome_exibicao;
 }
 
 /** Toca quando um cartão entra na coluna "Concluído" — pedido do Fabio,

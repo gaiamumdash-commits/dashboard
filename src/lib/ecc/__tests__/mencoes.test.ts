@@ -3,8 +3,16 @@ import { extrairIdsMencionados, calcularBuscaMencao, aplicarMencao } from "@/lib
 import type { MembroTenant } from "@/lib/ecc/tipos";
 
 const MEMBROS: MembroTenant[] = [
-  { user_id: "u1", email: "fabio@gaiamum.com.br", papel: "owner" },
-  { user_id: "u2", email: "ana@gaiamum.com.br", papel: "member" },
+  { user_id: "u1", email: "fabio@gaiamum.com.br", papel: "owner", nome_exibicao: "fabio" },
+  { user_id: "u2", email: "ana@gaiamum.com.br", papel: "member", nome_exibicao: "ana" },
+];
+
+// Revisão de privacidade (2026-10-01): `email` pode ser `null` quando quem
+// está vendo não tem direito a ele (migration 0049) — a @menção precisa
+// continuar funcionando usando `nome_exibicao` nesse caso.
+const MEMBROS_COM_UM_SEM_EMAIL: MembroTenant[] = [
+  { user_id: "u1", email: null, papel: "owner", nome_exibicao: "fabio" },
+  { user_id: "u2", email: "ana@gaiamum.com.br", papel: "member", nome_exibicao: "ana" },
 ];
 
 describe("extrairIdsMencionados — só reconhece @email de gente que é membro real", () => {
@@ -25,6 +33,18 @@ describe("extrairIdsMencionados — só reconhece @email de gente que é membro 
 
   it("sem nenhum membro no workspace, nunca reconhece nada", () => {
     expect(extrairIdsMencionados("@fabio@gaiamum.com.br", [])).toEqual([]);
+  });
+});
+
+describe("extrairIdsMencionados — revisão de privacidade (2026-10-01): membro sem e-mail visível", () => {
+  it("reconhece a menção pelo nome_exibicao quando email é null", () => {
+    const ids = extrairIdsMencionados("oi @fabio, pode revisar isso?", MEMBROS_COM_UM_SEM_EMAIL);
+    expect(ids).toEqual(["u1"]);
+  });
+
+  it("o membro com e-mail visível continua reconhecido pelo e-mail completo, sem mudança", () => {
+    const ids = extrairIdsMencionados("oi @ana@gaiamum.com.br", MEMBROS_COM_UM_SEM_EMAIL);
+    expect(ids).toEqual(["u2"]);
   });
 });
 

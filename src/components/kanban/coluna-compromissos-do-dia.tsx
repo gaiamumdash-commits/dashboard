@@ -65,7 +65,14 @@ export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }
   });
 
   return (
-    <div className="flex min-h-[10rem] w-[85vw] shrink-0 flex-col gap-2.5 rounded-xl border border-gaiamum-primary/40 bg-gaiamum-surface p-3 sm:min-h-[16rem] sm:w-64">
+    // `max-h` + `overflow-y-auto` (não `min-h`) — mesma altura máxima e
+    // mesma lógica de nivelamento das demais colunas (quadro-kanban.tsx):
+    // sem isso, esta coluna fixa não participava do nivelamento por
+    // conteúdo real e carregava um "chão" artificial mesmo vazia.
+    <div
+      className="flex w-[85vw] shrink-0 flex-col gap-2.5 overflow-y-auto rounded-xl border border-gaiamum-primary/40 bg-gaiamum-surface p-3 sm:w-64"
+      style={{ maxHeight: "var(--altura-maxima-coluna-kanban)" }}
+    >
       {resultado.status !== "oculto" && <BlocoCompromissos resultado={resultado} hoje={hoje} />}
 
       <ListaContasDoDiaKanban contas={contasDoDia} />

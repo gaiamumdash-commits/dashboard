@@ -16,6 +16,7 @@ import {
   listarMembros,
   listarMembrosComAcessoAoProjeto,
   obterPapelAtual,
+  resolverEmailsParaNotificacao,
 } from "@/lib/ecc/equipe";
 import { extrairIdsMencionados } from "@/lib/ecc/mencoes";
 import { formatarDataHoraBrasil } from "@/lib/ecc/kanban";
@@ -263,10 +264,13 @@ export async function criarProjeto(formData: FormData) {
     throw new Error(`Projeto criado, mas falha ao definir gestor: ${erroMembro.message}`);
   }
 
-  // Todo projeto novo nasce com as 3 colunas padrão — "Concluído" fixa,
-  // as outras duas o usuário pode renomear ou apagar depois.
+  // Todo projeto novo nasce com as 3 colunas padrão — "Concluído" fixa, "Hoje"
+  // já marcada como a coluna de sistema (migration 0048, só ela pode dividir
+  // em turnos e é onde novas colunas nascem por padrão) — as 2 abertas o
+  // usuário pode renomear ou apagar depois, "Hoje" inclusive (perde só o
+  // nome, não a marcação de sistema).
   const { error: erroColunas } = await supabase.from("colunas_kanban").insert([
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Aberto", ordem: 0, concluido: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Hoje", ordem: 0, concluido: false, hoje: true },
     { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Desenvolvimento", ordem: 1, concluido: false },
     { tenant_id: tenantId, projeto_id: projeto.id, nome: "Concluído", ordem: 0, concluido: true },
   ]);
@@ -868,23 +872,52 @@ export async function moverTarefa(
 // Colunas do kanban (configuráveis por projeto — só "Concluído" é fixa)
 // ---------------------------------------------------------------------------
 
+/** Nova coluna nasce logo DEPOIS da coluna "Hoje" (regra definitiva pedida
+ * pelo Fabio, 2026-10-01) — nunca no fim do quadro. `ordem` é inteiro, não
+ * fracionário como em `tarefas.ordem`, então "inserir no meio" exige abrir
+ * espaço de verdade: lê a lista de colunas abertas (já ordenadas, mesmo
+ * campo que `reordenarColunas` usa), insere o novo id na posição alvo e
+ * regrava `ordem` 0..N pra todas — reaproveita a mesma persistência de
+ * ordem existente, não cria mecanismo novo.
+ * Fallback documentado: se o projeto ainda não tem nenhuma coluna marcada
+ * como "Hoje" (projetos antigos, antes da migration 0048, até alguém usar
+ * `definirColunaHoje`), a nova coluna nasce na 1ª posição — nunca no fim. */
 export async function criarColuna(projetoId: string, formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
   const nome = campoObrigatorio(formData, "nome");
 
-  const { count } = await supabase
+  const { data: colunasAbertas } = await supabase
     .from("colunas_kanban")
-    .select("id", { count: "exact", head: true })
+    .select("id, hoje")
     .eq("projeto_id", projetoId)
-    .eq("concluido", false);
+    .eq("concluido", false)
+    .order("ordem", { ascending: true });
 
-  const { error } = await supabase
+  const lista = colunasAbertas ?? [];
+  const indiceHoje = lista.findIndex((c) => c.hoje);
+  const posicaoAlvo = indiceHoje === -1 ? 0 : indiceHoje + 1;
+
+  const { data: novaColuna, error: erroInsert } = await supabase
     .from("colunas_kanban")
-    .insert({ tenant_id: tenantId, projeto_id: projetoId, nome, ordem: count ?? 0 });
+    .insert({ tenant_id: tenantId, projeto_id: projetoId, nome, ordem: lista.length })
+    .select("id")
+    .single();
 
-  if (error) {
-    throw new Error(`Falha ao criar coluna: ${error.message}`);
+  if (erroInsert || !novaColuna) {
+    throw new Error(`Falha ao criar coluna: ${erroInsert?.message}`);
+  }
+
+  const idsNaOrdemFinal = lista.map((c) => c.id);
+  idsNaOrdemFinal.splice(posicaoAlvo, 0, novaColuna.id);
+
+  const reindexacoes = idsNaOrdemFinal.map((id, indice) =>
+    supabase.from("colunas_kanban").update({ ordem: indice }).eq("id", id),
+  );
+  const resultados = await Promise.all(reindexacoes);
+  const erroReindex = resultados.find((r) => r.error)?.error;
+  if (erroReindex) {
+    throw new Error(`Coluna criada, mas falha ao posicioná-la depois de "Hoje": ${erroReindex.message}`);
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
@@ -923,12 +956,21 @@ export async function alternarDivisaoEmTurnos(colunaId: string, projetoId: strin
 
   const { data: coluna } = await supabase
     .from("colunas_kanban")
-    .select("concluido")
+    .select("concluido, hoje")
     .eq("id", colunaId)
     .maybeSingle();
 
   if (coluna?.concluido) {
     throw new Error('A coluna "Concluído" é fixa e não pode ser dividida em turnos.');
+  }
+
+  // Regra definitiva (2026-10-01): só a coluna "Hoje" pode dividir em
+  // turnos. Checagem no SERVIDOR, não só escondendo o botão na interface —
+  // e o CHECK constraint da migration 0048 é a 2ª camada de defesa (RLS/SQL
+  // direto nunca contorna isso, mesmo chamando a tabela sem passar por
+  // aqui).
+  if (dividida && !coluna?.hoje) {
+    throw new Error('Só a coluna "Hoje" pode ser dividida em Manhã/Tarde/Noite.');
   }
 
   const { error } = await supabase.from("colunas_kanban").update({ dividida_em_turnos: dividida }).eq("id", colunaId);
@@ -942,6 +984,58 @@ export async function alternarDivisaoEmTurnos(colunaId: string, projetoId: strin
     if (erroLimpeza) {
       throw new Error(`Falha ao desfazer a divisão em turnos: ${erroLimpeza.message}`);
     }
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+/** Marca uma coluna como "a coluna Hoje" do projeto — identidade de sistema
+ * (migration 0048) que não depende do nome/título dela. No máximo 1 por
+ * projeto (índice único no banco): marcar uma nova desmarca a anterior
+ * automaticamente. Existe principalmente pro fallback de projetos sem
+ * nenhuma "Hoje" ainda (criados antes desta mudança) e pra permitir trocar
+ * depois, se o usuário quiser. Não transfere a divisão em turnos da coluna
+ * anterior — se ela estava dividida, perde essa divisão (o próprio CHECK
+ * constraint do banco exigiria isso); os cartões e o `turno` de cada um
+ * continuam intactos, só a divisão visual é que não se aplica mais ali. */
+export async function definirColunaHoje(colunaId: string, projetoId: string) {
+  const supabase = await createClient();
+
+  const { data: coluna } = await supabase
+    .from("colunas_kanban")
+    .select("concluido")
+    .eq("id", colunaId)
+    .maybeSingle();
+
+  if (coluna?.concluido) {
+    throw new Error('A coluna "Concluído" é fixa e não pode virar a coluna Hoje.');
+  }
+
+  // Desmarca a Hoje atual do projeto (se houver) e desliga a divisão em
+  // turnos dela — nessa ordem, antes de marcar a nova, porque o índice
+  // único (1 "Hoje" por projeto) e o CHECK constraint (turnos só na Hoje)
+  // rejeitariam qualquer estado intermediário com os dois ao mesmo tempo.
+  const { error: erroDesligarTurnos } = await supabase
+    .from("colunas_kanban")
+    .update({ dividida_em_turnos: false })
+    .eq("projeto_id", projetoId)
+    .eq("hoje", true);
+  if (erroDesligarTurnos) {
+    throw new Error(`Falha ao trocar a coluna Hoje: ${erroDesligarTurnos.message}`);
+  }
+
+  const { error: erroDesmarcar } = await supabase
+    .from("colunas_kanban")
+    .update({ hoje: false })
+    .eq("projeto_id", projetoId)
+    .eq("hoje", true);
+  if (erroDesmarcar) {
+    throw new Error(`Falha ao trocar a coluna Hoje: ${erroDesmarcar.message}`);
+  }
+
+  const { error } = await supabase.from("colunas_kanban").update({ hoje: true }).eq("id", colunaId);
+  if (error) {
+    throw new Error(`Falha ao definir a coluna Hoje: ${error.message}`);
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
@@ -1137,7 +1231,16 @@ export async function enviarConsolidacaoProjeto(projetoId: string): Promise<{ en
     secoes.push({ nomeResponsavel: "Sem responsável", itens: semResponsavel });
   }
 
-  const destinatarios = membrosComAcesso.map((m) => m.email);
+  // Resolução PRIVILEGIADA — ver comentário em `resolverEmailsParaNotificacao`:
+  // quem dispara o Freeze pode ser um gestor de projeto sem acesso completo
+  // (escopo='projeto'), e `membrosComAcesso` sempre inclui o(s) owner(s) do
+  // tenant mesmo sem projeto compartilhado com ele — não dependa do e-mail
+  // deles estar visível na interface pra esse gestor pra ainda assim
+  // conseguir notificá-los.
+  const destinatarios = await resolverEmailsParaNotificacao(
+    tenantId,
+    membrosComAcesso.map((m) => m.user_id),
+  );
 
   await enviarEmailConsolidacao({
     destinatarios,

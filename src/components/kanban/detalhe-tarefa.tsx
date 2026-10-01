@@ -14,7 +14,7 @@ import type {
   Tarefa,
   Turno,
 } from "@/lib/ecc/tipos";
-import { CLASSE_COR_ETIQUETA, CLASSE_FUNDO_QUADRO, paraDatetimeLocal, tocarSomConcluido } from "@/lib/ecc/kanban";
+import { CLASSE_COR_ETIQUETA, CLASSE_FUNDO_QUADRO, identificacaoDoMembro, paraDatetimeLocal, tocarSomConcluido } from "@/lib/ecc/kanban";
 import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
 import { aplicarMencao, calcularBuscaMencao, dividirTextoPorMencoes } from "@/lib/ecc/mencoes";
 import {
@@ -131,18 +131,22 @@ export function DetalheTarefa({
 
   function sugestoesMencao(busca: string | null): MembroTenant[] {
     if (busca === null) return [];
-    return membrosDoTenant.filter((m) => m.email.toLowerCase().includes(busca.toLowerCase()));
+    return membrosDoTenant.filter((m) => identificacaoDoMembro(m).toLowerCase().includes(busca.toLowerCase()));
   }
 
-  /** Chip destacado (bolinha + parte do e-mail antes do @) no lugar do
-   * `@email` cru — usado na timeline de comentários e nos itens do
-   * checklist já salvos. Descrição fica de fora (é sempre <textarea>). */
+  /** Chip destacado (bolinha + identificação) no lugar do `@<chave>` cru —
+   * usado na timeline de comentários e nos itens do checklist já salvos.
+   * Descrição fica de fora (é sempre <textarea>). `identificacaoDoMembro`
+   * (e-mail, ou `nome_exibicao` quando o e-mail não está visível pra quem
+   * está lendo — revisão de privacidade, 2026-10-01) já é a mesma chave
+   * que `dividirTextoPorMencoes` usou pra casar o texto, então sempre bate
+   * com o que está gravado. */
   function renderTextoComMencoes(texto: string) {
     return dividirTextoPorMencoes(texto, membrosDoTenant).map((parte, indice) =>
       parte.membro ? (
         <span key={indice} className="inline-flex items-center gap-1 align-middle">
-          <AvatarIniciais email={parte.membro.email} tamanho="sm" />
-          <span className="font-medium text-gaiamum-text">{parte.membro.email.split("@")[0]}</span>
+          <AvatarIniciais email={parte.membro.email} nomeExibicao={parte.membro.nome_exibicao} tamanho="sm" />
+          <span className="font-medium text-gaiamum-text">{identificacaoDoMembro(parte.membro).split("@")[0]}</span>
         </span>
       ) : (
         <span key={indice}>{parte.texto}</span>
@@ -156,8 +160,8 @@ export function DetalheTarefa({
     setBuscaMencaoComentario(calcularBuscaMencao(valor, cursor));
   }
 
-  function escolherMencaoComentario(email: string) {
-    const { novoTexto, novoCursor } = aplicarMencao(textoComentario, cursorComentario, email);
+  function escolherMencaoComentario(chave: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(textoComentario, cursorComentario, chave);
     cursorPendenteComentarioRef.current = novoCursor;
     setTextoComentario(novoTexto);
     setBuscaMencaoComentario(null);
@@ -169,8 +173,8 @@ export function DetalheTarefa({
     setBuscaMencaoDescricao(calcularBuscaMencao(valor, cursor));
   }
 
-  function escolherMencaoDescricao(email: string) {
-    const { novoTexto, novoCursor } = aplicarMencao(descricao, cursorDescricao, email);
+  function escolherMencaoDescricao(chave: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(descricao, cursorDescricao, chave);
     cursorPendenteDescricaoRef.current = novoCursor;
     setDescricao(novoTexto);
     setBuscaMencaoDescricao(null);
@@ -182,8 +186,8 @@ export function DetalheTarefa({
     setBuscaMencaoItem(calcularBuscaMencao(valor, cursor));
   }
 
-  function escolherMencaoItem(email: string) {
-    const { novoTexto, novoCursor } = aplicarMencao(textoItem, cursorItem, email);
+  function escolherMencaoItem(chave: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(textoItem, cursorItem, chave);
     cursorPendenteItemRef.current = novoCursor;
     setTextoItem(novoTexto);
     setBuscaMencaoItem(null);
@@ -608,11 +612,11 @@ export function DetalheTarefa({
                   key={membro.user_id}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => escolherMencaoDescricao(membro.email)}
+                  onClick={() => escolherMencaoDescricao(identificacaoDoMembro(membro))}
                   className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
                 >
-                  <AvatarIniciais email={membro.email} tamanho="sm" />
-                  {membro.email}
+                  <AvatarIniciais email={membro.email} nomeExibicao={membro.nome_exibicao} tamanho="sm" />
+                  {identificacaoDoMembro(membro)}
                 </button>
               ))}
             </div>
@@ -629,14 +633,14 @@ export function DetalheTarefa({
                   key={membro.user_id}
                   type="button"
                   onClick={() => alternarMembro(membro.user_id)}
-                  title={membro.email}
+                  title={identificacaoDoMembro(membro)}
                   className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition ${
                     ativo
                       ? "bg-gaiamum-primary text-white"
                       : "border border-gaiamum-border bg-gaiamum-surface-raised text-gaiamum-text-muted hover:border-gaiamum-primary"
                   }`}
                 >
-                  {membro.email.slice(0, 2).toUpperCase()}
+                  {identificacaoDoMembro(membro).slice(0, 2).toUpperCase()}
                 </button>
               );
             })}
@@ -703,11 +707,11 @@ export function DetalheTarefa({
                     key={membro.user_id}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => escolherMencaoItem(membro.email)}
+                    onClick={() => escolherMencaoItem(identificacaoDoMembro(membro))}
                     className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
                   >
-                    <AvatarIniciais email={membro.email} tamanho="sm" />
-                    {membro.email}
+                    <AvatarIniciais email={membro.email} nomeExibicao={membro.nome_exibicao} tamanho="sm" />
+                    {identificacaoDoMembro(membro)}
                   </button>
                 ))}
               </div>
@@ -756,11 +760,11 @@ export function DetalheTarefa({
                     key={membro.user_id}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => escolherMencaoComentario(membro.email)}
+                    onClick={() => escolherMencaoComentario(identificacaoDoMembro(membro))}
                     className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
                   >
-                    <AvatarIniciais email={membro.email} tamanho="sm" />
-                    {membro.email}
+                    <AvatarIniciais email={membro.email} nomeExibicao={membro.nome_exibicao} tamanho="sm" />
+                    {identificacaoDoMembro(membro)}
                   </button>
                 ))}
               </div>

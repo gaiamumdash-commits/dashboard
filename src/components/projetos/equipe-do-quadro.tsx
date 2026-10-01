@@ -14,7 +14,12 @@ import {
 
 export type MembroDoQuadro = {
   user_id: string;
-  email: string;
+  /** `null` quando quem está vendo não tem direito ao e-mail completo deste
+   * membro (ex.: gestor de projeto sem acesso completo olhando o owner, sem
+   * compartilhar outro projeto com ele — migration 0049). Use `email ??
+   * nomeExibicao` pra exibir. */
+  email: string | null;
+  nomeExibicao: string;
   origem: "owner" | "workspace" | "projeto";
   papelProjeto: PapelProjeto | null;
 };
@@ -110,7 +115,7 @@ export function EquipeDoQuadro({
               className="flex flex-col gap-1.5 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
             >
               <span className="text-sm text-gaiamum-text">
-                {m.email} <span className="text-xs text-gaiamum-text-muted">({rotulo(m)})</span>
+                {m.email ?? m.nomeExibicao} <span className="text-xs text-gaiamum-text-muted">({rotulo(m)})</span>
               </span>
               {m.origem !== "owner" && (
                 <div className="flex gap-2">

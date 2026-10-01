@@ -1,6 +1,17 @@
 @import "tailwindcss";
 
 :root {
+  /* Altura máxima de uma coluna do Kanban (quadro-kanban.tsx e
+     coluna-compromissos-do-dia.tsx compartilham esta variável — não
+     duplicar o número em CSS arbitrário nos dois lugares, pra não os dois
+     arquivos saírem de sincronia). Com `overflow-y:auto`, isso é o "teto"
+     que o nivelamento de altura (`items-stretch`, 2026-10-01) usa quando
+     pelo menos uma coluna tem conteúdo suficiente pra alcançá-lo — calibrado
+     subtraindo o espaço do cabeçalho da página acima do quadro (título,
+     botões de navegação do projeto, e no celular também a barra de
+     navegação de coluna). */
+  --altura-maxima-coluna-kanban: calc(100dvh - 13rem);
+
   /* Paleta oficial da marca (Gaiamum marca/Gaiamum dashboard.png):
      navy #011f51, azul #0141bc, azul vivo #0069fd, ciano #00cbee, creme #f5e9dc.
      Tema escuro é o padrão (sem atributo); tema claro entra via [data-theme="light"]. */

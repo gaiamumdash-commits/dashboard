@@ -11,6 +11,34 @@ export async function listarMembros(tenantId: string): Promise<MembroTenant[]> {
   return (data as MembroTenant[]) ?? [];
 }
 
+/** Resolve e-mails de notificação com PRIVILÉGIO TOTAL (service role),
+ * nunca limitado pelo escopo de quem disparou a ação que gera a notificação
+ * — revisão de privacidade, 2026-10-01. Diferente de `listarMembros()`
+ * (usada pra exibir/selecionar na interface, sujeita a RLS/escopo de quem
+ * está logado): "identificar/selecionar a pessoa na interface" e "resolver
+ * seu endereço para enviar notificação no servidor" são responsabilidades
+ * separadas — a 2ª nunca deveria depender de o remetente da ação enxergar o
+ * e-mail do destinatário. Achado real corrigido: antes, `registrarAtividade`/
+ * `enviarConsolidacaoProjeto` usavam `listarMembros()`, então um convidado
+ * de projeto (ou gestor de projeto sem acesso completo) que disparasse uma
+ * notificação pra um responsável que ele não "vê" plenamente (ex.: o owner,
+ * sem projeto compartilhado) deixaria de conseguir notificá-lo. Usa a RPC
+ * `emails_para_notificacao` (migration 0049, EXECUTE revogado de
+ * anon/authenticated — só o service role chama). */
+export async function resolverEmailsParaNotificacao(tenantId: string, userIds: string[]): Promise<string[]> {
+  if (userIds.length === 0) return [];
+  const service = createServiceClient();
+  const { data, error } = await service.rpc("emails_para_notificacao", {
+    p_user_ids: userIds,
+    p_tenant_id: tenantId,
+  });
+  if (error) {
+    console.error("[resolverEmailsParaNotificacao] falha ao resolver e-mails:", error);
+    return [];
+  }
+  return ((data ?? []) as { user_id: string; email: string }[]).map((m) => m.email);
+}
+
 export async function listarConvitesPendentes(tenantId: string): Promise<Convite[]> {
   const supabase = await createClient();
   const { data } = await supabase
