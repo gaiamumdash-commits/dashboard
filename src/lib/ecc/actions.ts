@@ -531,6 +531,15 @@ export async function criarTarefa(
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
+  // "Concluído" só recebe cartão por movimentação (arrasto/"Mover
+  // para..."), nunca por criação direta nela (pedido do Fabio, 2026-10-01).
+  // Checagem aqui dá um erro em português cedo; o trigger da migration 0050
+  // é quem garante isso de verdade mesmo contornando esta Server Action.
+  const { data: colunaDestino } = await supabase.from("colunas_kanban").select("concluido").eq("id", colunaId).single();
+  if (colunaDestino?.concluido) {
+    throw new Error('A coluna "Concluído" só recebe cartões movidos de outra coluna — crie o cartão em outra coluna e transporte pra cá.');
+  }
+
   // Cada linha do texto vira uma tarefa: cola uma lista pronta, sai um
   // cartão por item, sem precisar criar um por um.
   const titulos = campoObrigatorio(formData, "titulo")
@@ -983,6 +992,22 @@ export async function alternarDivisaoEmTurnos(colunaId: string, projetoId: strin
     const { error: erroLimpeza } = await supabase.from("tarefas").update({ turno: null }).eq("coluna_id", colunaId);
     if (erroLimpeza) {
       throw new Error(`Falha ao desfazer a divisão em turnos: ${erroLimpeza.message}`);
+    }
+  } else {
+    // Achado real (2026-10-01): cartões já existentes na coluna, sem turno
+    // definido, não sumiam de verdade — ficavam com `turno = null`, que
+    // nenhum dos 3 sub-blocos (filtro `turno === valor`) exibe. Em vez de um
+    // 4º bloco "sem turno" (ideia descartada pelo Fabio), a correção pedida
+    // é: ao dividir, todo cartão sem turno entra direto em "Manhã" — visível
+    // de cara, sem perder nada — e a pessoa reorganiza manualmente depois
+    // pra Tarde/Noite se fizer sentido.
+    const { error: erroDefault } = await supabase
+      .from("tarefas")
+      .update({ turno: "manha" })
+      .eq("coluna_id", colunaId)
+      .is("turno", null);
+    if (erroDefault) {
+      throw new Error(`Falha ao mover os cartões existentes para "Manhã": ${erroDefault.message}`);
     }
   }
 

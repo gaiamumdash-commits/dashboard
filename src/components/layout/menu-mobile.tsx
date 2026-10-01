@@ -7,11 +7,15 @@ import { LinksNavegacao } from "@/components/layout/links-navegacao";
 import { BotaoSair } from "@/components/layout/botao-sair";
 import { SeletorTema } from "@/components/theme-toggle";
 
-/** Cabeçalho + painel visíveis só abaixo de `sm` (640px) — mesmo breakpoint
- * em que o `<aside>` de MenuLateral aparece. Tudo dentro de um único wrapper
- * `sm:hidden`: se o painel estiver aberto e a viewport crescer (resize/
- * rotação de device), `display:none` no ancestral remove a subárvore
- * inteira, inclusive o overlay `fixed`, sem precisar de listener de resize.
+/** Cabeçalho + painel visíveis abaixo de `sm` (640px) OU em qualquer
+ * dispositivo de toque (`pointer: coarse`) — espelha exatamente o critério
+ * do `<aside>` de MenuLateral (achado real, 2026-10-01: celular DEITADO
+ * passa de 640px de largura, então só olhar a largura mostraria os dois
+ * menus — o de desktop E este — ou nenhum dos dois, dependendo de qual
+ * breakpoint ganhasse). Tudo dentro de um único wrapper: se o painel estiver
+ * aberto e a viewport crescer pra desktop real (resize/rotação de device),
+ * `display:none` no ancestral remove a subárvore inteira, inclusive o
+ * overlay `fixed`, sem precisar de listener de resize.
  *
  * Painel cai pra baixo, largura cheia — não é uma gaveta lateral. A lista de
  * links já é vertical por natureza, então um painel de largura cheia logo
@@ -37,7 +41,7 @@ export function MenuMobile({
   const [aberto, setAberto] = useState(false);
 
   return (
-    <div className="sm:hidden">
+    <div className="hidden max-[639px]:block [@media(pointer:coarse)]:block">
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-gaiamum-border bg-gaiamum-surface px-4">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/brand/crab-mark.png" alt="" width={28} height={28} />

@@ -507,21 +507,30 @@ export function QuadroKanban({
   }, [Boolean(arrastoToque)]);
 
   /** Liga/desliga a divisão de uma coluna em turnos — mesmo padrão otimista
-   * das demais ações de coluna. Ao desligar, limpa `turno` das tarefas dessa
-   * coluna no estado local também (a Server Action já faz isso no banco),
-   * senão os cartões só voltariam a aparecer juntos depois do próximo
-   * `router.refresh()` — decisão já tomada com o Fabio: nada se perde. */
+   * das demais ações de coluna.
+   * Ao desligar, limpa `turno` das tarefas dessa coluna no estado local
+   * também (a Server Action já faz isso no banco), senão os cartões só
+   * voltariam a aparecer juntos depois do próximo `router.refresh()` —
+   * decisão já tomada com o Fabio: nada se perde.
+   * Ao ligar, cartões já existentes sem turno (achado real, 2026-10-01: eles
+   * não desapareciam de fato, só ficavam invisíveis — nenhum dos 3
+   * sub-blocos mostra `turno === null`) entram direto em "Manhã", igual à
+   * Server Action — a pessoa reorganiza manualmente depois se quiser. */
   function alternarDivisaoTurnosOtimista(colunaId: string, dividida: boolean) {
     const tarefasAnteriores = tarefas;
     setColunas((atual) => atual.map((c) => (c.id === colunaId ? { ...c, dividida_em_turnos: dividida } : c)));
     if (!dividida) {
       setTarefas((atual) => atual.map((t) => (t.coluna_id === colunaId ? { ...t, turno: null } : t)));
+    } else {
+      setTarefas((atual) =>
+        atual.map((t) => (t.coluna_id === colunaId && t.turno == null ? { ...t, turno: "manha" } : t)),
+      );
     }
 
     iniciarTransicao(() => {
       alternarDivisaoEmTurnos(colunaId, projetoId, dividida).catch((err) => {
         setColunas((atual) => atual.map((c) => (c.id === colunaId ? { ...c, dividida_em_turnos: !dividida } : c)));
-        if (!dividida) setTarefas(tarefasAnteriores);
+        setTarefas(tarefasAnteriores);
         toast.error(mensagemDeErro(err, "Falha ao atualizar a divisão em turnos."));
       });
     });
@@ -940,7 +949,13 @@ export function QuadroKanban({
         ) : (
           <>
             {renderCartoes(tarefasDaColuna)}
-            {renderInputNovoCartao(null)}
+            {/* Concluído é uma coluna só de "chegada" (pedido do Fabio,
+                2026-10-01): nela nunca se cria cartão novo direto, só se
+                recebe por arrasto/"Mover para...". Pra criar, a pessoa cria
+                em outra coluna e transporta pra cá. Reforçado também no
+                servidor (criarTarefa) e por trigger no banco (migration
+                0050) — não é só esconder este campo. */}
+            {!ehFixa && renderInputNovoCartao(null)}
           </>
         )}
       </div>

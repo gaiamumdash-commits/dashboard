@@ -159,7 +159,7 @@ Cenário: projeto com coluna "Hoje" (20 tarefas, identidade de sistema), "Em And
 
 | Item | Estado |
 |---|---|
-| 1 — Turnos só na coluna Hoje | **IMPLEMENTADO E VALIDADO** (servidor + interface + migração de dado legado documentada) |
+| 1 — Turnos só na coluna Hoje | **IMPLEMENTADO E VALIDADO** (servidor + interface + migração de dado legado documentada; rodada 2 corrigiu que dividir não escondia mais cartões já existentes — ver seção 10) |
 | 2 — Altura nivelada / espaços vazios | **IMPLEMENTADO E VALIDADO** (CSS Grid nativo, sem cálculo manual) |
 | 3 — Ordem de colunas / botão + | **IMPLEMENTADO E VALIDADO** |
 | 4 — Navegação horizontal dupla | **IMPLEMENTADO E VALIDADO** (desktop, `lg:`) |
@@ -172,10 +172,11 @@ Cenário: projeto com coluna "Hoje" (20 tarefas, identidade de sistema), "Em And
 
 ## 7. Limitações e pendências reais
 
-- **Achado incidental não corrigido** (seção 2.1): cartões sem turno somem da visualização quando a coluna é dividida em turnos pela 1ª vez. Registrado para P2.
 - **Falha de persistência**: mecanismo de rollback não reescrito nem revalidado em profundidade nesta rodada (herdado, já existia); confirmado que a chamada de rede realmente falha quando interceptada, não confirmado visualmente o estado otimista intermediário por limitação de timing do teste automatizado.
 - **`nome_exibicao` deriva do e-mail** (parte local) — não é um campo de perfil independente. Se o e-mail de alguém mudar, a identificação muda junto (comportamento aceito, não um bug).
-- **Teste em dispositivo físico**: não realizado. Roteiro abaixo.
+- **Teste em dispositivo físico**: não realizado nesta máquina — depende do Preview publicado (seção 10) e do Fabio testar no celular dele.
+- **Paisagem com `pointer: coarse` real** (seção 10): a correção do menu lateral foi validada logicamente nos dois extremos (retrato / desktop com mouse), mas o caso real "celular deitado" não pôde ser emulado com as ferramentas de teste desta sessão — só o teste físico do Fabio fecha isso de verdade.
+- **Barra de navegação por toque do kanban em paisagem** (seção 10): continua aparecendo mesmo com múltiplas colunas já visíveis lado a lado, ocupando altura numa tela de ~390px — não foi alterada porque era um pedido explícito anterior do Fabio ("retrato e paisagem"); fica como possível ajuste futuro, não mudança unilateral.
 
 ---
 
@@ -188,6 +189,8 @@ Cenário: projeto com coluna "Hoje" (20 tarefas, identidade de sistema), "Em And
 4. Usar a barra de rolagem horizontal que agora aparece **em cima** das colunas — não precisa mais descer até o fim do quadro.
 5. Arrastar uma coluna com o mouse pra antes de "Hoje" — confirmar que funciona e persiste depois de recarregar.
 6. Na coluna "Concluído", tocar em "👁 Mostrar" — ver todos os cartões concluídos aparecerem; tocar em "🙈 Ocultar" — eles somem de novo (nada é apagado, é só visual).
+7. Na coluna "Concluído", confirmar que NÃO existe mais o campo "+ Adicionar cartão" — só dá pra colocar um cartão ali arrastando ou usando "Mover para...".
+8. Numa coluna com cartões sem turno, clicar em "▥" (dividir em Manhã/Tarde/Noite) — confirmar que todos os cartões aparecem em "Manhã", nenhum some.
 
 ### No celular
 1. Numa coluna com muitos cartões, pegar o do fim (pela alcinha ⠿) e levar até o topo da tela, segurando ali — a coluna deve rolar sozinha até o início.
@@ -195,11 +198,41 @@ Cenário: projeto com coluna "Hoje" (20 tarefas, identidade de sistema), "Em And
 3. Mover um cartão de outra coluna pra dentro de um turno específico de "Hoje" (se ela estiver dividida).
 4. Testar: segurar um cartão, arrastar até fora de qualquer coluna (ex: pro cabeçalho) e soltar — nada deve se mover.
 5. Reportar qualquer caso em que a rolagem automática não acontecer, ou o cartão "sumir" visualmente.
+6. **Girar o celular pra paisagem (deitado)** dentro de um projeto com várias colunas — confirmar que o menu lateral de ícones (Início/Projetos/Metas SMART/Equipe) NÃO aparece mais ocupando a tela, e que dá pra ver 2-3 colunas lado a lado.
 
 ---
 
 ## 9. Estado da branch, commits e próximo passo
 
-- Mesma branch `consolidacao/p0-confiabilidade-metas`, commit anterior `7b192e3` sobre `8d289b8` — este incremento deve virar um commit novo em cima deles.
-- **Nada publicado, nenhuma migration aplicada em lugar novo além do Postgres de teste isolado, nenhum e-mail real enviado.**
-- Próximo passo de publicação: inalterado em relação ao relatório anterior — decidir sobre Preview com banco de Homologação isolado, não executado nesta rodada.
+Ver seção 10 — estado atualizado após a rodada 2 de correções no mesmo dia.
+
+---
+
+## 10. Rodada 2 — correções pedidas depois do primeiro teste do Fabio (2026-10-01, mesmo dia)
+
+### 10.1 Causa raiz do "não apareceu nada"
+
+O Fabio testou o app publicado (produção) depois de concluído o trabalho da rodada 1 e não viu nenhuma das mudanças (nem o botão "toca", nem o ajuste de paisagem). Causa: a branch `consolidacao/p0-confiabilidade-metas` nunca tinha sido publicada — `main` seguia parada num commit anterior a todo este incremento. Não era bug, era ausência de publicação. Resolvido publicando a branch (seção 10.5).
+
+### 10.2 Coluna "Concluído" não aceita mais criação direta de cartão
+
+Pedido do Fabio: só se coloca cartão em Concluído por movimentação (arrasto/"Mover para..."), nunca criando direto nela. Implementado em 3 camadas — interface (campo de criar cartão não é mais renderizado nessa coluna), Server Action `criarTarefa` (rejeita com mensagem em português) e um trigger novo no banco, `tarefas_bloqueia_criacao_em_concluido` (migration `0050_concluido_nao_aceita_criacao_direta.sql`) que rejeita o INSERT mesmo contornando a Server Action — só INSERT é bloqueado, mover um cartão já existente (UPDATE) continua liberado. Testado manualmente contra o banco (INSERT direto rejeitado, UPDATE de movimentação aceito) e com 3 testes automatizados novos.
+
+### 10.3 Dividir em turnos não esconde mais cartões existentes
+
+Correção do achado incidental que na rodada 1 tinha ficado só registrado em backlog (P2-C) sem ser corrigido. O Fabio decidiu o comportamento: ao dividir uma coluna populada em Manhã/Tarde/Noite pela 1ª vez, todo cartão sem turno entra direto em "Manhã" (visível, nada some) — a pessoa reorganiza manualmente depois se quiser Tarde/Noite. Corrigido em `alternarDivisaoEmTurnos` (Server Action) e no otimista do cliente; validado via Playwright (6 cartões continuaram todos visíveis em "Manhã", inclusive depois de recarregar a página — não é só otimista) e com 2 testes automatizados novos.
+
+### 10.4 Achado real adicional: paisagem não ativava de verdade (menu lateral)
+
+O quadro kanban já tinha sido desenhado na rodada 1 pra reconhecer celular deitado pela largura (`sm:`, 640px) e mostrar colunas lado a lado — isso de fato funciona. Mas o `MenuLateral` (menu de 240px fixos: Início/Projetos/Metas SMART/Equipe/Lab) usava o MESMO critério de só largura, sem considerar se é toque ou mouse — então qualquer celular deitado também disparava esse menu de desktop, roubando um quarto da largura bem na hora em que mais sobrava espaço pro quadro. Corrigido: o menu lateral de desktop agora só aparece com `(min-width: 640px) and (pointer: fine)` — mouse de verdade; o cabeçalho com hambúrguer (`MenuMobile`) passa a cobrir exatamente o caso oposto, inclusive celular deitado.
+
+**Limite honesto da validação**: confirmei a lógica nos dois extremos que dava pra testar aqui (retrato sempre esconde o menu de desktop; largura de desktop + mouse sempre mostra) e que o build/tsc/eslint continuam limpos. O terceiro caso — largura de celular deitado **com toque de verdade** — não pôde ser emulado: o Playwright deste ambiente sempre reporta `pointer: fine` (como se fosse mouse) e a ferramenta de emulação de mídia disponível não cobre `pointer`/`hover`. Só o teste físico do Fabio, girando o celular de verdade, fecha essa validação.
+
+Não mexi na barra de navegação por toque do próprio kanban (o seletor "‹ Hoje (6) › Visão geral" que ainda aparece em paisagem mesmo com várias colunas já visíveis) — ela existe por um pedido explícito anterior do Fabio ("retrato e paisagem", 2026-09-30) documentado no código; revertê-la sem confirmar seria sobrepor uma decisão de design dele por conta própria. Fica registrado como possível ajuste futuro.
+
+### 10.5 Testes, publicação e estado final
+
+- Suíte completa: **120/120** (era 115 ao fim da rodada 1; +5 novos: 3 de Concluído sem criação, 2 de divisão de turnos). `tsc --noEmit`, `eslint` (mesmos 3 warnings pré-existentes, sem erro novo) e `npm run build` limpos depois de cada rodada de mudança.
+- Nova migration: `supabase/migrations/0050_concluido_nao_aceita_criacao_direta.sql`, aplicada e testada no Postgres de teste isolado — **não aplicada em produção**.
+- **Achado operacional à parte**: o `.env.local` deste projeto aponta para o Supabase **cloud** de produção, não para o Postgres local de teste — ao subir o servidor local pra validar visualmente, descobri isso a tempo (um login de teste chegou a bater, sem sucesso, no projeto cloud — só uma tentativa de autenticação rejeitada, nenhuma escrita) e troquei para forçar as variáveis do ambiente local antes de continuar. Vale registrar pra quem for rodar `npm run dev` neste projeto no futuro: por padrão ele fala com produção.
+- Publicação: a branch foi enviada ao GitHub (`git push`) pra gerar um Preview Deployment isolado na Vercel — **produção (`main`) não foi tocada**. Link do Preview e instruções de teste no celular físico entregues junto com este relatório.
