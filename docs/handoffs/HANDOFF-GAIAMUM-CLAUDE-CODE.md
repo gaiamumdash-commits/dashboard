@@ -10,7 +10,18 @@
 
 ---
 
-## Estado confirmado (2026-10-01, sessão nova #60 — última atualização)
+## Estado confirmado (2026-10-01, sessão nova #61 — última atualização)
+
+**Resumo em uma linha**: 2º achado real de bug nesta rodada de teste físico — criar cartão/coluna quebrava fora de contexto seguro (HTTP puro, o próprio ambiente de teste via rede Wi-Fi) porque `crypto.randomUUID` não existe ali; corrigido com fallback que gera um UUID v4 válido de verdade (não uma string qualquer — isso quebraria no banco).
+
+- **Bug**: `TypeError: crypto.randomUUID is not a function` ao criar cartão em qualquer coluna, visível no Fabio como o indicador vermelho "1 Issue" do Next.js Dev Tools. Causa: essa API só existe em "contexto seguro" (HTTPS ou `localhost`) — o teste físico via `http://192.168.0.18:3000` é HTTP puro num IP de rede, então o navegador remove a função. Nunca apareceria em produção (sempre HTTPS).
+- **2ª camada do mesmo achado**: a 1ª correção usava fallback `"temp-" + algo`, que passa no navegador mas quebra no banco ("invalid input syntax for type uuid") porque esse id é enviado como a PK real da linha (não é só local). Corrigido com um UUID v4 válido gerado à mão (`gerarIdCliente()` em `kanban.ts`).
+- **125 testes passando** (+3). Validado via Playwright acessando pelo mesmo IP/HTTP do Fabio, confirmando `isSecureContext: false` e criando um cartão de ponta a ponta com persistência após reload.
+- **Nada publicado em produção.**
+
+---
+
+## Estado confirmado (2026-10-01, sessão nova #60)
 
 **Resumo em uma linha**: rodada 3, no mesmo dia, em cima do teste físico real do Fabio no celular (via rede Wi-Fi local, não produção) — achado de bug real corrigido (criar projeto novo quebrava), nova coluna padrão "Tarefas", e confirmação de que "contas do dia destacadas em Compromissos do dia" já existia de uma sessão anterior.
 

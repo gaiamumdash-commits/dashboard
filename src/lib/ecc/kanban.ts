@@ -1,5 +1,35 @@
 import type { CorEtiqueta, MembroTenant, Tarefa } from "@/lib/ecc/tipos";
 
+/** Id otimista pra uma tarefa/coluna ainda não confirmada pelo servidor —
+ * gerado no cliente e enviado como a PK real da linha (`criarTarefa`
+ * insere com esse `id` em vez de deixar o banco gerar um novo), pra manter
+ * o estado otimista e o estado real como a MESMA linha — por isso precisa
+ * ser um UUID válido de verdade, a coluna `id` é `uuid` no banco.
+ * Achado real (2026-10-01, teste físico do Fabio no celular via rede
+ * Wi-Fi local em HTTP puro, não HTTPS): `crypto.randomUUID()` só existe em
+ * "contexto seguro" do navegador (HTTPS ou localhost) — em qualquer outro
+ * endereço (um IP de rede local em HTTP, por exemplo) o navegador remove
+ * a função do objeto `crypto`, e chamá-la estoura `TypeError: crypto.
+ * randomUUID is not a function`, quebrando toda criação otimista. Em
+ * produção (sempre HTTPS) isso nunca apareceria.
+ * 2ª rodada do mesmo achado: a 1ª correção usava um fallback do tipo
+ * `"temp-" + algo` — passa no navegador, mas falha no banco com "invalid
+ * input syntax for type uuid", porque não tem o FORMATO de UUID. O
+ * fallback abaixo monta um UUID v4 válido à mão (`Math.random()`, não
+ * criptograficamente forte, mas suficiente pra um ID que é só local até o
+ * servidor confirmar — nunca usado pra nada que exija imprevisibilidade
+ * criptográfica). */
+export function gerarIdCliente(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 /** Fonte única das 6 cores fixas — reaproveitada pro fallback de cor
  * automática de etiqueta (etiquetas.ts) e pro hash de cor de avatar
  * (corAvatarPorEmail, abaixo). */

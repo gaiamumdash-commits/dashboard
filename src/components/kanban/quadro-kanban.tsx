@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro, Turno } from "@/lib/ecc/tipos";
-import { calcularNovaOrdem, calcularVelocidadeAutoScroll, encontrarColunaEmFoco, tocarSomConcluido } from "@/lib/ecc/kanban";
+import { calcularNovaOrdem, calcularVelocidadeAutoScroll, encontrarColunaEmFoco, gerarIdCliente, tocarSomConcluido } from "@/lib/ecc/kanban";
 import {
   alternarDivisaoEmTurnos,
   criarColuna,
@@ -249,7 +249,7 @@ export function QuadroKanban({
       .filter((linha) => linha.length > 0);
     if (titulos.length === 0) return;
 
-    const ids = titulos.map(() => crypto.randomUUID());
+    const ids = titulos.map(() => gerarIdCliente());
     const agora = new Date().toISOString();
     const ordensDaColuna = tarefas.filter((t) => t.coluna_id === colunaId && t.turno === turno).map((t) => t.ordem);
     const ordemBase = ordensDaColuna.length > 0 ? Math.max(...ordensDaColuna) : 0;
@@ -313,7 +313,7 @@ export function QuadroKanban({
   // esperar o servidor confirmar.
   function criarColunaOtimista(nome: string) {
     if (!nome.trim()) return;
-    const id = crypto.randomUUID();
+    const id = gerarIdCliente();
     const novaColuna: ColunaKanban = {
       id,
       tenant_id: "",

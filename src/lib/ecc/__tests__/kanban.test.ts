@@ -7,7 +7,32 @@ import {
   paraUtcDoFuso,
   encontrarColunaEmFoco,
   calcularVelocidadeAutoScroll,
+  gerarIdCliente,
 } from "@/lib/ecc/kanban";
+
+const REGEX_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+describe("gerarIdCliente — achado real, 2026-10-01: fallback precisa ser um UUID válido de verdade", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("usa crypto.randomUUID quando disponível (contexto seguro: HTTPS ou localhost)", () => {
+    const id = gerarIdCliente();
+    expect(id).toMatch(REGEX_UUID);
+  });
+
+  it("[REGRESSÃO] em contexto NÃO seguro (crypto.randomUUID ausente, como HTTP puro num IP de rede), ainda devolve um UUID válido — não um 'temp-xxx' qualquer que o banco rejeitaria com 'invalid input syntax for type uuid'", () => {
+    vi.stubGlobal("crypto", {});
+    const id = gerarIdCliente();
+    expect(id).toMatch(REGEX_UUID);
+  });
+
+  it("gera ids diferentes em chamadas sucessivas, mesmo no fallback", () => {
+    vi.stubGlobal("crypto", {});
+    const a = gerarIdCliente();
+    const b = gerarIdCliente();
+    expect(a).not.toBe(b);
+  });
+});
 
 describe("urgenciaDoPrazo", () => {
   afterEach(() => vi.useRealTimers());
