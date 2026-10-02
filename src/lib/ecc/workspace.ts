@@ -15,12 +15,24 @@ import { emailAutorizadoNoBeta, modoCadastroFechado, registrarUsoDoAcessoBeta } 
  * mesmo usuário via advisory lock — 2 requisições quase simultâneas sem
  * membership ainda não criam mais de 1 workspace. auth.uid() é resolvido
  * dentro do RPC, nunca recebido como parâmetro vindo do cliente.
+ *
+ * Achado real (2026-10-02): a maioria das páginas do app chama isto como
+ * 1ª coisa, sem checar `obterUsuarioAtual()` antes — ANTES desta correção,
+ * isso lançava um erro genérico (tela de "Runtime Error" feia) em vez de
+ * mandar pro login quando a sessão expira/não existe. Só a home (`/`) e as
+ * páginas do Lab tinham um guard explícito próprio, mas essas rodavam
+ * DEPOIS de `garantirWorkspace()` na ordem do código — ou seja, o guard
+ * delas nunca era alcançado na prática, o erro genérico sempre disparava
+ * primeiro. `redirect()` aqui dentro corrige TODAS as páginas de uma vez
+ * (e também as Server Actions que chamam `garantirWorkspace()`: sessão
+ * expirada no meio de uma ação agora manda pro login em vez de um toast de
+ * erro genérico) — sem precisar adicionar o mesmo guard em cada uma.
  */
 export async function garantirWorkspace(): Promise<string> {
   const user = await obterUsuarioAtual();
 
   if (!user) {
-    throw new Error("Usuário não autenticado.");
+    redirect("/auth");
   }
 
   const membershipExistente = await buscarMembershipAtual();
