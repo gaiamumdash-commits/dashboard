@@ -10,7 +10,20 @@
 
 ---
 
-## Estado confirmado (2026-10-01, sessão nova #59 — última atualização)
+## Estado confirmado (2026-10-01, sessão nova #60 — última atualização)
+
+**Resumo em uma linha**: rodada 3, no mesmo dia, em cima do teste físico real do Fabio no celular (via rede Wi-Fi local, não produção) — achado de bug real corrigido (criar projeto novo quebrava), nova coluna padrão "Tarefas", e confirmação de que "contas do dia destacadas em Compromissos do dia" já existia de uma sessão anterior.
+
+- **Bug real corrigido**: `criarProjeto` quebrava com "null value in column 'hoje' ... not-null constraint" ao criar qualquer projeto novo. Causa: INSERT em lote do PostgREST monta as colunas pela união das chaves de TODOS os objetos do array — só o objeto "Hoje" tinha a chave `hoje`, os outros recebiam `null` explícito em vez do `default false`. Corrigido garantindo a mesma forma em todos os objetos. Nunca tinha sido pego porque nenhum seed desta sessão exercitava a Server Action de verdade (sempre inseria direto via service client com objetos já explícitos).
+- **Nova coluna padrão "Tarefas"**: pedido do Fabio — todo projeto novo nasce com Hoje → Tarefas → Em Desenvolvimento → Concluído (mais o bloco fixo "Compromissos do dia"). Só o ponto de partida, a pessoa edita livremente depois. Não é retroativo.
+- **"Contas do dia destacadas" já existia**: o Fabio pediu sem saber que `listarContasDoDia()` + `ListaContasDoDiaKanban` já mostram contas a pagar vencendo hoje dentro de "Compromissos do dia", num retângulo amarelo/warning nitidamente diferente. Validado criando uma conta de teste e confirmando visualmente — ele só não tinha visto em ação por falta de dado de teste.
+- **122 testes passando** (+2 do bug de criarProjeto). `tsc`/eslint/build limpos.
+- **Como o teste no celular físico ficou viável**: servidor `next dev` nesta máquina, acessível por `http://192.168.0.18:3000` na rede Wi-Fi local, Supabase local de teste (não produção). Documentado nos checkpoints #58/#59.
+- **Nada publicado em produção, nenhuma migration fora do Postgres de teste isolado.**
+
+---
+
+## Estado confirmado (2026-10-01, sessão nova #59)
 
 **Resumo em uma linha**: rodada 2, no mesmo dia, em resposta ao teste real do Fabio — Concluído não aceita mais criação direta de cartão (trigger no banco, migration 0050), dividir em turnos não esconde mais cartões existentes (todos entram em "Manhã"), achado real corrigido no ajuste de paisagem (menu lateral de desktop usava só largura, roubava espaço do quadro em celular deitado), e o app rodando acessível pela rede Wi-Fi local pro Fabio testar no celular físico de verdade — **produção nunca foi tocada**.
 

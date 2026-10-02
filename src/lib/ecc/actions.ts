@@ -264,15 +264,24 @@ export async function criarProjeto(formData: FormData) {
     throw new Error(`Projeto criado, mas falha ao definir gestor: ${erroMembro.message}`);
   }
 
-  // Todo projeto novo nasce com as 3 colunas padrão — "Concluído" fixa, "Hoje"
+  // Todo projeto novo nasce com as 4 colunas padrão — "Concluído" fixa, "Hoje"
   // já marcada como a coluna de sistema (migration 0048, só ela pode dividir
-  // em turnos e é onde novas colunas nascem por padrão) — as 2 abertas o
-  // usuário pode renomear ou apagar depois, "Hoje" inclusive (perde só o
-  // nome, não a marcação de sistema).
+  // em turnos e é onde novas colunas nascem por padrão) — as abertas o
+  // usuário pode renomear/apagar/criar outras livremente depois (pedido do
+  // Fabio, 2026-10-01: "é só o padrão de fábrica, a pessoa edita como
+  // quiser"), "Hoje" inclusive (perde só o nome, não a marcação de sistema).
+  // Achado real (2026-10-01, reportado pelo Fabio em teste físico): o
+  // INSERT em lote (array) do PostgREST monta as colunas pela UNIÃO das
+  // chaves de todos os objetos do array — como só o 1º objeto tinha a
+  // chave `hoje`, os outros recebiam `null` EXPLÍCITO pra essa coluna em
+  // vez de cair no `default false` do banco, violando o `not null` da
+  // migration 0048 e quebrando a criação de todo projeto novo. Todo objeto
+  // do array precisa ter exatamente as mesmas chaves.
   const { error: erroColunas } = await supabase.from("colunas_kanban").insert([
     { tenant_id: tenantId, projeto_id: projeto.id, nome: "Hoje", ordem: 0, concluido: false, hoje: true },
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Desenvolvimento", ordem: 1, concluido: false },
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Concluído", ordem: 0, concluido: true },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Tarefas", ordem: 1, concluido: false, hoje: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Desenvolvimento", ordem: 2, concluido: false, hoje: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Concluído", ordem: 0, concluido: true, hoje: false },
   ]);
 
   if (erroColunas) {
