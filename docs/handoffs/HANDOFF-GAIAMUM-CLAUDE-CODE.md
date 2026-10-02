@@ -10,7 +10,26 @@
 
 ---
 
-## Estado confirmado (2026-10-02, sessão nova #63 — última atualização)
+## Estado confirmado (2026-10-02, sessão nova #64 — última atualização)
+
+**Resumo em uma linha**: a criação de projeto com planejamento assistido por IA (checkpoint #63) foi testada pelo Fabio no celular, aprovada, e publicada de verdade em produção (migration `0051` + deploy). Próxima pendência, já com especificação detalhada do Fabio: temporizador de hiperfoco na coluna "Em Desenvolvimento" — ainda não iniciado.
+
+- **Ambiente de teste local montado**: `next dev` nesta máquina, acessível em `http://192.168.0.18:3000`, apontando pro Postgres de teste isolado já existente no Docker (`supabase_db_Gaiamum`, porta 57322/API 57321) — migration `0051` aplicada e registrada ali antes do teste (nunca em produção nesse passo). Usuário de teste reaproveitado (`teste@gaiamum.local`), senha resetada via Admin API do GoTrue local.
+- **2 achados reais corrigidos no processo de destravar o teste físico**:
+  1. `/projetos` (`src/app/projetos/page.tsx`) chama `garantirWorkspace()` sem checar `obterUsuarioAtual()` antes e sem redirecionar pra `/auth` — diferente das páginas do Lab, que já fazem esse guard. Quem cai nessa rota deslogado (ex.: aba salva de um teste físico anterior) vê um erro feio em vez de ir pro login. **Não corrigido ainda** — registrado como pendência de robustez, não bloqueou o teste de hoje (contornado pedindo pro Fabio entrar direto por `/auth`).
+  2. O formulário de login roda no **navegador do celular** (client-side, `supabase.auth.signInWithPassword`) — ao configurar o ambiente de teste com `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:57321`, o login falhava silenciosamente porque `127.0.0.1` no celular aponta pro próprio celular, não pra esta máquina. Corrigido trocando pro IP da rede (`http://192.168.0.18:57321`) — confirmado via firewall do Windows (regras já amplas de Docker/Node, nenhuma nova necessária) e teste de conexão.
+- **Teste do Fabio**: roteiro do aniversário (contexto por voz/texto → prévia de tarefas → revisão → confirmação) rodado no celular físico contra o ambiente isolado acima — **aprovado**.
+- **Publicação em produção, nesta ordem** (pedido explícito do Fabio: "aplique e se precisar eu coloco o SQL manualmente"):
+  1. Migration `0051` aplicada por ele no SQL Editor do Supabase de produção (`zfjtcivusdmjvdbycpjs`), dentro de `begin;...commit;` — confirmado "Success. No rows returned".
+  2. `npm run build` local limpo, confirmado de novo antes do deploy.
+  3. `vercel deploy --prod` (CLI já autenticada como `gaiamumdash-3080`, projeto `gaiamum-dashboard` linkado) — alias `gaiamum.com.br` atualizado. Smoke test: `GET /auth` em produção real retornou 200.
+  4. `git push origin main` tentado de novo — **continua rejeitado**, mesma pendência de sempre: `refusing to allow an OAuth App to create or update workflow .github/workflows/ci.yml without 'workflow' scope`. Resolver com `gh auth refresh -h github.com -s workflow` (só o Fabio completa o login no navegador). Não bloqueante — produção já está correta, publicada direto via Vercel.
+- **Pedido novo do Fabio, com especificação detalhada** (refina a pendência "temporizador de hiperfoco" do checkpoint #62): ao mover um cartão pra coluna fixa "Em Desenvolvimento", um popup pergunta se quer definir um alarme pra essa tarefa (**opcional**, pode pular) — se definir: o cartão fica **amarelo na metade do tempo**, **borda vermelha** ao esgotar, e **toca alarme/notificação (sininho)** no horário exato em que vence; ao vencer, pode perguntar se quer **renovar e em qual horário**. O **mesmo efeito visual de cor** (não necessariamente o popup) deve valer também pra cartões com **data definida dentro deles** (prazo normal, independente da coluna). **Limite de 1 cartão por vez** com o timer ativo, de propósito, pra foco único — ajuda quem procrastina/tem TDAH. Confirmado com o Fabio: o alarme só precisa funcionar com a aba aberta/em primeiro plano (sem push notification/service worker por enquanto). **Planejamento iniciado** (EnterPlanMode + agente Explore disparado pra mapear schema de `tarefas`, fluxo de mover cartão entre colunas, e padrões de modal/cor já existentes) — pausado pra dar prioridade à publicação acima, retomado na sequência.
+- **Nada mais mudou de errado**: nenhuma migration nova além da 0051, nenhum dado de produção tocado fora do SQL que o próprio Fabio colou.
+
+---
+
+## Estado confirmado (2026-10-02, sessão nova #63)
 
 **Resumo em uma linha**: implementada de verdade (não só planejada) a criação de projeto com planejamento assistido por IA — pendência #2 do checkpoint #62 abaixo. Código completo, testado (108 testes unitários passando + 5 de integração prontos/não executados), **migration 0051 NÃO aplicada em produção** (pedido explícito do Fabio nesta rodada) e **nada publicado ainda** (só local/branch `main`, sem deploy).
 
