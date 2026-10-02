@@ -10,14 +10,26 @@
 
 ---
 
-## Estado confirmado (2026-10-02, sessão nova #66 — última atualização)
+## Estado confirmado (2026-10-02, sessão nova #67 — última atualização)
+
+**Resumo em uma linha**: corrigido o achado do checkpoint #64 — e virou um bug bem maior do que parecia: **33 das 39 páginas do app** (não só `/projetos`) mostravam uma tela de erro feia em vez de mandar pro login quando a sessão não existia. Corrigido na raiz, 1 arquivo, publicado em produção.
+
+- **Causa raiz**: `garantirWorkspace()` (`src/lib/ecc/workspace.ts`) lançava `throw new Error("Usuário não autenticado.")` quando não havia usuário — quase toda página do app chama essa função como 1º passo, sem checar `obterUsuarioAtual()` antes. A home (`/`) e as páginas do Lab tinham um `redirect("/auth")` próprio, mas ele vinha DEPOIS de `garantirWorkspace()` no código — nunca era alcançado de verdade, porque o `throw` já tinha disparado antes.
+- **Correção**: trocado o `throw` por `redirect("/auth")` direto dentro de `garantirWorkspace()` — conserta as 33 páginas de uma vez só (e as Server Actions que chamam essa função também: sessão expirada no meio de uma ação agora manda pro login, em vez de um toast de erro genérico). Descoberto o alcance real do bug com um script rápido comparando a posição de `garantirWorkspace()` vs. `redirect("/auth")`/`obterUsuarioAtual()` em cada `page.tsx` — não foi preciso tocar nas outras 32 páginas.
+- **Validado via Playwright**: deslogado, `/projetos` agora mostra a tela de login normal (sem erro); logado, segue funcionando sem regressão (abriu a lista de projetos normalmente). 172 testes, `tsc`, `eslint` e `npm run build` limpos.
+- **Publicado**: commit `d6de73d`, `git push` (já destravado) + `vercel deploy --prod`. Smoke test: `/auth` e `/projetos` → 200. CI → `success`.
+- **Pendências**: nenhuma. Fabio ainda vai testar o timer de hiperfoco em uso real (testado por mim via Playwright + simulação de tempo no banco, não pelo Fabio em pessoa) — não bloqueante, já está em produção.
+
+---
+
+## Estado confirmado (2026-10-02, sessão nova #66)
 
 **Resumo em uma linha**: temporizador de hiperfoco (checkpoint #65) publicado em produção, e a pendência histórica do `git push` foi resolvida de vez — o Fabio completou o device-code flow do GitHub (escopo `workflow`), o repositório remoto está sincronizado com produção pela 1ª vez em várias sessões, e o CI (`.github/workflows/ci.yml`) rodou de verdade pela 1ª vez — **passou**.
 
 - **`git push` destravado**: `gh auth refresh -h github.com -s workflow` — gerei o código de verificação, o Fabio confirmou no navegador (`https://github.com/login/device`), `git push origin main` funcionou (`1c6157f..f0802ab`). Essa pendência vinha sendo registrada como "não bloqueante" desde o checkpoint #58 — a partir de agora o GitHub reflete produção de verdade, não precisa mais do caminho alternativo (`vercel deploy --prod` direto) só por causa disso (continua válido como opção, mas não é mais a única).
 - **CI validado pela 1ª vez**: `gh run list` confirmou `completed / success` no primeiro push real que o workflow processou — nunca tinha rodado de ponta a ponta antes (branches anteriores nunca tinham sido publicadas via `git push` por causa do mesmo bloqueio de escopo).
 - **Publicação do temporizador de hiperfoco**: mesma ordem das rodadas anteriores — (1) Fabio aplicou a migration `0052` no SQL Editor de produção, confirmado "Success. No rows returned"; (2) `vercel deploy --prod`, alias `gaiamum.com.br` atualizado; (3) smoke test `GET /auth` → 200; (4) `git push` (agora funcionando) sincronizou o commit `f0802ab` no GitHub.
-- **Pendências**: nenhuma bloqueante. Only itens leves já conhecidos: guard de autenticação ausente em `/projetos` (achado no checkpoint #64, não corrigido ainda); Fabio ainda vai testar o timer de hiperfoco em uso real (testado por mim via Playwright + simulação de tempo no banco, não pelo Fabio em pessoa).
+- **Pendências**: nenhuma bloqueante. Only itens leves já conhecidos: guard de autenticação ausente em `/projetos` (achado no checkpoint #64, não corrigido ainda — resolvido no checkpoint #67 acima); Fabio ainda vai testar o timer de hiperfoco em uso real (testado por mim via Playwright + simulação de tempo no banco, não pelo Fabio em pessoa).
 
 ---
 
