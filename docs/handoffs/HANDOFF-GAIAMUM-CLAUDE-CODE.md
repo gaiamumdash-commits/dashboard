@@ -6,11 +6,27 @@
 
 **Criado:** 2026-08-29 · **Branch:** main · **Remoto:** https://github.com/gaiamumdash-commits/dashboard
 **Local do projeto:** `c:\Users\proff\Documents\Gaiamum\` (**fora do OneDrive de propósito** — não mover de volta)
-**Produção:** https://www.gaiamum.com.br (domínio próprio, DNS já propagado — **falta só o certificado SSL ativar**, ver "Estado confirmado"). Enquanto isso, o app responde normalmente em https://gaiamum-dashboard.vercel.app.
+**Produção:** https://www.gaiamum.com.br (domínio próprio, HTTPS confirmado funcionando em 2026-10-02). Também responde em https://gaiamum-dashboard.vercel.app.
 
 ---
 
-## Estado confirmado (2026-10-01, sessão nova #61 — última atualização)
+## Estado confirmado (2026-10-02, sessão nova #62 — última atualização)
+
+**Resumo em uma linha**: TUDO desta sessão (checkpoints #58-#61 abaixo) foi para PRODUÇÃO de verdade — `main` recebeu o merge, o banco de produção recebeu as 3 migrations (0048, 0049, 0050) aplicadas manualmente pelo Fabio via SQL Editor, e o código foi publicado com `vercel deploy --prod` (não via GitHub — ver pendência abaixo). Além disso, o Gaiamum Lab foi escondido visualmente (pedido do Fabio: "não está funcionando, hoje só causa experiência ruim").
+
+- **Banco de produção migrado**: o Fabio colou e rodou manualmente (SQL Editor do Supabase, dentro de uma transação `begin;...commit;`) o SQL consolidado das migrations 0048, 0049 e 0050 — confirmou "Success. No rows returned". Isso foi feito ANTES do deploy do código novo (ordem importa: código sem as migrations quebraria, exatamente como aconteceu no Preview da Vercel investigado no checkpoint #59).
+- **Merge pra `main`**: `git merge --no-ff consolidacao/p0-confiabilidade-metas` — limpo, sem conflitos. 125/125 testes e `tsc` confirmados limpos em `main` antes do deploy.
+- **Deploy de produção**: `vercel deploy --prod` (Vercel CLI já autenticada nesta máquina como `gaiamumdash-3080`) — **não** via `git push`/GitHub Actions. Resultado: `target: "production"`, alias `gaiamum.com.br` atualizado. Smoke test confirmado: `https://www.gaiamum.com.br/auth` carrega sem erro no console.
+- **Pendência real, não bloqueante**: `git push` (de `main` e da branch) continua rejeitado pelo GitHub — `refusing to allow an OAuth App to create or update workflow .github/workflows/ci.yml without 'workflow' scope`. A conta `gaiamumdash-commits` do `gh` CLI só tem os escopos `gist, read:org, repo`, falta `workflow`. **Para resolver**: rodar `gh auth refresh -h github.com -s workflow` (dispara um código de verificação + link `https://github.com/login/device` — só o Fabio pode completar esse login, é um device-code flow do GitHub). Até isso ser feito, o repositório remoto no GitHub está desatualizado em relação à produção real (que já está correta, publicada direto via Vercel) — resolver é só pra manter o histórico do GitHub sincronizado, não é urgente.
+- **Gaiamum Lab escondido visualmente**: nova flag `LAB_VISIVEL = false` (`src/lib/ecc/lab/flags.ts`) usada em 3 pontos de entrada (oferta no onboarding, link no menu lateral, link em Configurações) — nada do Lab foi apagado, rotas/actions/migrations/dados continuam intactos. Reverter: trocar a constante pra `true`.
+- **Pedidos novos do Fabio, ainda NÃO implementados** (ele pediu planejamento antes de codificar):
+  1. **Temporizador de hiperfoco (TDAH)**: ao mover um cartão pra "Em Desenvolvimento" (coluna fixa), abrir um modal perguntando "em quanto tempo você vai fazer isso" (ex.: 1h, ou nenhum prazo) — o cartão fica amarelo conforme o tempo passa e vermelho quando esgota, com aviso pra "renovar" ou "concluir". Não foi implementado. Precisa de design: schema novo (prazo + início da execução no cartão), lógica de cor por tempo restante, e como o "esgotou" é detectado (client-side teria que fechar o app = nunca mais checa; precisa decidir se é só visual-ao-abrir ou se precisa de verificação em background/cron).
+  2. **IA sugerindo tarefas a partir da descrição do projeto**: ao criar um projeto, a pessoa descreve o objetivo (ex.: "planejar a festa de aniversário do meu filho de 8 anos") e a IA sugere uma lista de tarefas candidatas (tópicos/checkboxes) — a pessoa marca as que quer, e elas entram como cartões reais na coluna "Tarefas". Fabio sugere opt-in explícito ("Quer ajuda da IA?") pra controlar custo, já que a IA usada é o free tier do Gemini (mesma preocupação de custo do resto do app — ver `ia-rate-limit.ts`). Pedido explícito dele: "pode planejar e verificar a melhor forma de implantar?" — ele quer um PLANO antes de qualquer código.
+- **Testes**: 125/125 (sem mudança de número desta rodada — só o Lab, que não tem teste dedicado ainda). Build/tsc/eslint limpos.
+
+---
+
+## Estado confirmado (2026-10-01, sessão nova #61)
 
 **Resumo em uma linha**: 2º achado real de bug nesta rodada de teste físico — criar cartão/coluna quebrava fora de contexto seguro (HTTP puro, o próprio ambiente de teste via rede Wi-Fi) porque `crypto.randomUUID` não existe ali; corrigido com fallback que gera um UUID v4 válido de verdade (não uma string qualquer — isso quebraria no banco).
 
