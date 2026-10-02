@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { autorizacaoCronValida } from "@/lib/cron-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ANTECEDENCIA_MIN_VESPERA_CONTA_A_PAGAR } from "@/lib/ecc/kanban";
+import { gerarIdCorrelacao, registrarErro, registrarInfo } from "@/lib/observabilidade";
 
 function ultimoDiaDoMes(data: Date): number {
   return new Date(data.getFullYear(), data.getMonth() + 1, 0).getDate();
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
+  const idExecucao = gerarIdCorrelacao();
   const supabase = createServiceClient();
   const hoje = new Date();
   const ano = hoje.getFullYear();
@@ -67,7 +69,12 @@ export async function GET(request: NextRequest) {
     .eq("ativo", true);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    registrarErro({
+      operacao: "cron.gerar-contas-fixas.buscar-modelos",
+      idCorrelacao: idExecucao,
+      erro: error.message,
+    });
+    return NextResponse.json({ idExecucao, error: error.message }, { status: 500 });
   }
 
   let geradas = 0;
@@ -104,5 +111,19 @@ export async function GET(request: NextRequest) {
     geradas++;
   }
 
-  return NextResponse.json({ verificadas: modelos?.length ?? 0, geradas, falhas });
+  if (falhas.length > 0) {
+    registrarErro({
+      operacao: "cron.gerar-contas-fixas",
+      idCorrelacao: idExecucao,
+      contexto: { verificadas: modelos?.length ?? 0, geradas, totalFalhas: falhas.length },
+      erro: falhas.join(" | "),
+    });
+  } else {
+    registrarInfo({
+      operacao: "cron.gerar-contas-fixas",
+      contexto: { idExecucao, verificadas: modelos?.length ?? 0, geradas },
+    });
+  }
+
+  return NextResponse.json({ idExecucao, verificadas: modelos?.length ?? 0, geradas, falhas });
 }

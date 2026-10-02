@@ -11,6 +11,7 @@ import { EmailDaConta } from "@/components/layout/email-da-conta";
 import { LinksNavegacao } from "@/components/layout/links-navegacao";
 import { MenuMobile } from "@/components/layout/menu-mobile";
 import { EmblemaPatente } from "@/components/lab/emblema-patente";
+import { LAB_VISIVEL } from "@/lib/ecc/lab/flags";
 
 /** Busca a contagem de não lidas separada num componente próprio, dentro de
  * `<Suspense>` — sem isso, `MenuLateral` (renderizado em toda página do
@@ -35,12 +36,19 @@ async function PatenteComEmblema() {
   return <EmblemaPatente codigo={atual} />;
 }
 
-/** Mesmo padrão do sino/patente: busca própria dentro de `<Suspense>`. Nunca
- * esconde o link do Lab — antes de concluir, convite a explorar; depois de
- * conquistar a patente 'explorador', só troca o rótulo/selo pra sinalizar
- * que virou material de consulta, não pendência (pedido explícito do Fabio:
- * o Lab é referência viva de gestão, não um tutorial descartável). */
+/** Mesmo padrão do sino/patente: busca própria dentro de `<Suspense>`.
+ * Normalmente nunca esconde o link do Lab — antes de concluir, convite a
+ * explorar; depois de conquistar a patente 'explorador', só troca o
+ * rótulo/selo pra sinalizar que virou material de consulta, não pendência
+ * (pedido explícito do Fabio: o Lab é referência viva de gestão, não um
+ * tutorial descartável).
+ * Lab escondido visualmente (2026-10-02, pedido do Fabio: "não está
+ * funcionando, hoje ele só causa uma experiência ruim"): enquanto
+ * `LAB_VISIVEL` for `false`, este link não aparece pra ninguém, nem pra
+ * quem já tem a patente. Nada do Lab foi apagado — só este ponto de
+ * entrada (e os outros, ver `flags.ts`) ficam ocultos. */
 async function LinkLabCondicional() {
+  if (!LAB_VISIVEL) return null;
   const user = await obterUsuarioAtual();
   if (!user) return null;
   const patentes = await listarPatentesDoUsuario(user.id);
@@ -88,8 +96,16 @@ export function MenuLateral({
     <>
       {/* `sticky` + `h-screen`: o menu fica preso à altura da tela mesmo em
           página comprida, então o e-mail da conta e o "Sair" do rodapé estão
-          sempre à vista — sem isso o rodapé ia parar no fim da página. */}
-      <aside className="hidden h-screen w-60 shrink-0 flex-col self-start overflow-hidden border-r border-gaiamum-border bg-gaiamum-surface px-4 py-6 sm:sticky sm:top-0 sm:flex">
+          sempre à vista — sem isso o rodapé ia parar no fim da página.
+          Critério de visibilidade (achado real, 2026-10-01): NÃO é só a
+          largura (`sm:`, 640px) — um celular DEITADO facilmente ultrapassa
+          isso (ex.: 844px) e ativaria este menu de 240px fixos, roubando um
+          quarto da largura do quadro kanban exatamente na hora em que mais
+          sobra espaço útil. Por isso soma `pointer: fine` (mouse de verdade)
+          como critério independente de largura — só aparece em desktop/
+          notebook real; qualquer dispositivo de toque, não importa a
+          largura, usa o `MenuMobile` (cabeçalho + painel) abaixo. */}
+      <aside className="hidden h-screen w-60 shrink-0 flex-col self-start overflow-hidden border-r border-gaiamum-border bg-gaiamum-surface px-4 py-6 [@media(min-width:640px)_and_(pointer:fine)]:sticky [@media(min-width:640px)_and_(pointer:fine)]:top-0 [@media(min-width:640px)_and_(pointer:fine)]:flex">
         <div className="mb-8 flex items-center justify-between px-2">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/brand/crab-mark.png" alt="" width={32} height={32} />

@@ -3,6 +3,7 @@ import { autorizacaoCronValida } from "@/lib/cron-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { paraUtcDoFuso } from "@/lib/ecc/kanban";
 import { enviarEmailAlarme } from "@/lib/ecc/notificacoes";
+import { gerarIdCorrelacao, registrarErro, registrarInfo } from "@/lib/observabilidade";
 import type { Alarme } from "@/lib/ecc/tipos";
 
 type Disparo = {
@@ -31,6 +32,12 @@ export async function GET(request: NextRequest) {
   if (!autorizacaoCronValida(request.headers.get("authorization"), process.env.CRON_SECRET ?? "")) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
+
+  // Observabilidade mínima (P0, 2026-09-30) — este cron rodava sem nenhum
+  // registro estruturado: falhas ficavam só no corpo da resposta HTTP, que
+  // ninguém vê a menos que consulte manualmente. Um id por execução
+  // correlaciona todas as falhas desta rodada no log da Vercel.
+  const idExecucao = gerarIdCorrelacao();
 
   const supabase = createServiceClient();
   const agora = new Date();
@@ -182,5 +189,21 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ verificados: disparos.length, disparados, falhas });
+  if (falhas.length > 0) {
+    registrarErro({
+      operacao: "cron.disparar-alarmes",
+      idCorrelacao: idExecucao,
+      contexto: { verificados: disparos.length, disparados, totalFalhas: falhas.length },
+      // Mensagens de erro do Postgres/Supabase, nunca dado de usuário (só
+      // ids de alarme/tarefa e a mensagem técnica do driver).
+      erro: falhas.join(" | "),
+    });
+  } else {
+    registrarInfo({
+      operacao: "cron.disparar-alarmes",
+      contexto: { idExecucao, verificados: disparos.length, disparados },
+    });
+  }
+
+  return NextResponse.json({ idExecucao, verificados: disparos.length, disparados, falhas });
 }

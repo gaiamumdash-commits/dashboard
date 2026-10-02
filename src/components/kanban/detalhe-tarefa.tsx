@@ -14,7 +14,7 @@ import type {
   Tarefa,
   Turno,
 } from "@/lib/ecc/tipos";
-import { CLASSE_COR_ETIQUETA, CLASSE_FUNDO_QUADRO, paraDatetimeLocal, tocarSomConcluido } from "@/lib/ecc/kanban";
+import { CLASSE_COR_ETIQUETA, CLASSE_FUNDO_QUADRO, identificacaoDoMembro, paraDatetimeLocal, tocarSomConcluido } from "@/lib/ecc/kanban";
 import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
 import { aplicarMencao, calcularBuscaMencao, dividirTextoPorMencoes } from "@/lib/ecc/mencoes";
 import {
@@ -131,18 +131,22 @@ export function DetalheTarefa({
 
   function sugestoesMencao(busca: string | null): MembroTenant[] {
     if (busca === null) return [];
-    return membrosDoTenant.filter((m) => m.email.toLowerCase().includes(busca.toLowerCase()));
+    return membrosDoTenant.filter((m) => identificacaoDoMembro(m).toLowerCase().includes(busca.toLowerCase()));
   }
 
-  /** Chip destacado (bolinha + parte do e-mail antes do @) no lugar do
-   * `@email` cru — usado na timeline de comentários e nos itens do
-   * checklist já salvos. Descrição fica de fora (é sempre <textarea>). */
+  /** Chip destacado (bolinha + identificação) no lugar do `@<chave>` cru —
+   * usado na timeline de comentários e nos itens do checklist já salvos.
+   * Descrição fica de fora (é sempre <textarea>). `identificacaoDoMembro`
+   * (e-mail, ou `nome_exibicao` quando o e-mail não está visível pra quem
+   * está lendo — revisão de privacidade, 2026-10-01) já é a mesma chave
+   * que `dividirTextoPorMencoes` usou pra casar o texto, então sempre bate
+   * com o que está gravado. */
   function renderTextoComMencoes(texto: string) {
     return dividirTextoPorMencoes(texto, membrosDoTenant).map((parte, indice) =>
       parte.membro ? (
         <span key={indice} className="inline-flex items-center gap-1 align-middle">
-          <AvatarIniciais email={parte.membro.email} tamanho="sm" />
-          <span className="font-medium text-gaiamum-text">{parte.membro.email.split("@")[0]}</span>
+          <AvatarIniciais email={parte.membro.email} nomeExibicao={parte.membro.nome_exibicao} tamanho="sm" />
+          <span className="font-medium text-gaiamum-text">{identificacaoDoMembro(parte.membro).split("@")[0]}</span>
         </span>
       ) : (
         <span key={indice}>{parte.texto}</span>
@@ -156,8 +160,8 @@ export function DetalheTarefa({
     setBuscaMencaoComentario(calcularBuscaMencao(valor, cursor));
   }
 
-  function escolherMencaoComentario(email: string) {
-    const { novoTexto, novoCursor } = aplicarMencao(textoComentario, cursorComentario, email);
+  function escolherMencaoComentario(chave: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(textoComentario, cursorComentario, chave);
     cursorPendenteComentarioRef.current = novoCursor;
     setTextoComentario(novoTexto);
     setBuscaMencaoComentario(null);
@@ -169,8 +173,8 @@ export function DetalheTarefa({
     setBuscaMencaoDescricao(calcularBuscaMencao(valor, cursor));
   }
 
-  function escolherMencaoDescricao(email: string) {
-    const { novoTexto, novoCursor } = aplicarMencao(descricao, cursorDescricao, email);
+  function escolherMencaoDescricao(chave: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(descricao, cursorDescricao, chave);
     cursorPendenteDescricaoRef.current = novoCursor;
     setDescricao(novoTexto);
     setBuscaMencaoDescricao(null);
@@ -182,8 +186,8 @@ export function DetalheTarefa({
     setBuscaMencaoItem(calcularBuscaMencao(valor, cursor));
   }
 
-  function escolherMencaoItem(email: string) {
-    const { novoTexto, novoCursor } = aplicarMencao(textoItem, cursorItem, email);
+  function escolherMencaoItem(chave: string) {
+    const { novoTexto, novoCursor } = aplicarMencao(textoItem, cursorItem, chave);
     cursorPendenteItemRef.current = novoCursor;
     setTextoItem(novoTexto);
     setBuscaMencaoItem(null);
@@ -330,23 +334,43 @@ export function DetalheTarefa({
   }
 
   return (
+    // No celular ocupa a tela inteira (pedido explícito do Fabio, "detalhes
+    // usam tela inteira, com fechamento visível") — sem padding, sem
+    // centralizar, altura em `dvh` (não `vh`) pra não sobrar espaço morto
+    // quando o teclado virtual encolhe a viewport visível. No desktop
+    // (`sm:`) preservado exatamente como era: modal centralizado, max-w-lg.
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 py-10"
+      className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto bg-black/50 sm:items-start sm:overflow-y-auto sm:p-4 sm:py-10"
       onClick={aoFechar}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-6"
+        className="flex min-h-[100dvh] w-full flex-col bg-gaiamum-surface sm:min-h-0 sm:max-w-lg sm:rounded-2xl sm:border sm:border-gaiamum-border"
       >
-        <div className="flex items-start justify-between gap-3">
+        {/* Cabeçalho fixo no topo, com a área segura do notch/status bar —
+            "fechamento visível" mesmo com o conteúdo rolado pra baixo. */}
+        <div
+          className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-gaiamum-border bg-gaiamum-surface px-4 pb-3 sm:static sm:border-b-0 sm:px-6 sm:pb-0"
+          style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
+        >
           <h2 className="text-lg font-semibold text-gaiamum-text">{tarefa.titulo}</h2>
           <div className="flex shrink-0 items-center gap-2">
             {pendente && <span className="text-xs text-gaiamum-text-muted">Salvando…</span>}
-            <button type="button" onClick={aoFechar} className="text-gaiamum-text-muted hover:text-gaiamum-text">
+            <button
+              type="button"
+              onClick={aoFechar}
+              aria-label="Fechar"
+              className="rounded-full p-1 text-xl leading-none text-gaiamum-text-muted hover:bg-gaiamum-surface-raised hover:text-gaiamum-text sm:text-base sm:hover:bg-transparent"
+            >
               ✕
             </button>
           </div>
         </div>
+
+        <div
+          className="flex-1 px-4 pb-6 sm:px-6 sm:pb-6"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)" }}
+        >
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="flex flex-col gap-1 text-xs font-medium text-gaiamum-text-muted">
@@ -588,11 +612,11 @@ export function DetalheTarefa({
                   key={membro.user_id}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => escolherMencaoDescricao(membro.email)}
+                  onClick={() => escolherMencaoDescricao(identificacaoDoMembro(membro))}
                   className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
                 >
-                  <AvatarIniciais email={membro.email} tamanho="sm" />
-                  {membro.email}
+                  <AvatarIniciais email={membro.email} nomeExibicao={membro.nome_exibicao} tamanho="sm" />
+                  {identificacaoDoMembro(membro)}
                 </button>
               ))}
             </div>
@@ -609,14 +633,14 @@ export function DetalheTarefa({
                   key={membro.user_id}
                   type="button"
                   onClick={() => alternarMembro(membro.user_id)}
-                  title={membro.email}
+                  title={identificacaoDoMembro(membro)}
                   className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition ${
                     ativo
                       ? "bg-gaiamum-primary text-white"
                       : "border border-gaiamum-border bg-gaiamum-surface-raised text-gaiamum-text-muted hover:border-gaiamum-primary"
                   }`}
                 >
-                  {membro.email.slice(0, 2).toUpperCase()}
+                  {identificacaoDoMembro(membro).slice(0, 2).toUpperCase()}
                 </button>
               );
             })}
@@ -683,11 +707,11 @@ export function DetalheTarefa({
                     key={membro.user_id}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => escolherMencaoItem(membro.email)}
+                    onClick={() => escolherMencaoItem(identificacaoDoMembro(membro))}
                     className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
                   >
-                    <AvatarIniciais email={membro.email} tamanho="sm" />
-                    {membro.email}
+                    <AvatarIniciais email={membro.email} nomeExibicao={membro.nome_exibicao} tamanho="sm" />
+                    {identificacaoDoMembro(membro)}
                   </button>
                 ))}
               </div>
@@ -736,11 +760,11 @@ export function DetalheTarefa({
                     key={membro.user_id}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => escolherMencaoComentario(membro.email)}
+                    onClick={() => escolherMencaoComentario(identificacaoDoMembro(membro))}
                     className="flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gaiamum-surface-raised"
                   >
-                    <AvatarIniciais email={membro.email} tamanho="sm" />
-                    {membro.email}
+                    <AvatarIniciais email={membro.email} nomeExibicao={membro.nome_exibicao} tamanho="sm" />
+                    {identificacaoDoMembro(membro)}
                   </button>
                 ))}
               </div>
@@ -766,6 +790,7 @@ export function DetalheTarefa({
               </div>
             ))}
           </div>
+        </div>
         </div>
       </div>
     </div>

@@ -1,10 +1,12 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { MetaSmart } from "@/lib/ecc/tipos";
 
 /**
  * Tag usada tanto na leitura cacheada (contarMetasSmart) quanto na
- * invalidação (revalidateTag em criarMetasSmart, src/lib/ecc/actions.ts) —
+ * invalidação (revalidateTag em salvarMetasSmart, src/lib/ecc/actions.ts) —
  * a mesma string dos dois lados evita divergência por digitação.
  */
 export function tagMetasSmart(tenantId: string): string {
@@ -30,7 +32,7 @@ export function tagMetasSmart(tenantId: string): string {
  * revalidateTag invalidar só o tenant certo.
  *
  * revalidate: 3600 é rede de segurança, mas o revalidateTag em
- * criarMetasSmart não é opcional: sem ele, a contagem "0" que o
+ * salvarMetasSmart não é opcional: sem ele, a contagem "0" que o
  * onboarding lê ANTES do usuário preencher o formulário fica presa em
  * cache por até 1h mesmo depois do INSERT — isso é o caminho principal
  * do dia 1 de uso de qualquer tenant novo, não um edge case.
@@ -50,4 +52,45 @@ export async function contarMetasSmart(tenantId: string): Promise<number> {
   );
 
   return buscar();
+}
+
+/**
+ * As metas SMART completas do workspace (não só a contagem) — usada pela
+ * tela de onboarding pra pré-preencher o formulário de edição (correção do
+ * P0: antes desta função, não havia como mostrar os valores já salvos pra
+ * edição, só a contagem via `contarMetasSmart`). Sem cache: é lida uma
+ * única vez, na página de onboarding, que já não é uma rota de alto
+ * tráfego.
+ */
+export async function listarMetasSmart(tenantId: string): Promise<MetaSmart[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("metas_smart")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("criado_em", { ascending: true });
+
+  if (error) {
+    throw new Error(`Falha ao carregar metas SMART: ${error.message}`);
+  }
+
+  return (data as MetaSmart[] | null) ?? [];
+}
+
+/**
+ * O workspace já teve a decisão explícita de "pular, preencho depois"
+ * registrada (`tenants.onboarding_metas_pulado_em`, migration 0045)? Usada
+ * pelo Painel geral (`/`) pra não empurrar de volta pro onboarding quem já
+ * escolheu pular — corrige o achado de loop de onboarding do P0 (ver
+ * `pularOnboarding` em actions.ts).
+ */
+export async function onboardingDeMetasFoiPulado(tenantId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("tenants")
+    .select("onboarding_metas_pulado_em")
+    .eq("id", tenantId)
+    .maybeSingle();
+
+  return Boolean(data?.onboarding_metas_pulado_em);
 }

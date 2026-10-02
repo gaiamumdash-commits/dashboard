@@ -1,4 +1,34 @@
-import type { CorEtiqueta, Tarefa } from "@/lib/ecc/tipos";
+import type { CorEtiqueta, MembroTenant, Tarefa } from "@/lib/ecc/tipos";
+
+/** Id otimista pra uma tarefa/coluna ainda não confirmada pelo servidor —
+ * gerado no cliente e enviado como a PK real da linha (`criarTarefa`
+ * insere com esse `id` em vez de deixar o banco gerar um novo), pra manter
+ * o estado otimista e o estado real como a MESMA linha — por isso precisa
+ * ser um UUID válido de verdade, a coluna `id` é `uuid` no banco.
+ * Achado real (2026-10-01, teste físico do Fabio no celular via rede
+ * Wi-Fi local em HTTP puro, não HTTPS): `crypto.randomUUID()` só existe em
+ * "contexto seguro" do navegador (HTTPS ou localhost) — em qualquer outro
+ * endereço (um IP de rede local em HTTP, por exemplo) o navegador remove
+ * a função do objeto `crypto`, e chamá-la estoura `TypeError: crypto.
+ * randomUUID is not a function`, quebrando toda criação otimista. Em
+ * produção (sempre HTTPS) isso nunca apareceria.
+ * 2ª rodada do mesmo achado: a 1ª correção usava um fallback do tipo
+ * `"temp-" + algo` — passa no navegador, mas falha no banco com "invalid
+ * input syntax for type uuid", porque não tem o FORMATO de UUID. O
+ * fallback abaixo monta um UUID v4 válido à mão (`Math.random()`, não
+ * criptograficamente forte, mas suficiente pra um ID que é só local até o
+ * servidor confirmar — nunca usado pra nada que exija imprevisibilidade
+ * criptográfica). */
+export function gerarIdCliente(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 /** Fonte única das 6 cores fixas — reaproveitada pro fallback de cor
  * automática de etiqueta (etiquetas.ts) e pro hash de cor de avatar
@@ -38,12 +68,22 @@ export const TEXTO_SOBRE_FUNDO_QUADRO: Record<CorEtiqueta, string> = {
   lime: "text-black",
 };
 
-/** Cor determinística por e-mail — pra bolinha de iniciais não ficar toda
- * da mesma cor quando reaproveitada em vários lugares (menção, dropdown,
- * membros do cartão). */
+/** Cor determinística por e-mail (ou outra string estável) — pra bolinha de
+ * iniciais não ficar toda da mesma cor quando reaproveitada em vários
+ * lugares (menção, dropdown, membros do cartão). */
 export function corAvatarPorEmail(email: string): CorEtiqueta {
   const soma = Array.from(email).reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return CORES_ETIQUETA[soma % CORES_ETIQUETA.length];
+}
+
+/** Fonte única de verdade pra "qual string identifica este membro na
+ * interface" — revisão de privacidade, 2026-10-01: `email` pode ser `null`
+ * (convidado de projeto vendo o owner sem compartilhar projeto, migration
+ * 0049), e `nome_exibicao` (parte local do e-mail, sempre presente) é o
+ * fallback. Usada pra @menção, avatar e qualquer exibição/comparação que
+ * hoje usaria `membro.email` direto — nunca ler `.email` cru fora daqui. */
+export function identificacaoDoMembro(membro: MembroTenant): string {
+  return membro.email ?? membro.nome_exibicao;
 }
 
 /** Toca quando um cartão entra na coluna "Concluído" — pedido do Fabio,
@@ -187,6 +227,49 @@ export function urgenciaDoPrazo(
   if (horasRestantes <= 0) return "atrasado";
   if (horasRestantes <= HORAS_PARA_ALERTA_AMARELO) return "proximo";
   return "ok";
+}
+
+/**
+ * Qual coluna está "em foco" durante a rolagem horizontal do quadro no
+ * celular (uma coluna por vez, com scroll-snap) — a mais próxima do centro
+ * do container visível. Função pura (recebe posições já medidas do DOM, não
+ * mede nada sozinha) pra dar pra testar sem precisar montar um DOM de
+ * verdade. `null` quando não há nenhuma coluna (quadro vazio).
+ */
+export function encontrarColunaEmFoco(
+  colunas: Array<{ id: string; offsetLeft: number; largura: number }>,
+  centroVisivel: number,
+): string | null {
+  if (colunas.length === 0) return null;
+  let melhorId = colunas[0].id;
+  let melhorDistancia = Infinity;
+  for (const coluna of colunas) {
+    const centroDaColuna = coluna.offsetLeft + coluna.largura / 2;
+    const distancia = Math.abs(centroDaColuna - centroVisivel);
+    if (distancia < melhorDistancia) {
+      melhorDistancia = distancia;
+      melhorId = coluna.id;
+    }
+  }
+  return melhorId;
+}
+
+/**
+ * Velocidade (px/frame) do auto-scroll durante um arrasto de cartão por
+ * toque, quando o dedo está perto de uma borda (topo/fundo da tela pra
+ * rolagem vertical, laterais pra trocar de coluna). `distanciaDaBorda`
+ * negativa ou maior que `zonaAtivacao` = fora da zona, sem rolagem (0).
+ * Quanto mais perto da borda (distância menor), mais rápido — rolagem
+ * suave em vez de "liga/desliga" abrupto.
+ */
+export function calcularVelocidadeAutoScroll(
+  distanciaDaBorda: number,
+  zonaAtivacao: number,
+  velocidadeMaxima: number,
+): number {
+  if (distanciaDaBorda < 0 || distanciaDaBorda >= zonaAtivacao || zonaAtivacao <= 0) return 0;
+  const proporcao = (zonaAtivacao - distanciaDaBorda) / zonaAtivacao;
+  return Math.ceil(proporcao * velocidadeMaxima);
 }
 
 /** Ordem fracionária do cartão solto entre `ordemAntes` e `ordemDepois`

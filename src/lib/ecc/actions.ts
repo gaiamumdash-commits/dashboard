@@ -16,6 +16,7 @@ import {
   listarMembros,
   listarMembrosComAcessoAoProjeto,
   obterPapelAtual,
+  resolverEmailsParaNotificacao,
 } from "@/lib/ecc/equipe";
 import { extrairIdsMencionados } from "@/lib/ecc/mencoes";
 import { formatarDataHoraBrasil } from "@/lib/ecc/kanban";
@@ -52,31 +53,130 @@ function campoObrigatorio(formData: FormData, nome: string): string {
 // Módulo 0 — Onboarding & Metas SMART
 // ---------------------------------------------------------------------------
 
-export async function criarMetasSmart(formData: FormData) {
+/**
+ * Cria OU edita as metas SMART do workspace — corrige o achado da auditoria
+ * de 2026-09-30 (handoff canônico, seções 11/16/21): antes disso, não
+ * havia nenhuma forma de editar uma meta depois de criada, e o link
+ * "Editar" do dashboard prometia uma ação que a tela de destino não
+ * oferecia.
+ *
+ * Revisão de 2026-09-30 (validação do P0): a primeira versão usava
+ * `.upsert(..., {onConflict: "tenant_id,horizonte"})` — funcionalmente
+ * seguro (nunca duplica, nunca troca tenant, porque `tenant_id` sempre vem
+ * de `garantirWorkspace()`), mas era exatamente o "upsert genérico" que o
+ * prompt de consolidação pediu pra NÃO usar. Trocado por um UPDATE
+ * explícito por `id` no caminho de edição — mais direto de auditar (o alvo
+ * da mudança é o próprio id da meta, não uma inferência via índice) e mais
+ * alinhado ao pedido original ("Criar update explícito autorizado").
+ *
+ * Fluxo, por horizonte:
+ * 1. Busca o id já existente daquele horizonte pro tenant (se houver).
+ * 2. Existe → UPDATE por `id` (+ `tenant_id` redundante, defesa em
+ *    profundidade sobre a RLS) — nunca toca `id`/`criado_em`/`tenant_id`
+ *    da linha, então `projetos.meta_smart_id`/`decisoes.meta_smart_id`
+ *    continuam válidos depois de editar.
+ * 3. Não existe → INSERT (primeira vez desse horizonte). Índice único
+ *    `(tenant_id, horizonte)` (migration 0045) continua sendo o backstop
+ *    de verdade contra corrida: se dois requests quase simultâneos (ex.:
+ *    clique duplo) passarem pelo SELECT do passo 1 vendo "ainda não
+ *    existe", só o primeiro INSERT vence — o segundo recebe erro 23505
+ *    (violação do índice único) e cai no fallback abaixo, que vira um
+ *    UPDATE de verdade na linha que o outro request acabou de criar (nunca
+ *    perde a submissão do segundo clique, nunca duplica).
+ */
+export async function salvarMetasSmart(formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
 
   // Fonte única com a UI (HORIZONTES, smart.ts) — evita os dois listarem
   // horizontes diferentes e o form quebrar por campo ausente.
   const horizontes: Horizonte[] = HORIZONTES.map((h) => h.valor);
-  const linhas = horizontes.map((horizonte) => ({
-    tenant_id: tenantId,
-    horizonte,
-    visao_macro: campoObrigatorio(formData, `${horizonte}_visao_macro`),
-    specific: campoObrigatorio(formData, `${horizonte}_specific`),
-    measurable: campoObrigatorio(formData, `${horizonte}_measurable`),
-    attainable: campoObrigatorio(formData, `${horizonte}_attainable`),
-    relevant: campoObrigatorio(formData, `${horizonte}_relevant`),
-    time_bound: campoObrigatorio(formData, `${horizonte}_time_bound`),
-  }));
 
-  const { data: metasCriadas, error } = await supabase
+  const { data: existentes, error: erroLeitura } = await supabase
     .from("metas_smart")
-    .insert(linhas)
-    .select("*");
+    .select("id, horizonte")
+    .eq("tenant_id", tenantId);
 
-  if (error) {
-    throw new Error(`Falha ao salvar metas SMART: ${error.message}`);
+  if (erroLeitura) {
+    throw new Error(`Falha ao carregar metas existentes: ${erroLeitura.message}`);
+  }
+
+  const idPorHorizonte = new Map(
+    ((existentes ?? []) as { id: string; horizonte: Horizonte }[]).map((m) => [m.horizonte, m.id]),
+  );
+
+  const metasSalvas: MetaSmart[] = [];
+
+  for (const horizonte of horizontes) {
+    const campos = {
+      visao_macro: campoObrigatorio(formData, `${horizonte}_visao_macro`),
+      specific: campoObrigatorio(formData, `${horizonte}_specific`),
+      measurable: campoObrigatorio(formData, `${horizonte}_measurable`),
+      attainable: campoObrigatorio(formData, `${horizonte}_attainable`),
+      relevant: campoObrigatorio(formData, `${horizonte}_relevant`),
+      time_bound: campoObrigatorio(formData, `${horizonte}_time_bound`),
+    };
+
+    const idExistente = idPorHorizonte.get(horizonte);
+
+    if (idExistente) {
+      // Caminho de EDIÇÃO — update explícito pelo id da meta.
+      const { data, error } = await supabase
+        .from("metas_smart")
+        .update(campos)
+        .eq("id", idExistente)
+        .eq("tenant_id", tenantId)
+        .select("*")
+        .single();
+
+      if (error) {
+        throw new Error(`Falha ao atualizar meta (${horizonte}): ${error.message}`);
+      }
+      metasSalvas.push(data as MetaSmart);
+      continue;
+    }
+
+    // Caminho de CRIAÇÃO — só quando este horizonte ainda não tem meta.
+    const { data, error } = await supabase
+      .from("metas_smart")
+      .insert({ tenant_id: tenantId, horizonte, ...campos })
+      .select("*")
+      .single();
+
+    if (!error) {
+      metasSalvas.push(data as MetaSmart);
+      continue;
+    }
+
+    if (error.code !== "23505") {
+      throw new Error(`Falha ao criar meta (${horizonte}): ${error.message}`);
+    }
+
+    // Corrida real: outro request criou a linha entre o SELECT do início
+    // da função e este INSERT — resolve como edição de verdade, não perde
+    // a submissão nem duplica.
+    const { data: criadaPeloOutro, error: erroBusca } = await supabase
+      .from("metas_smart")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("horizonte", horizonte)
+      .single();
+
+    if (erroBusca || !criadaPeloOutro) {
+      throw new Error(`Falha ao resolver corrida ao salvar meta (${horizonte}): ${erroBusca?.message}`);
+    }
+
+    const { data: atualizada, error: erroUpdate } = await supabase
+      .from("metas_smart")
+      .update(campos)
+      .eq("id", criadaPeloOutro.id as string)
+      .select("*")
+      .single();
+
+    if (erroUpdate) {
+      throw new Error(`Falha ao salvar meta (${horizonte}) após corrida: ${erroUpdate.message}`);
+    }
+    metasSalvas.push(atualizada as MetaSmart);
   }
 
   updateTag(tagMetasSmart(tenantId));
@@ -84,14 +184,43 @@ export async function criarMetasSmart(formData: FormData) {
   const { data: tenant } = await supabase.from("tenants").select("nome").eq("id", tenantId).single();
   const nomeWorkspace = tenant?.nome ?? "Gaiamum";
 
-  for (const meta of (metasCriadas ?? []) as MetaSmart[]) {
+  for (const meta of metasSalvas) {
     await exportarMetaSmartMarkdown(meta, nomeWorkspace);
   }
 
   redirect("/projetos");
 }
 
+/**
+ * Pular o onboarding agora GRAVA a decisão (`tenants.onboarding_metas_pulado_em`,
+ * migration 0045) antes de sair — sem isso, o Painel geral (`/`) redirecionava
+ * de volta pro onboarding em toda visita seguinte enquanto não houvesse
+ * nenhuma meta salva, um loop de fato pra quem pula (achado do P0, handoff
+ * canônico). Via service client de propósito: quem pula pode ser um member
+ * com escopo completo, não só o owner, e a policy de UPDATE de `tenants`
+ * (migration 0036) é só-owner — `tenantId` aqui nunca vem de input do
+ * cliente (sempre de garantirWorkspace()), então é seguro escrever assim,
+ * mesmo padrão já usado em vincularUsuarioAoConvite().
+ */
 export async function pularOnboarding() {
+  const tenantId = await garantirWorkspace();
+  const service = createServiceClient();
+
+  const { error } = await service
+    .from("tenants")
+    .update({ onboarding_metas_pulado_em: new Date().toISOString() })
+    .eq("id", tenantId)
+    // Nunca sobrescreve uma decisão já registrada (idempotente) — só grava
+    // na primeira vez que a pessoa pula.
+    .is("onboarding_metas_pulado_em", null);
+
+  if (error) {
+    console.error("[pularOnboarding] falha ao registrar decisão de pular:", error);
+    // Nunca bloqueia a navegação por causa disso — pior caso, a pessoa vê
+    // o onboarding de novo na próxima visita, mesmo comportamento de antes
+    // desta correção.
+  }
+
   redirect("/projetos");
 }
 
@@ -135,12 +264,24 @@ export async function criarProjeto(formData: FormData) {
     throw new Error(`Projeto criado, mas falha ao definir gestor: ${erroMembro.message}`);
   }
 
-  // Todo projeto novo nasce com as 3 colunas padrão — "Concluído" fixa,
-  // as outras duas o usuário pode renomear ou apagar depois.
+  // Todo projeto novo nasce com as 4 colunas padrão — "Concluído" fixa, "Hoje"
+  // já marcada como a coluna de sistema (migration 0048, só ela pode dividir
+  // em turnos e é onde novas colunas nascem por padrão) — as abertas o
+  // usuário pode renomear/apagar/criar outras livremente depois (pedido do
+  // Fabio, 2026-10-01: "é só o padrão de fábrica, a pessoa edita como
+  // quiser"), "Hoje" inclusive (perde só o nome, não a marcação de sistema).
+  // Achado real (2026-10-01, reportado pelo Fabio em teste físico): o
+  // INSERT em lote (array) do PostgREST monta as colunas pela UNIÃO das
+  // chaves de todos os objetos do array — como só o 1º objeto tinha a
+  // chave `hoje`, os outros recebiam `null` EXPLÍCITO pra essa coluna em
+  // vez de cair no `default false` do banco, violando o `not null` da
+  // migration 0048 e quebrando a criação de todo projeto novo. Todo objeto
+  // do array precisa ter exatamente as mesmas chaves.
   const { error: erroColunas } = await supabase.from("colunas_kanban").insert([
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Aberto", ordem: 0, concluido: false },
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Desenvolvimento", ordem: 1, concluido: false },
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Concluído", ordem: 0, concluido: true },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Hoje", ordem: 0, concluido: false, hoje: true },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Tarefas", ordem: 1, concluido: false, hoje: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Desenvolvimento", ordem: 2, concluido: false, hoje: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Concluído", ordem: 0, concluido: true, hoje: false },
   ]);
 
   if (erroColunas) {
@@ -398,6 +539,15 @@ export async function criarTarefa(
 ) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
+
+  // "Concluído" só recebe cartão por movimentação (arrasto/"Mover
+  // para..."), nunca por criação direta nela (pedido do Fabio, 2026-10-01).
+  // Checagem aqui dá um erro em português cedo; o trigger da migration 0050
+  // é quem garante isso de verdade mesmo contornando esta Server Action.
+  const { data: colunaDestino } = await supabase.from("colunas_kanban").select("concluido").eq("id", colunaId).single();
+  if (colunaDestino?.concluido) {
+    throw new Error('A coluna "Concluído" só recebe cartões movidos de outra coluna — crie o cartão em outra coluna e transporte pra cá.');
+  }
 
   // Cada linha do texto vira uma tarefa: cola uma lista pronta, sai um
   // cartão por item, sem precisar criar um por um.
@@ -740,23 +890,52 @@ export async function moverTarefa(
 // Colunas do kanban (configuráveis por projeto — só "Concluído" é fixa)
 // ---------------------------------------------------------------------------
 
+/** Nova coluna nasce logo DEPOIS da coluna "Hoje" (regra definitiva pedida
+ * pelo Fabio, 2026-10-01) — nunca no fim do quadro. `ordem` é inteiro, não
+ * fracionário como em `tarefas.ordem`, então "inserir no meio" exige abrir
+ * espaço de verdade: lê a lista de colunas abertas (já ordenadas, mesmo
+ * campo que `reordenarColunas` usa), insere o novo id na posição alvo e
+ * regrava `ordem` 0..N pra todas — reaproveita a mesma persistência de
+ * ordem existente, não cria mecanismo novo.
+ * Fallback documentado: se o projeto ainda não tem nenhuma coluna marcada
+ * como "Hoje" (projetos antigos, antes da migration 0048, até alguém usar
+ * `definirColunaHoje`), a nova coluna nasce na 1ª posição — nunca no fim. */
 export async function criarColuna(projetoId: string, formData: FormData) {
   const tenantId = await garantirWorkspace();
   const supabase = await createClient();
   const nome = campoObrigatorio(formData, "nome");
 
-  const { count } = await supabase
+  const { data: colunasAbertas } = await supabase
     .from("colunas_kanban")
-    .select("id", { count: "exact", head: true })
+    .select("id, hoje")
     .eq("projeto_id", projetoId)
-    .eq("concluido", false);
+    .eq("concluido", false)
+    .order("ordem", { ascending: true });
 
-  const { error } = await supabase
+  const lista = colunasAbertas ?? [];
+  const indiceHoje = lista.findIndex((c) => c.hoje);
+  const posicaoAlvo = indiceHoje === -1 ? 0 : indiceHoje + 1;
+
+  const { data: novaColuna, error: erroInsert } = await supabase
     .from("colunas_kanban")
-    .insert({ tenant_id: tenantId, projeto_id: projetoId, nome, ordem: count ?? 0 });
+    .insert({ tenant_id: tenantId, projeto_id: projetoId, nome, ordem: lista.length })
+    .select("id")
+    .single();
 
-  if (error) {
-    throw new Error(`Falha ao criar coluna: ${error.message}`);
+  if (erroInsert || !novaColuna) {
+    throw new Error(`Falha ao criar coluna: ${erroInsert?.message}`);
+  }
+
+  const idsNaOrdemFinal = lista.map((c) => c.id);
+  idsNaOrdemFinal.splice(posicaoAlvo, 0, novaColuna.id);
+
+  const reindexacoes = idsNaOrdemFinal.map((id, indice) =>
+    supabase.from("colunas_kanban").update({ ordem: indice }).eq("id", id),
+  );
+  const resultados = await Promise.all(reindexacoes);
+  const erroReindex = resultados.find((r) => r.error)?.error;
+  if (erroReindex) {
+    throw new Error(`Coluna criada, mas falha ao posicioná-la depois de "Hoje": ${erroReindex.message}`);
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
@@ -795,12 +974,21 @@ export async function alternarDivisaoEmTurnos(colunaId: string, projetoId: strin
 
   const { data: coluna } = await supabase
     .from("colunas_kanban")
-    .select("concluido")
+    .select("concluido, hoje")
     .eq("id", colunaId)
     .maybeSingle();
 
   if (coluna?.concluido) {
     throw new Error('A coluna "Concluído" é fixa e não pode ser dividida em turnos.');
+  }
+
+  // Regra definitiva (2026-10-01): só a coluna "Hoje" pode dividir em
+  // turnos. Checagem no SERVIDOR, não só escondendo o botão na interface —
+  // e o CHECK constraint da migration 0048 é a 2ª camada de defesa (RLS/SQL
+  // direto nunca contorna isso, mesmo chamando a tabela sem passar por
+  // aqui).
+  if (dividida && !coluna?.hoje) {
+    throw new Error('Só a coluna "Hoje" pode ser dividida em Manhã/Tarde/Noite.');
   }
 
   const { error } = await supabase.from("colunas_kanban").update({ dividida_em_turnos: dividida }).eq("id", colunaId);
@@ -814,6 +1002,74 @@ export async function alternarDivisaoEmTurnos(colunaId: string, projetoId: strin
     if (erroLimpeza) {
       throw new Error(`Falha ao desfazer a divisão em turnos: ${erroLimpeza.message}`);
     }
+  } else {
+    // Achado real (2026-10-01): cartões já existentes na coluna, sem turno
+    // definido, não sumiam de verdade — ficavam com `turno = null`, que
+    // nenhum dos 3 sub-blocos (filtro `turno === valor`) exibe. Em vez de um
+    // 4º bloco "sem turno" (ideia descartada pelo Fabio), a correção pedida
+    // é: ao dividir, todo cartão sem turno entra direto em "Manhã" — visível
+    // de cara, sem perder nada — e a pessoa reorganiza manualmente depois
+    // pra Tarde/Noite se fizer sentido.
+    const { error: erroDefault } = await supabase
+      .from("tarefas")
+      .update({ turno: "manha" })
+      .eq("coluna_id", colunaId)
+      .is("turno", null);
+    if (erroDefault) {
+      throw new Error(`Falha ao mover os cartões existentes para "Manhã": ${erroDefault.message}`);
+    }
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+/** Marca uma coluna como "a coluna Hoje" do projeto — identidade de sistema
+ * (migration 0048) que não depende do nome/título dela. No máximo 1 por
+ * projeto (índice único no banco): marcar uma nova desmarca a anterior
+ * automaticamente. Existe principalmente pro fallback de projetos sem
+ * nenhuma "Hoje" ainda (criados antes desta mudança) e pra permitir trocar
+ * depois, se o usuário quiser. Não transfere a divisão em turnos da coluna
+ * anterior — se ela estava dividida, perde essa divisão (o próprio CHECK
+ * constraint do banco exigiria isso); os cartões e o `turno` de cada um
+ * continuam intactos, só a divisão visual é que não se aplica mais ali. */
+export async function definirColunaHoje(colunaId: string, projetoId: string) {
+  const supabase = await createClient();
+
+  const { data: coluna } = await supabase
+    .from("colunas_kanban")
+    .select("concluido")
+    .eq("id", colunaId)
+    .maybeSingle();
+
+  if (coluna?.concluido) {
+    throw new Error('A coluna "Concluído" é fixa e não pode virar a coluna Hoje.');
+  }
+
+  // Desmarca a Hoje atual do projeto (se houver) e desliga a divisão em
+  // turnos dela — nessa ordem, antes de marcar a nova, porque o índice
+  // único (1 "Hoje" por projeto) e o CHECK constraint (turnos só na Hoje)
+  // rejeitariam qualquer estado intermediário com os dois ao mesmo tempo.
+  const { error: erroDesligarTurnos } = await supabase
+    .from("colunas_kanban")
+    .update({ dividida_em_turnos: false })
+    .eq("projeto_id", projetoId)
+    .eq("hoje", true);
+  if (erroDesligarTurnos) {
+    throw new Error(`Falha ao trocar a coluna Hoje: ${erroDesligarTurnos.message}`);
+  }
+
+  const { error: erroDesmarcar } = await supabase
+    .from("colunas_kanban")
+    .update({ hoje: false })
+    .eq("projeto_id", projetoId)
+    .eq("hoje", true);
+  if (erroDesmarcar) {
+    throw new Error(`Falha ao trocar a coluna Hoje: ${erroDesmarcar.message}`);
+  }
+
+  const { error } = await supabase.from("colunas_kanban").update({ hoje: true }).eq("id", colunaId);
+  if (error) {
+    throw new Error(`Falha ao definir a coluna Hoje: ${error.message}`);
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
@@ -1009,7 +1265,16 @@ export async function enviarConsolidacaoProjeto(projetoId: string): Promise<{ en
     secoes.push({ nomeResponsavel: "Sem responsável", itens: semResponsavel });
   }
 
-  const destinatarios = membrosComAcesso.map((m) => m.email);
+  // Resolução PRIVILEGIADA — ver comentário em `resolverEmailsParaNotificacao`:
+  // quem dispara o Freeze pode ser um gestor de projeto sem acesso completo
+  // (escopo='projeto'), e `membrosComAcesso` sempre inclui o(s) owner(s) do
+  // tenant mesmo sem projeto compartilhado com ele — não dependa do e-mail
+  // deles estar visível na interface pra esse gestor pra ainda assim
+  // conseguir notificá-los.
+  const destinatarios = await resolverEmailsParaNotificacao(
+    tenantId,
+    membrosComAcesso.map((m) => m.user_id),
+  );
 
   await enviarEmailConsolidacao({
     destinatarios,

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { buscarMembershipAtual } from "@/lib/ecc/membership";
-import { contarMetasSmart } from "@/lib/ecc/metas";
+import { contarMetasSmart, onboardingDeMetasFoiPulado } from "@/lib/ecc/metas";
 import { primeiroDiaDoMesAtual, urgenciaDoPrazo } from "@/lib/ecc/kanban";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConsolidacaoGlobal } from "@/components/financeiro/consolidacao-global";
@@ -36,8 +36,16 @@ export default async function PaginaInicial() {
   const supabase = await createClient();
 
   const totalMetasSmart = await contarMetasSmart(tenantId);
+  const temMetasSmart = Boolean(totalMetasSmart);
 
-  if (!totalMetasSmart) {
+  // Correção do P0 (2026-09-30): antes desta mudança, quem clicava "Pular,
+  // preencho depois" no onboarding voltava pra cá em qualquer visita
+  // seguinte e era empurrado de volta pro onboarding — um loop de fato,
+  // porque o único critério pra sair daqui era ter meta salva, e pular não
+  // gravava decisão nenhuma. Agora só força o onboarding pra quem nunca
+  // decidiu nada (nem criou meta, nem pulou); quem pulou vê o painel
+  // normal, com um convite simples pra criar a meta quando quiser (abaixo).
+  if (!temMetasSmart && !(await onboardingDeMetasFoiPulado(tenantId))) {
     redirect("/onboarding");
   }
 
@@ -141,19 +149,32 @@ export default async function PaginaInicial() {
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">Metas SMART</h2>
             <Link href="/onboarding" className="text-sm text-gaiamum-primary hover:underline">
-              Editar →
+              {listaMetas.length > 0 ? "Editar →" : "Criar suas metas →"}
             </Link>
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {listaMetas.map((meta) => (
-              <div key={meta.id} className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
-                <p className="text-xs uppercase tracking-wide text-gaiamum-text-muted">
-                  {ROTULO_HORIZONTE[meta.horizonte]}
-                </p>
-                <p className="mt-1 text-sm text-gaiamum-text">{meta.visao_macro}</p>
-              </div>
-            ))}
-          </div>
+          {listaMetas.length > 0 ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {listaMetas.map((meta) => (
+                <div key={meta.id} className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
+                  <p className="text-xs uppercase tracking-wide text-gaiamum-text-muted">
+                    {ROTULO_HORIZONTE[meta.horizonte]}
+                  </p>
+                  <p className="mt-1 text-sm text-gaiamum-text">{meta.visao_macro}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Só aparece pra quem clicou "Pular, preencho depois" no onboarding
+            // (ver seção de correção do P0 mais acima) — sem meta nenhuma
+            // definida ainda, mas sem forçar o redirect que existia antes.
+            <p className="mt-3 text-sm text-gaiamum-text-muted">
+              Você ainda não definiu suas metas SMART.{" "}
+              <Link href="/onboarding" className="text-gaiamum-primary hover:underline">
+                Criar agora
+              </Link>
+              .
+            </p>
+          )}
         </section>
 
         <section className="mt-10">

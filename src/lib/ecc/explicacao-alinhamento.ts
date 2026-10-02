@@ -8,6 +8,7 @@ import { alinhamentoTemDadosReais, calcularAlinhamentoGaiamum } from "@/lib/ecc/
 import { gerarTextoComGemini, mensagemDeErroGemini, MODELO_GEMINI_PADRAO } from "@/lib/ecc/gemini";
 import { concederPatente } from "@/lib/ecc/lab/patentes";
 import { registrarConsumoIA } from "@/lib/ecc/ia-consumo";
+import { verificarRateLimitIA } from "@/lib/ecc/ia-rate-limit";
 import type { ColunaKanban, Projeto, Tarefa } from "@/lib/ecc/tipos";
 
 async function exigirOwner(tenantId: string) {
@@ -92,6 +93,17 @@ export async function gerarExplicacaoAlinhamento(projetoId: string): Promise<Res
     // ficar disponível tanto no log de consumo de sucesso quanto no de
     // falha, além de continuar servindo pra concederPatente logo abaixo.
     const user = await obterUsuarioAtual();
+    if (!user) {
+      return { texto: null, erro: "Usuário não autenticado." };
+    }
+
+    // Rate limit (P0, 2026-09-30) — checado DEPOIS de confirmar que há
+    // dado real pra explicar (não desperdiça "tentativa" numa chamada que
+    // nem seria feita) e ANTES de qualquer chamada real ao Gemini.
+    const rateLimit = await verificarRateLimitIA({ userId: user.id, tenantId });
+    if (!rateLimit.permitido) {
+      return { texto: null, erro: rateLimit.motivo };
+    }
 
     const prompt = montarPrompt(projetoTipado, alinhamento);
 

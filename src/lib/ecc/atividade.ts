@@ -1,7 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
-import { listarMembros } from "@/lib/ecc/equipe";
+import { resolverEmailsParaNotificacao } from "@/lib/ecc/equipe";
 import { enviarEmailAtividade } from "@/lib/ecc/notificacoes";
 import { MENSAGEM_POR_TIPO } from "@/lib/ecc/mensagens-atividade";
 import type { TipoAtividade } from "@/lib/ecc/tipos";
@@ -78,10 +78,10 @@ export async function registrarAtividade({
 
     if (idsResponsaveis.length === 0) return;
 
-    const membros = await listarMembros(tenantId);
-    const emails = membros
-      .filter((m) => idsResponsaveis.includes(m.user_id))
-      .map((m) => m.email);
+    // Resolução PRIVILEGIADA — não depende de quem disparou a ação
+    // enxergar o e-mail do responsável na interface (ver comentário em
+    // `resolverEmailsParaNotificacao`).
+    const emails = await resolverEmailsParaNotificacao(tenantId, idsResponsaveis);
 
     if (emails.length === 0) return;
 

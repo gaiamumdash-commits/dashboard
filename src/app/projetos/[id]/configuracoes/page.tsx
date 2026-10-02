@@ -47,6 +47,7 @@ export default async function PaginaConfiguracoesQuadro({ params }: { params: Pr
   const membrosDoQuadro: MembroDoQuadro[] = quemVe.map((membro) => ({
     user_id: membro.user_id,
     email: membro.email,
+    nomeExibicao: membro.nome_exibicao,
     origem: membro.papel === "owner" ? "owner" : papelPorMembro.has(membro.user_id) ? "projeto" : "workspace",
     papelProjeto: papelPorMembro.get(membro.user_id) ?? null,
   }));
