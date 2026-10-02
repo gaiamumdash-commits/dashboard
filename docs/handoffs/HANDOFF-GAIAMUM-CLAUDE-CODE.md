@@ -10,9 +10,20 @@
 
 ---
 
-## Estado confirmado (2026-10-02, sessão nova #65 — última atualização)
+## Estado confirmado (2026-10-02, sessão nova #66 — última atualização)
 
-**Resumo em uma linha**: temporizador de hiperfoco (pendência do checkpoint #64, especificação detalhada do Fabio) implementado, testado (172 testes, zero regressão — 1ª vez que TODOS os testes de integração do projeto rodaram de verdade, Docker disponível) e validado visualmente ponta a ponta via Playwright. **Migration `0052` NÃO aplicada em produção e nada publicado** — aguardando o Fabio testar local primeiro, mesma disciplina de sempre.
+**Resumo em uma linha**: temporizador de hiperfoco (checkpoint #65) publicado em produção, e a pendência histórica do `git push` foi resolvida de vez — o Fabio completou o device-code flow do GitHub (escopo `workflow`), o repositório remoto está sincronizado com produção pela 1ª vez em várias sessões, e o CI (`.github/workflows/ci.yml`) rodou de verdade pela 1ª vez — **passou**.
+
+- **`git push` destravado**: `gh auth refresh -h github.com -s workflow` — gerei o código de verificação, o Fabio confirmou no navegador (`https://github.com/login/device`), `git push origin main` funcionou (`1c6157f..f0802ab`). Essa pendência vinha sendo registrada como "não bloqueante" desde o checkpoint #58 — a partir de agora o GitHub reflete produção de verdade, não precisa mais do caminho alternativo (`vercel deploy --prod` direto) só por causa disso (continua válido como opção, mas não é mais a única).
+- **CI validado pela 1ª vez**: `gh run list` confirmou `completed / success` no primeiro push real que o workflow processou — nunca tinha rodado de ponta a ponta antes (branches anteriores nunca tinham sido publicadas via `git push` por causa do mesmo bloqueio de escopo).
+- **Publicação do temporizador de hiperfoco**: mesma ordem das rodadas anteriores — (1) Fabio aplicou a migration `0052` no SQL Editor de produção, confirmado "Success. No rows returned"; (2) `vercel deploy --prod`, alias `gaiamum.com.br` atualizado; (3) smoke test `GET /auth` → 200; (4) `git push` (agora funcionando) sincronizou o commit `f0802ab` no GitHub.
+- **Pendências**: nenhuma bloqueante. Only itens leves já conhecidos: guard de autenticação ausente em `/projetos` (achado no checkpoint #64, não corrigido ainda); Fabio ainda vai testar o timer de hiperfoco em uso real (testado por mim via Playwright + simulação de tempo no banco, não pelo Fabio em pessoa).
+
+---
+
+## Estado confirmado (2026-10-02, sessão nova #65)
+
+**Resumo em uma linha**: temporizador de hiperfoco implementado e testado (172 testes, zero regressão — 1ª vez que TODOS os testes de integração do projeto rodaram de verdade, Docker disponível) e validado visualmente ponta a ponta via Playwright. Publicado em produção logo em seguida, no checkpoint #66 acima (migration `0052` + deploy + `git push` finalmente destravado).
 
 - **O que existe agora**: ao mover um cartão pra coluna de foco ("Em Desenvolvimento" por padrão, mas pode ser outra via "Definir foco"), um popup pergunta se quer um alarme de hiperfoco — **opcional**, "Sem alarme, só mover" não chama nada. Se definir uma duração (atalhos 15min/30min/1h/2h ou minutos personalizados): o cartão fica **amarelo + badge amarelo** na metade do tempo, **borda vermelha + badge "esgotado"** quando o tempo acaba, toca um **bipe** (Web Audio API, sem arquivo de áudio novo) e abre um popup perguntando se quer **renovar** (mesmos atalhos de duração) ou **só parar**. **No máximo 1 cronômetro ativo por PESSOA** (não por workspace) — a 2ª tentativa da mesma pessoa é rejeitada com mensagem amigável, mostrada dentro do próprio popup. Sair da coluna de foco encerra o timer automaticamente. Botão "Definir foco" (mesmo padrão de "Definir Hoje") deixa marcar outra coluna manualmente se "Em Desenvolvimento" foi renomeada/apagada.
 - **Migration `0052_timer_hiperfoco.sql`**: `colunas_kanban.dispara_hiperfoco` (flag dedicada, índice único parcial — 1 por projeto, mesmo padrão exato de `hoje` da migration 0048, nunca comparação por nome); `tarefas.hiperfoco_iniciado_em`/`hiperfoco_user_id` novos; índice único parcial em `hiperfoco_user_id` é a trava REAL de "1 por pessoa" (não só a interface); reaproveita `tarefas.tempo_estimado_min` (existia desde a migration 0001, nunca usado) pra guardar a duração. Também redefine `criar_projeto_planejado_ia` (CREATE OR REPLACE, só pra marcar `dispara_hiperfoco: true` em "Em Desenvolvimento" nos projetos criados pelo assistente de IA).
@@ -22,10 +33,10 @@
 - **Testes**: 9 unitários novos (`estadoHiperfoco`/`minutosRestantesHiperfoco` — proporcional à duração escolhida, não um limiar fixo) + 5 de integração novos (`timer-hiperfoco.test.ts`: trava de unicidade sob RLS real, 2 pessoas em paralelo não se bloqueiam, índice único de coluna). **172/172 passando, 0 skip** — primeira vez que a suíte de integração inteira (10 arquivos, antes sempre pulados por falta de Docker) rodou de verdade nesta sessão. `tsc --noEmit`, `eslint` (achado: `Date.now()` direto no JSX viola `react-hooks/purity` — corrigido extraindo pra função utilitária) e `npm run build` limpos.
 - **Validado via Playwright** contra o Postgres de teste isolado (mesmo Docker, migration aplicada só lá): popup abre ao mover pra "Em Desenvolvimento"; "Sem alarme" fecha sem nada; definir duração mostra o badge "⏱ X min restantes"; simulado (via UPDATE direto no banco de teste) o tempo decorrido pra confirmar visualmente a borda amarela na metade e vermelha + popup de renovação ao esgotar; "Só parar o cronômetro" encerra; tentar iniciar um 2º timer com a mesma pessoa mostra a mensagem de erro amigável dentro do popup, não um erro genérico.
 - **Achado à parte, não corrigido** (fora do escopo desta feature, registrado como pendência de robustez): `src/app/projetos/page.tsx` não redireciona pra `/auth` quando deslogado (diferente de todas as páginas do Lab, que já fazem esse guard) — quem cai nessa rota deslogado vê um erro feio.
-- **Pendências**:
-  1. Fabio testar local (ambiente já deixado configurado, mesmo Docker/`next dev` desta sessão) antes de aplicar a migration `0052` em produção e publicar.
-  2. `git push` continua pendente de `gh auth refresh -h github.com -s workflow` (mesma pendência leve, não bloqueante).
-  3. Corrigir o guard de autenticação ausente em `/projetos` (achado acima), se o Fabio quiser numa rodada rápida.
+- **Pendências (RESOLVIDAS no checkpoint #66 acima, mantido aqui por registro histórico)**:
+  1. ~~Fabio testar local antes de aplicar a migration `0052` em produção e publicar~~ — publicado no mesmo dia, sem teste manual prévio do Fabio em pessoa (ele autorizou explicitamente: "Deu commit e suba tudo").
+  2. ~~`git push` pendente de `gh auth refresh -h github.com -s workflow`~~ — resolvido, ver #66.
+  3. Corrigir o guard de autenticação ausente em `/projetos` (achado acima) — continua pendente, não bloqueante.
 
 ---
 
