@@ -6,14 +6,19 @@ import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import { listarPatentesDoUsuario } from "@/lib/ecc/lab/patentes";
+import { LAB_VISIVEL } from "@/lib/ecc/lab/flags";
 
 /** Elegibilidade pra tela de escolha pré-onboarding ("Fazer o Lab" vs "Ir
  * direto pro app"): só owner do workspace (quem assina a conta — convidado
  * de projeto nunca vê isso), só quem esse workspace ainda não perguntou, e
  * só quem ainda não tem a patente 'explorador'. A patente é por CONTA
  * (user_id, ver 0027_gaiamum_lab.sql), não por workspace — um owner que já
- * concluiu o Lab num tenant não é oferecido de novo num tenant novo. */
+ * concluiu o Lab num tenant não é oferecido de novo num tenant novo.
+ * Lab escondido visualmente (2026-10-02, pedido do Fabio): essa oferta
+ * nunca aparece enquanto `LAB_VISIVEL` for `false`, nem pra quem seria
+ * elegível. */
 export async function deveOferecerLab(tenantId: string): Promise<boolean> {
+  if (!LAB_VISIVEL) return false;
   const user = await obterUsuarioAtual();
   if (!user) return false;
 

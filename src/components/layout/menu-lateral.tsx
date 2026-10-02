@@ -11,6 +11,7 @@ import { EmailDaConta } from "@/components/layout/email-da-conta";
 import { LinksNavegacao } from "@/components/layout/links-navegacao";
 import { MenuMobile } from "@/components/layout/menu-mobile";
 import { EmblemaPatente } from "@/components/lab/emblema-patente";
+import { LAB_VISIVEL } from "@/lib/ecc/lab/flags";
 
 /** Busca a contagem de não lidas separada num componente próprio, dentro de
  * `<Suspense>` — sem isso, `MenuLateral` (renderizado em toda página do
@@ -35,12 +36,19 @@ async function PatenteComEmblema() {
   return <EmblemaPatente codigo={atual} />;
 }
 
-/** Mesmo padrão do sino/patente: busca própria dentro de `<Suspense>`. Nunca
- * esconde o link do Lab — antes de concluir, convite a explorar; depois de
- * conquistar a patente 'explorador', só troca o rótulo/selo pra sinalizar
- * que virou material de consulta, não pendência (pedido explícito do Fabio:
- * o Lab é referência viva de gestão, não um tutorial descartável). */
+/** Mesmo padrão do sino/patente: busca própria dentro de `<Suspense>`.
+ * Normalmente nunca esconde o link do Lab — antes de concluir, convite a
+ * explorar; depois de conquistar a patente 'explorador', só troca o
+ * rótulo/selo pra sinalizar que virou material de consulta, não pendência
+ * (pedido explícito do Fabio: o Lab é referência viva de gestão, não um
+ * tutorial descartável).
+ * Lab escondido visualmente (2026-10-02, pedido do Fabio: "não está
+ * funcionando, hoje ele só causa uma experiência ruim"): enquanto
+ * `LAB_VISIVEL` for `false`, este link não aparece pra ninguém, nem pra
+ * quem já tem a patente. Nada do Lab foi apagado — só este ponto de
+ * entrada (e os outros, ver `flags.ts`) ficam ocultos. */
 async function LinkLabCondicional() {
+  if (!LAB_VISIVEL) return null;
   const user = await obterUsuarioAtual();
   if (!user) return null;
   const patentes = await listarPatentesDoUsuario(user.id);
