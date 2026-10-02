@@ -1,5 +1,6 @@
 import "server-only";
 import { GoogleGenAI, ApiError, createPartFromBase64 } from "@google/genai";
+import type { Schema } from "@google/genai";
 import type { ProvedorIA, ResultadoGeracaoIA } from "@/lib/ecc/provedor-ia";
 
 /** Modelo padrão do provedor Gemini — decisão explícita (2026-09-09): rápido
@@ -41,6 +42,37 @@ export const gerarTextoComGemini: ProvedorIA["gerarTexto"] = async (prompt: stri
     },
   };
 };
+
+/** Variante de `gerarTextoComGemini` em "modo JSON" (`responseMimeType` +
+ * `responseSchema`) — usada quando quem chama precisa de uma estrutura
+ * confiável (ex.: planejamento assistido de projeto) em vez de texto livre.
+ * `response.text` aqui já é uma string JSON (ainda não parseada/validada —
+ * quem chama faz isso com um schema zod próprio, nunca confia cegamente no
+ * formato só porque pediu `responseSchema`: o modelo pode devolver um JSON
+ * sintaticamente válido mas semanticamente fora do esperado). */
+export async function gerarJsonComGemini(prompt: string, schema: Schema): Promise<ResultadoGeracaoIA> {
+  const ai = obterClient();
+  const response = await ai.models.generateContent({
+    model: MODELO_GEMINI_PADRAO,
+    contents: prompt,
+    config: { responseMimeType: "application/json", responseSchema: schema },
+  });
+
+  if (!response.text) {
+    throw new Error("O Gemini não devolveu nenhum texto.");
+  }
+
+  return {
+    texto: response.text,
+    provedor: "gemini",
+    modelo: MODELO_GEMINI_PADRAO,
+    uso: {
+      promptTokens: response.usageMetadata?.promptTokenCount,
+      candidatesTokens: response.usageMetadata?.candidatesTokenCount,
+      totalTokens: response.usageMetadata?.totalTokenCount,
+    },
+  };
+}
 
 /** O Gemini documenta `audio/aac` como MIME type de áudio aceito, mas não
  * `audio/mp4` — que é o que o `MediaRecorder` do Safari/iOS produz (mesmo

@@ -10,6 +10,25 @@
 
 ---
 
+## Estado confirmado (2026-10-02, sessão nova #63 — última atualização)
+
+**Resumo em uma linha**: implementada de verdade (não só planejada) a criação de projeto com planejamento assistido por IA — pendência #2 do checkpoint #62 abaixo. Código completo, testado (108 testes unitários passando + 5 de integração prontos/não executados), **migration 0051 NÃO aplicada em produção** (pedido explícito do Fabio nesta rodada) e **nada publicado ainda** (só local/branch `main`, sem deploy).
+
+- **O que foi inspecionado antes de codar**: confirmado que a estrutura de colunas padrão (Hoje → Tarefas → Em Desenvolvimento → Concluído) já era exatamente a pedida, criada em `criarProjeto` (actions.ts); confirmado que "Compromissos" já é uma visualização derivada (`ColunaCompromissosDoDia`, renderizada à parte, nunca uma coluna persistida) — nada precisou mudar nos dois. Reaproveitado sem duplicar: `GravadorVozAgenda` (voz→texto), `gemini.ts` (provedor), `ia-rate-limit.ts`/`ia-consumo.ts` (limites e log), `tarefa_checklist_itens` (checklist), RLS existente de `projetos`/`colunas_kanban`/`tarefas`/`projeto_membros`.
+- **O que foi criado**: migration `0051_planejamento_assistido_ia_projetos.sql` (tabela de idempotência + RPC `criar_projeto_planejado_ia`, SECURITY INVOKER, atômica); `src/lib/ecc/planejamento-ia.ts` (lógica pura: schema zod, prompt, seleção da prévia); `src/lib/ecc/planejamento-ia-actions.ts` (2 Server Actions); nova função `gerarJsonComGemini` em `gemini.ts` (modo JSON/`responseSchema`); `criarProjeto` (actions.ts) agora retorna `{id}`; `formulario-novo-projeto.tsx` reescrito como modal com os 2 caminhos (manual/IA).
+- **Fluxo**: "+ Novo projeto" → nome/descrição → "Criar por conta própria" (igual a sempre) ou "Planejar com IA" (contexto por texto/voz → prévia de 8-20 sugestões com checklist, revisável/editável/selecionável, nenhuma chamada de IA nova ao editar → confirmação cria projeto + colunas padrão + só os cartões selecionados, todos em "Tarefas", não concluídos → abre o quadro).
+- **Segurança**: só owner do workspace cria projeto/usa o assistente (mesma regra de sempre); resposta da IA é sempre dado não confiável (validada com zod em TS E de novo na RPC); nenhum id de tenant/usuário/coluna vindo do modelo é aceito; idempotência via advisory lock (mesma técnica de `garantir_workspace_pessoal`) — clique duplo/retry nunca duplica o projeto.
+- **Testes**: `npm test` → 108 passando, 50 pulados (os de integração/RLS, sem Docker nesta sessão) — 28 testes unitários novos desta rodada, nenhuma regressão nos pré-existentes. `tsc --noEmit` limpo, `eslint` limpo, `npm run build` limpo. 5 testes de integração novos da RPC prontos mas não executados — mesma pendência de Docker/Postgres local já documentada pro resto do projeto.
+- **Detalhe completo**: `docs/gaiamum/GAIAMUM-RELATORIO-PLANEJAMENTO-IA.md` (comportamento, arquivos, migration, testes, limites de IA, pendências, roteiro de teste pro Fabio). Backlog atualizado (`GAIAMUM-BACKLOG-CONSOLIDACAO.md`, item P1-Q) e Blueprint atualizado (seção 3, contagem de usos reais do Gemini).
+- **Pendências reais**:
+  1. Aplicar a migration 0051 em produção (manual, SQL Editor — mesma rotina de 0048-0050) ANTES de publicar o código novo — não feito nesta rodada, por pedido explícito ("não aplique migrations em produção nesta rodada").
+  2. Nada foi publicado (nem merge pra confirmar, nem deploy) — o código está pronto na árvore de trabalho, esperando o Fabio testar/aprovar.
+  3. Qualidade real das sugestões da IA não avaliada com chamada real ao Gemini (só com stub nos testes automatizados) — depende do teste do Fabio em uso real (roteiro no relatório).
+  4. `git push` pro GitHub continua pendente de `gh auth refresh -h github.com -s workflow` (mesma pendência leve do checkpoint #62, não bloqueante).
+- **Pendência seguinte, ainda não iniciada**: temporizador de hiperfoco (ver checkpoint #62 abaixo — segue sem design).
+
+---
+
 ## Estado confirmado (2026-10-02, sessão nova #62 — última atualização)
 
 **Resumo em uma linha**: TUDO desta sessão (checkpoints #58-#61 abaixo) foi para PRODUÇÃO de verdade — `main` recebeu o merge, o banco de produção recebeu as 3 migrations (0048, 0049, 0050) aplicadas manualmente pelo Fabio via SQL Editor, e o código foi publicado com `vercel deploy --prod` (não via GitHub — ver pendência abaixo). Além disso, o Gaiamum Lab foi escondido visualmente (pedido do Fabio: "não está funcionando, hoje só causa experiência ruim").
@@ -1370,6 +1389,10 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-10-02 (sessão nova #63) — Criação de projeto com planejamento assistido por IA, implementada de ponta a ponta
+
+Resumo completo em "Estado confirmado" (seção da própria sessão #63, no topo do arquivo). Em uma linha: implementei de verdade (não só planejei) a pendência #2 do checkpoint #62 — ao criar um projeto, a pessoa pode descrever o objetivo por texto/voz e a IA sugere cartões (com checklist interno) pra revisar/selecionar antes de criar; confirmação cria projeto + colunas padrão + só os cartões escolhidos, tudo atômico e idempotente (RPC nova, migration 0051). Reaproveitei tudo que já existia (voz, Gemini, rate limit, RLS) sem duplicar nada. 108 testes unitários passando, build/tsc/lint limpos. **Nada publicado**: migration não aplicada em produção e nenhum deploy feito, por pedido explícito — o Fabio ainda precisa testar no celular (roteiro no relatório) antes de qualquer publicação.
 
 ### 2026-09-28 (sessão nova #50) — Agenda editável + sincronização com Google Calendar, menu com e-mail, coluna do dia no Kanban
 

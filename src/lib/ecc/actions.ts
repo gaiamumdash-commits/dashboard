@@ -289,6 +289,11 @@ export async function criarProjeto(formData: FormData) {
   }
 
   revalidatePath("/projetos");
+  // Retorno usado pelo assistente de planejamento (caminho "Criar por conta
+  // própria"/"Criar projeto sem tarefas", em planejamento-ia-actions.ts) pra
+  // navegar direto pro quadro novo — inofensivo pro uso antigo como
+  // `<form action={criarProjeto}>`, que sempre ignorou o retorno.
+  return { id: projeto.id as string };
 }
 
 export async function atualizarStatusProjeto(projetoId: string, status: StatusProjeto) {
