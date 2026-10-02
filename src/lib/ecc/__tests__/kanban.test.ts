@@ -8,6 +8,8 @@ import {
   encontrarColunaEmFoco,
   calcularVelocidadeAutoScroll,
   gerarIdCliente,
+  estadoHiperfoco,
+  minutosRestantesHiperfoco,
 } from "@/lib/ecc/kanban";
 
 const REGEX_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -62,6 +64,72 @@ describe("urgenciaDoPrazo", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-30T12:00:00.000Z"));
     expect(urgenciaDoPrazo({ data_limite: "2026-10-05T12:00:00.000Z" }, false)).toBe("ok");
+  });
+});
+
+describe("estadoHiperfoco — temporizador de hiperfoco (migration 0052)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("inativo quando não há timer (sem início ou sem duração)", () => {
+    expect(estadoHiperfoco(null, 30)).toBe("inativo");
+    expect(estadoHiperfoco("2026-10-02T10:00:00.000Z", null)).toBe("inativo");
+  });
+
+  it("ativo logo no início do timer", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-02T10:01:00.000Z"));
+    expect(estadoHiperfoco("2026-10-02T10:00:00.000Z", 30)).toBe("ativo");
+  });
+
+  it("metade exatamente na metade do tempo — pedido do Fabio: proporcional à duração, não um limiar fixo", () => {
+    vi.useFakeTimers();
+    // Timer de 30min iniciado às 10:00 — metade é às 10:15.
+    vi.setSystemTime(new Date("2026-10-02T10:15:00.000Z"));
+    expect(estadoHiperfoco("2026-10-02T10:00:00.000Z", 30)).toBe("metade");
+  });
+
+  it("ainda ativo 1min antes da metade", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-02T10:14:00.000Z"));
+    expect(estadoHiperfoco("2026-10-02T10:00:00.000Z", 30)).toBe("ativo");
+  });
+
+  it("esgotado exatamente no horário em que vence", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-02T10:30:00.000Z"));
+    expect(estadoHiperfoco("2026-10-02T10:00:00.000Z", 30)).toBe("esgotado");
+  });
+
+  it("continua esgotado bem depois de vencer", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-02T12:00:00.000Z"));
+    expect(estadoHiperfoco("2026-10-02T10:00:00.000Z", 30)).toBe("esgotado");
+  });
+
+  it("timers de durações diferentes acendem o amarelo em momentos proporcionalmente diferentes", () => {
+    vi.useFakeTimers();
+    // 15min de duração, metade é aos 7min30s — 7min ainda deve ser "ativo".
+    vi.setSystemTime(new Date("2026-10-02T10:07:00.000Z"));
+    expect(estadoHiperfoco("2026-10-02T10:00:00.000Z", 15)).toBe("ativo");
+    vi.setSystemTime(new Date("2026-10-02T10:08:00.000Z"));
+    expect(estadoHiperfoco("2026-10-02T10:00:00.000Z", 15)).toBe("metade");
+  });
+});
+
+describe("minutosRestantesHiperfoco", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("conta os minutos restantes, arredondando pra cima", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-02T10:20:30.000Z"));
+    // 30min a partir de 10:00 vence às 10:30 — faltam 9min30s, arredonda pra 10.
+    expect(minutosRestantesHiperfoco("2026-10-02T10:00:00.000Z", 30)).toBe(10);
+  });
+
+  it("nunca fica negativo depois de esgotar", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-02T11:00:00.000Z"));
+    expect(minutosRestantesHiperfoco("2026-10-02T10:00:00.000Z", 30)).toBe(0);
   });
 });
 

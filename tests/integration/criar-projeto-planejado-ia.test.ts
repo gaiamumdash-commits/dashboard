@@ -44,9 +44,17 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("criar_projeto_planejado_ia", () => {
     expect(error).toBeNull();
     expect(projetoId).toBeTruthy();
 
-    const { data: colunas } = await service.from("colunas_kanban").select("nome, hoje, concluido").eq("projeto_id", projetoId).order("ordem");
+    const { data: colunas } = await service.from("colunas_kanban").select("nome, hoje, concluido, dispara_hiperfoco").eq("projeto_id", projetoId).order("ordem");
     expect(colunas).toHaveLength(4);
-    expect(colunas!.map((c) => c.nome)).toEqual(["Hoje", "Tarefas", "Em Desenvolvimento", "Concluído"]);
+    // "Concluído" tem `ordem: 0` (mesmo valor de "Hoje") de propósito — a UI
+    // sempre trata a coluna concluída à parte, nunca pela posição relativa
+    // dela no array (ver `criarColunaOtimista`/render do quadro). Checar as
+    // 3 colunas ABERTAS separado evita depender de uma ordem que o SQL não
+    // garante entre linhas empatadas em `ordem`.
+    const abertas = colunas!.filter((c) => !c.concluido);
+    expect(abertas.map((c) => c.nome)).toEqual(["Hoje", "Tarefas", "Em Desenvolvimento"]);
+    expect(colunas!.some((c) => c.nome === "Concluído" && c.concluido)).toBe(true);
+    expect(colunas!.find((c) => c.nome === "Em Desenvolvimento")?.dispara_hiperfoco).toBe(true);
 
     const { data: colunaTarefas } = await service.from("colunas_kanban").select("id").eq("projeto_id", projetoId).eq("nome", "Tarefas").single();
     const { data: tarefas } = await service.from("tarefas").select("id, titulo, coluna_id").eq("projeto_id", projetoId).order("ordem");

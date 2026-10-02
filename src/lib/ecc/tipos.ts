@@ -58,6 +58,14 @@ export type Tarefa = {
   // Só tem sentido quando `coluna_id` aponta pra uma coluna com
   // `dividida_em_turnos: true` — ver comentário do tipo `Turno`.
   turno: Turno | null;
+  // Temporizador de hiperfoco (migration 0052) — `null` = sem timer ativo.
+  // `tempo_estimado_min` (acima) é reaproveitado pra guardar a duração
+  // escolhida (minutos) desta sessão de foco. `hiperfoco_user_id` nunca
+  // vem do cliente — sempre `auth.uid()` resolvido na Server Action.
+  // Índice único parcial no banco garante no máximo 1 timer ativo por
+  // pessoa (não por workspace) — ver `iniciarHiperfoco` em actions.ts.
+  hiperfoco_iniciado_em: string | null;
+  hiperfoco_user_id: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -126,6 +134,12 @@ export type ColunaKanban = {
   // uma coluna nova nasce (logo depois dela — ver `criarColuna`). Pode ser
   // movida/renomeada livremente, diferente de `concluido`.
   hoje: boolean;
+  // Identidade de sistema (migration 0052), mesmo padrão de `hoje` acima —
+  // NÃO depende do nome da coluna. Controla se mover um cartão pra cá
+  // oferece o popup de temporizador de hiperfoco. "Em Desenvolvimento"
+  // nasce marcada por padrão (`criarProjeto`), mas pode ser movida pra
+  // outra coluna via `definirColunaHiperfoco`. No máximo 1 por projeto.
+  dispara_hiperfoco: boolean;
 };
 
 export type CategoriaFinanceira = "consumo" | "investimento" | "despesa";

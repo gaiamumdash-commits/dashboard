@@ -277,11 +277,15 @@ export async function criarProjeto(formData: FormData) {
   // vez de cair no `default false` do banco, violando o `not null` da
   // migration 0048 e quebrando a criação de todo projeto novo. Todo objeto
   // do array precisa ter exatamente as mesmas chaves.
+  // "Em Desenvolvimento" nasce marcada como a coluna de foco (migration
+  // 0052, mesmo padrão de `hoje`) — é ali que o popup de temporizador de
+  // hiperfoco é oferecido. MESMA chave `dispara_hiperfoco` em TODO objeto
+  // do array, pela mesma razão do comentário acima sobre `hoje`.
   const { error: erroColunas } = await supabase.from("colunas_kanban").insert([
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Hoje", ordem: 0, concluido: false, hoje: true },
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Tarefas", ordem: 1, concluido: false, hoje: false },
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Desenvolvimento", ordem: 2, concluido: false, hoje: false },
-    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Concluído", ordem: 0, concluido: true, hoje: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Hoje", ordem: 0, concluido: false, hoje: true, dispara_hiperfoco: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Tarefas", ordem: 1, concluido: false, hoje: false, dispara_hiperfoco: false },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Em Desenvolvimento", ordem: 2, concluido: false, hoje: false, dispara_hiperfoco: true },
+    { tenant_id: tenantId, projeto_id: projeto.id, nome: "Concluído", ordem: 0, concluido: true, hoje: false, dispara_hiperfoco: false },
   ]);
 
   if (erroColunas) {
@@ -854,12 +858,12 @@ export async function moverTarefa(
 
   const { data: tarefaAtual } = await supabase
     .from("tarefas")
-    .select("coluna_id")
+    .select("coluna_id, hiperfoco_iniciado_em")
     .eq("id", tarefaId)
     .maybeSingle();
 
   const idsColunas = [tarefaAtual?.coluna_id, novaColunaId].filter((id): id is string => Boolean(id));
-  const { data: colunas } = await supabase.from("colunas_kanban").select("id, nome").in("id", idsColunas);
+  const { data: colunas } = await supabase.from("colunas_kanban").select("id, nome, dispara_hiperfoco").in("id", idsColunas);
   const nomeDe = colunas?.find((c) => c.id === tarefaAtual?.coluna_id)?.nome ?? "?";
   const nomePara = colunas?.find((c) => c.id === novaColunaId)?.nome ?? "?";
 
@@ -871,9 +875,21 @@ export async function moverTarefa(
     ordem = (ultimaOrdem?.ordem ?? 0) + 1000;
   }
 
+  // Sair da coluna de foco (migration 0052) encerra automaticamente um
+  // temporizador de hiperfoco ativo nessa tarefa — continuar contando numa
+  // coluna que não é mais "Em Desenvolvimento" não faz sentido pro usuário.
+  const saindoDaColunaDeFoco =
+    colunas?.find((c) => c.id === tarefaAtual?.coluna_id)?.dispara_hiperfoco && novaColunaId !== tarefaAtual?.coluna_id;
+  const encerrarHiperfocoNoMove = Boolean(saindoDaColunaDeFoco && tarefaAtual?.hiperfoco_iniciado_em);
+
   const { error } = await supabase
     .from("tarefas")
-    .update({ coluna_id: novaColunaId, ordem, turno: novoTurno ?? null })
+    .update({
+      coluna_id: novaColunaId,
+      ordem,
+      turno: novoTurno ?? null,
+      ...(encerrarHiperfocoNoMove ? { hiperfoco_iniciado_em: null, hiperfoco_user_id: null } : {}),
+    })
     .eq("id", tarefaId);
 
   if (error) {
@@ -887,6 +903,69 @@ export async function moverTarefa(
     tipo: "movida",
     detalhe: { de: nomeDe, para: nomePara },
   });
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+// ---------------------------------------------------------------------------
+// Temporizador de hiperfoco (migration 0052) — pedido do Fabio: ao entrar na
+// coluna de foco ("Em Desenvolvimento" por padrão), oferece um alarme
+// opcional pra tarefa. Reaproveita `tarefas.tempo_estimado_min` (existia
+// desde a migration 0001, nunca usado) pra guardar a duração escolhida.
+// `hiperfoco_user_id` nunca vem do cliente — sempre `auth.uid()` resolvido
+// aqui, igual ao resto do projeto ("o navegador não é fonte de
+// autorização"). O índice único parcial da migration 0052 é a trava real de
+// "1 timer por pessoa, não por workspace" — a tentativa de iniciar um 2º
+// enquanto já tem um ativo falha com violação de unicidade (23505), tratada
+// abaixo como mensagem amigável em vez de erro genérico de banco.
+// ---------------------------------------------------------------------------
+
+function mensagemSeViolacaoDeUnicidade(error: { code?: string; message: string }): string {
+  if (error.code === "23505") {
+    return "Você já tem um cronômetro de foco ativo em outra tarefa — finalize ou cancele antes de iniciar outro.";
+  }
+  return error.message;
+}
+
+export async function iniciarHiperfoco(tarefaId: string, projetoId: string, minutos: number) {
+  const supabase = await createClient();
+  const user = await obterUsuarioAtual();
+  if (!user) throw new Error("Usuário não autenticado.");
+
+  if (!Number.isFinite(minutos) || minutos <= 0 || minutos > 24 * 60) {
+    throw new Error("Duração inválida — escolha entre 1 minuto e 24 horas.");
+  }
+
+  const { error } = await supabase
+    .from("tarefas")
+    .update({ hiperfoco_iniciado_em: new Date().toISOString(), hiperfoco_user_id: user.id, tempo_estimado_min: minutos })
+    .eq("id", tarefaId);
+
+  if (error) {
+    throw new Error(`Falha ao iniciar o cronômetro de foco: ${mensagemSeViolacaoDeUnicidade(error)}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+/** Mesma operação de `iniciarHiperfoco` (reseta o início, já é a mesma
+ * pessoa dona do timer) — função separada só pra deixar a intenção clara
+ * nas Server Actions chamadas pelo popup de "tempo esgotado". */
+export async function renovarHiperfoco(tarefaId: string, projetoId: string, minutos: number) {
+  await iniciarHiperfoco(tarefaId, projetoId, minutos);
+}
+
+export async function encerrarHiperfoco(tarefaId: string, projetoId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("tarefas")
+    .update({ hiperfoco_iniciado_em: null, hiperfoco_user_id: null })
+    .eq("id", tarefaId);
+
+  if (error) {
+    throw new Error(`Falha ao encerrar o cronômetro de foco: ${error.message}`);
+  }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
@@ -1075,6 +1154,44 @@ export async function definirColunaHoje(colunaId: string, projetoId: string) {
   const { error } = await supabase.from("colunas_kanban").update({ hoje: true }).eq("id", colunaId);
   if (error) {
     throw new Error(`Falha ao definir a coluna Hoje: ${error.message}`);
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+}
+
+/** Marca manualmente qual coluna oferece o popup de temporizador de
+ * hiperfoco (migration 0052) — mesmo padrão de `definirColunaHoje` acima.
+ * "Em Desenvolvimento" já nasce marcada em `criarProjeto`, então isso só é
+ * necessário se o usuário renomeou/apagou a coluna de origem e quer marcar
+ * outra manualmente. Não mexe em turnos (regra exclusiva da coluna Hoje). */
+export async function definirColunaHiperfoco(colunaId: string, projetoId: string) {
+  const supabase = await createClient();
+
+  const { data: coluna } = await supabase
+    .from("colunas_kanban")
+    .select("concluido")
+    .eq("id", colunaId)
+    .maybeSingle();
+
+  if (coluna?.concluido) {
+    throw new Error('A coluna "Concluído" é fixa e não pode virar a coluna de foco.');
+  }
+
+  // Desmarca a atual do projeto (se houver) antes de marcar a nova — o
+  // índice único parcial (1 por projeto) rejeitaria as duas marcadas ao
+  // mesmo tempo.
+  const { error: erroDesmarcar } = await supabase
+    .from("colunas_kanban")
+    .update({ dispara_hiperfoco: false })
+    .eq("projeto_id", projetoId)
+    .eq("dispara_hiperfoco", true);
+  if (erroDesmarcar) {
+    throw new Error(`Falha ao trocar a coluna de foco: ${erroDesmarcar.message}`);
+  }
+
+  const { error } = await supabase.from("colunas_kanban").update({ dispara_hiperfoco: true }).eq("id", colunaId);
+  if (error) {
+    throw new Error(`Falha ao definir a coluna de foco: ${error.message}`);
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);

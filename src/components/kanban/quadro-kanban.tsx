@@ -10,13 +10,16 @@ import {
   alternarDivisaoEmTurnos,
   criarColuna,
   criarTarefa,
+  definirColunaHiperfoco,
   definirColunaHoje,
   deletarTarefa,
   excluirColuna,
+  iniciarHiperfoco,
   moverTarefa,
   renomearColuna,
   reordenarColunas,
 } from "@/lib/ecc/actions";
+import { PopupHiperfocoIniciar } from "@/components/kanban/popup-hiperfoco-iniciar";
 
 const TURNOS: { valor: Turno; rotulo: string }[] = [
   { valor: "manha", rotulo: "🌅 Manhã" },
@@ -122,6 +125,12 @@ export function QuadroKanban({
   // Posição de rolagem do quadro antes de abrir o modal de detalhe — pra
   // fechar "voltar pra mesma coluna/posição", pedido explícito do Fabio.
   const [posicaoAntesDoModal, setPosicaoAntesDoModal] = useState<{ left: number; top: number } | null>(null);
+  // Cartão recém-movido pra coluna de foco (migration 0052,
+  // `dispara_hiperfoco`) — abre o popup oferecendo o cronômetro de
+  // hiperfoco. Não bloqueia o movimento em si: o cartão já trocou de
+  // coluna antes deste popup abrir, "Sem alarme" só fecha sem nenhuma
+  // Server Action.
+  const [tarefaIniciandoHiperfocoId, setTarefaIniciandoHiperfocoId] = useState<string | null>(null);
 
   // Mantém o estado local em dia com o que o servidor manda depois de um
   // router.refresh() (ex.: ao fechar o modal de detalhe da tarefa, que edita
@@ -142,8 +151,17 @@ export function QuadroKanban({
   // explícita). `soltarSobreCartao` abaixo cobre o caso de reordenar em
   // cima de um cartão específico (inclusive dentro da mesma coluna).
   function moverPara(tarefaId: string, novaColunaId: string, novoTurno: Turno | null = null, extremidade: "inicio" | "fim" = "fim") {
-    if (colunasIniciais.find((c) => c.id === novaColunaId)?.concluido) {
+    const colunaDestino = colunasIniciais.find((c) => c.id === novaColunaId);
+    if (colunaDestino?.concluido) {
       tocarSomConcluido();
+    }
+    // Entrar na coluna de foco (migration 0052) oferece o popup de
+    // cronômetro de hiperfoco — só quando REALMENTE muda de coluna (não ao
+    // reordenar dentro da própria coluna de foco, que chamaria isto de
+    // novo a cada arrasto sem sentido).
+    const tarefaMovendo = tarefas.find((t) => t.id === tarefaId);
+    if (colunaDestino?.dispara_hiperfoco && tarefaMovendo?.coluna_id !== novaColunaId) {
+      setTarefaIniciandoHiperfocoId(tarefaId);
     }
     const tarefaAtual = tarefas.find((t) => t.id === tarefaId);
     const colunaAnterior = tarefaAtual?.coluna_id;
@@ -184,8 +202,13 @@ export function QuadroKanban({
     if (!tarefaAlvo) return;
     const turnoAlvo = tarefaAlvo.turno ?? null;
 
-    if (colunasIniciais.find((c) => c.id === tarefaAlvo.coluna_id)?.concluido) {
+    const colunaDestino = colunasIniciais.find((c) => c.id === tarefaAlvo.coluna_id);
+    if (colunaDestino?.concluido) {
       tocarSomConcluido();
+    }
+    const tarefaMovendo = tarefas.find((t) => t.id === tarefaArrastadaId);
+    if (colunaDestino?.dispara_hiperfoco && tarefaMovendo?.coluna_id !== tarefaAlvo.coluna_id) {
+      setTarefaIniciandoHiperfocoId(tarefaArrastadaId);
     }
 
     const ordenadasDaColunaAlvo = tarefas
@@ -271,6 +294,8 @@ export function QuadroKanban({
       aguardando_de: null,
       valor_estimado: null,
       turno,
+      hiperfoco_iniciado_em: null,
+      hiperfoco_user_id: null,
     }));
 
     setTarefas((atual) => [...atual, ...novas]);
@@ -324,6 +349,7 @@ export function QuadroKanban({
       criado_em: new Date().toISOString(),
       dividida_em_turnos: false,
       hoje: false,
+      dispara_hiperfoco: false,
     };
     const indiceHoje = colunasAbertas.findIndex((c) => c.hoje);
     const posicaoAlvo = indiceHoje === -1 ? 0 : indiceHoje + 1;
@@ -561,6 +587,30 @@ export function QuadroKanban({
         setColunas(colunasAnteriores);
         setTarefas(tarefasAnteriores);
         toast.error(mensagemDeErro(err, 'Falha ao definir a coluna "Hoje".'));
+      });
+    });
+  }
+
+  /** Marca manualmente qual coluna oferece o cronômetro de hiperfoco
+   * (migration 0052) — só necessário se "Em Desenvolvimento" foi
+   * renomeada/apagada, já que ela nasce marcada por padrão. Mesmo padrão
+   * otimista de `definirColunaHojeOtimista` acima, mais simples (não mexe
+   * em turnos). */
+  function definirColunaHiperfocoOtimista(colunaId: string) {
+    const colunasAnteriores = colunas;
+    const focoAnteriorId = colunas.find((c) => c.dispara_hiperfoco)?.id;
+    setColunas((atual) =>
+      atual.map((c) => {
+        if (c.id === colunaId) return { ...c, dispara_hiperfoco: true };
+        if (c.id === focoAnteriorId) return { ...c, dispara_hiperfoco: false };
+        return c;
+      }),
+    );
+
+    iniciarTransicao(() => {
+      definirColunaHiperfoco(colunaId, projetoId).catch((err) => {
+        setColunas(colunasAnteriores);
+        toast.error(mensagemDeErro(err, "Falha ao definir a coluna de foco."));
       });
     });
   }
@@ -846,6 +896,14 @@ export function QuadroKanban({
                   📌 Hoje
                 </span>
               )}
+              {coluna.dispara_hiperfoco && (
+                <span
+                  className="ml-1 rounded-full bg-gaiamum-warning/15 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-gaiamum-warning"
+                  title="Coluna de foco — mover um cartão pra cá oferece o cronômetro de hiperfoco"
+                >
+                  🎯 Foco
+                </span>
+              )}
             </h2>
           )}
           {!ehFixa && (
@@ -858,6 +916,16 @@ export function QuadroKanban({
                   title='Marcar esta como a coluna "Hoje" — só ela pode dividir em turnos, e é onde novas colunas nascem'
                 >
                   Definir Hoje
+                </button>
+              )}
+              {colunaEditandoId !== coluna.id && !coluna.dispara_hiperfoco && (
+                <button
+                  type="button"
+                  onClick={() => definirColunaHiperfocoOtimista(coluna.id)}
+                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-warning"
+                  title="Marcar esta como a coluna de foco — mover um cartão pra cá vai oferecer o cronômetro de hiperfoco"
+                >
+                  Definir foco
                 </button>
               )}
               {/* "Somente a coluna Hoje deve oferecer a ação de dividir em
@@ -1257,6 +1325,21 @@ export function QuadroKanban({
           aoFechar={fecharModal}
         />
       )}
+
+      {tarefaIniciandoHiperfocoId &&
+        (() => {
+          const tarefaParaHiperfoco = tarefas.find((t) => t.id === tarefaIniciandoHiperfocoId);
+          if (!tarefaParaHiperfoco) return null;
+          return (
+            <PopupHiperfocoIniciar
+              tituloTarefa={tarefaParaHiperfoco.titulo}
+              aoFechar={() => setTarefaIniciandoHiperfocoId(null)}
+              aoConfirmar={(minutos) =>
+                iniciarHiperfoco(tarefaParaHiperfoco.id, projetoId, minutos).then(() => router.refresh())
+              }
+            />
+          );
+        })()}
     </div>
   );
 }

@@ -14,10 +14,11 @@ import type {
   TarefaMembro,
   Turno,
 } from "@/lib/ecc/tipos";
-import { CLASSE_COR_ETIQUETA, CLASSE_PRAZO, urgenciaDoPrazo } from "@/lib/ecc/kanban";
-import { atualizarTituloTarefa } from "@/lib/ecc/actions";
+import { CLASSE_COR_ETIQUETA, CLASSE_PRAZO, estadoHiperfoco, minutosRestantesHiperfoco, tocarAlarmeHiperfoco, urgenciaDoPrazo } from "@/lib/ecc/kanban";
+import { atualizarTituloTarefa, encerrarHiperfoco, renovarHiperfoco } from "@/lib/ecc/actions";
 import { AvatarIniciais } from "@/components/avatar-iniciais";
 import { MoverParaMenu } from "@/components/kanban/mover-para-menu";
+import { PopupHiperfocoVencido } from "@/components/kanban/popup-hiperfoco-vencido";
 
 const TURNOS: { valor: Turno; rotulo: string }[] = [
   { valor: "manha", rotulo: "🌅 Manhã" },
@@ -261,6 +262,41 @@ export function CartaoTarefa({
   const urgencia = urgenciaDoPrazo(tarefa, coluna.concluido);
   const concluidos = checklistDaTarefa.filter((c) => c.concluido).length;
 
+  // Temporizador de hiperfoco (migration 0052) — recalculado a partir de 2
+  // timestamps absolutos, nunca de um timer relativo guardado só em
+  // memória (sobrevive a reload). `[, forcarRecalculo]` força um re-render
+  // periódico SÓ enquanto este cartão tem um timer ativo — não cria
+  // interval nenhum nos outros cartões.
+  const [, forcarRecalculo] = useState(0);
+  const [popupVencidoAberto, setPopupVencidoAberto] = useState(false);
+  const avisouEsgotadoRef = useRef<string | null>(null);
+  const hiperfoco = estadoHiperfoco(tarefa.hiperfoco_iniciado_em, tarefa.tempo_estimado_min);
+
+  useEffect(() => {
+    if (!tarefa.hiperfoco_iniciado_em) return;
+    const id = window.setInterval(() => forcarRecalculo((n) => n + 1), 15_000);
+    return () => window.clearInterval(id);
+  }, [tarefa.hiperfoco_iniciado_em]);
+
+  useEffect(() => {
+    // Dispara o alarme e abre o popup de renovação só 1 vez por "ciclo" do
+    // timer (chave = `hiperfoco_iniciado_em`) — sem isso, o interval acima
+    // reabriria o popup a cada 15s enquanto a pessoa ainda está decidindo.
+    if (hiperfoco === "esgotado" && tarefa.hiperfoco_iniciado_em && avisouEsgotadoRef.current !== tarefa.hiperfoco_iniciado_em) {
+      avisouEsgotadoRef.current = tarefa.hiperfoco_iniciado_em;
+      tocarAlarmeHiperfoco();
+      setPopupVencidoAberto(true);
+    }
+  }, [hiperfoco, tarefa.hiperfoco_iniciado_em]);
+
+  function renovarHiperfocoDaTarefa(minutos: number) {
+    return renovarHiperfoco(tarefa.id, projetoId, minutos).then(() => router.refresh());
+  }
+
+  function pararHiperfocoDaTarefa() {
+    return encerrarHiperfoco(tarefa.id, projetoId).then(() => router.refresh());
+  }
+
   function salvarTitulo(novoTitulo: string) {
     setEditandoTitulo(false);
     if (!novoTitulo.trim() || novoTitulo.trim() === tarefa.titulo) return;
@@ -307,6 +343,15 @@ export function CartaoTarefa({
           ? "border-t-2 border-t-gaiamum-primary"
           : (posicaoDrop ?? indicadorDrop) === "depois"
             ? "border-b-2 border-b-gaiamum-primary"
+            : ""
+      } ${
+        // Cronômetro de foco (migration 0052) — `!` força a prioridade sobre
+        // as classes de borda acima (responsável/drop), que usam a mesma
+        // propriedade CSS. "esgotado" sempre prevalece sobre "metade".
+        hiperfoco === "esgotado"
+          ? "!border-gaiamum-danger"
+          : hiperfoco === "metade"
+            ? "!border-gaiamum-warning bg-gaiamum-warning/10"
             : ""
       }`}
     >
@@ -415,6 +460,23 @@ export function CartaoTarefa({
                 {new Date(tarefa.data_limite).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
               </span>
             )}
+            {tarefa.hiperfoco_iniciado_em && tarefa.tempo_estimado_min && (
+              <span
+                className={`rounded-full border px-2 py-0.5 ${
+                  hiperfoco === "esgotado"
+                    ? "border-gaiamum-danger text-gaiamum-danger"
+                    : hiperfoco === "metade"
+                      ? "border-gaiamum-warning text-gaiamum-warning"
+                      : "border-gaiamum-border text-gaiamum-text-muted"
+                }`}
+                title="Cronômetro de foco"
+              >
+                ⏱{" "}
+                {hiperfoco === "esgotado"
+                  ? "esgotado"
+                  : `${minutosRestantesHiperfoco(tarefa.hiperfoco_iniciado_em, tarefa.tempo_estimado_min)} min restantes`}
+              </span>
+            )}
             {checklistDaTarefa.length > 0 && (
               <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
                 ☑ {concluidos}/{checklistDaTarefa.length}
@@ -457,6 +519,15 @@ export function CartaoTarefa({
             aoMoverPara(colunaId, turno, extremidade);
           }}
           aoFechar={() => setMenuMoverAberto(false)}
+        />
+      )}
+
+      {popupVencidoAberto && (
+        <PopupHiperfocoVencido
+          tituloTarefa={tarefa.titulo}
+          aoFechar={() => setPopupVencidoAberto(false)}
+          aoRenovar={renovarHiperfocoDaTarefa}
+          aoParar={pararHiperfocoDaTarefa}
         />
       )}
     </div>

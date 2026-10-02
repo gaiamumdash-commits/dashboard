@@ -229,6 +229,73 @@ export function urgenciaDoPrazo(
   return "ok";
 }
 
+export type EstadoHiperfoco = "inativo" | "ativo" | "metade" | "esgotado";
+
+export const CLASSE_HIPERFOCO: Record<EstadoHiperfoco, string> = {
+  inativo: "",
+  ativo: "",
+  metade: "border-gaiamum-warning bg-gaiamum-warning/10",
+  esgotado: "border-gaiamum-danger border-2",
+};
+
+/** Estado do temporizador de hiperfoco (migration 0052) a partir de 2
+ * timestamps absolutos — nunca de um timer relativo guardado só em memória,
+ * então sobrevive a reload/fechar aba sem perder a conta. "Metade do tempo"
+ * (não um limiar fixo como `urgenciaDoPrazo` acima) é o pedido explícito do
+ * Fabio: um alarme de foco de 15min e um de 2h têm que acender o amarelo em
+ * momentos proporcionalmente diferentes. */
+export function estadoHiperfoco(iniciadoEm: string | null, minutos: number | null): EstadoHiperfoco {
+  if (!iniciadoEm || !minutos) return "inativo";
+
+  const decorridoMs = Date.now() - new Date(iniciadoEm).getTime();
+  const duracaoMs = minutos * 60_000;
+
+  if (decorridoMs >= duracaoMs) return "esgotado";
+  if (decorridoMs >= duracaoMs / 2) return "metade";
+  return "ativo";
+}
+
+/** Minutos restantes do cronômetro de hiperfoco (0 se já esgotou) — função
+ * separada de `estadoHiperfoco` acima só porque o linter (`react-hooks/purity`)
+ * proíbe chamar `Date.now()` diretamente no corpo/JSX de um componente;
+ * encapsular numa função utilitária evita o erro sem perder a pureza real
+ * do componente (o valor muda só quando ele re-renderiza, nunca sozinho). */
+export function minutosRestantesHiperfoco(iniciadoEm: string, minutos: number): number {
+  const decorridoMs = Date.now() - new Date(iniciadoEm).getTime();
+  const duracaoMs = minutos * 60_000;
+  return Math.max(0, Math.ceil((duracaoMs - decorridoMs) / 60_000));
+}
+
+/** Bipe curto gerado via Web Audio API — evita depender de um arquivo de
+ * áudio novo (diferente de `tocarSomConcluido` acima, que toca um .mp3 já
+ * existente). Silenciosamente ignorado se o navegador bloquear áudio sem
+ * interação prévia do usuário, mesmo padrão de `tocarSomConcluido`. */
+export function tocarAlarmeHiperfoco() {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioContextCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+    const contexto = new AudioContextCtor();
+    const tocarBipe = (inicioS: number) => {
+      const oscilador = contexto.createOscillator();
+      const ganho = contexto.createGain();
+      oscilador.type = "sine";
+      oscilador.frequency.value = 880;
+      ganho.gain.setValueAtTime(0.0001, contexto.currentTime + inicioS);
+      ganho.gain.exponentialRampToValueAtTime(0.2, contexto.currentTime + inicioS + 0.02);
+      ganho.gain.exponentialRampToValueAtTime(0.0001, contexto.currentTime + inicioS + 0.3);
+      oscilador.connect(ganho).connect(contexto.destination);
+      oscilador.start(contexto.currentTime + inicioS);
+      oscilador.stop(contexto.currentTime + inicioS + 0.3);
+    };
+    tocarBipe(0);
+    tocarBipe(0.35);
+    tocarBipe(0.7);
+  } catch {
+    // Silencioso de propósito — alarme é um reforço, nunca pode quebrar a tela.
+  }
+}
+
 /**
  * Qual coluna está "em foco" durante a rolagem horizontal do quadro no
  * celular (uma coluna por vez, com scroll-snap) — a mais próxima do centro

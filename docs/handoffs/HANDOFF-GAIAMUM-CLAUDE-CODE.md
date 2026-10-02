@@ -10,9 +10,28 @@
 
 ---
 
-## Estado confirmado (2026-10-02, sessão nova #64 — última atualização)
+## Estado confirmado (2026-10-02, sessão nova #65 — última atualização)
 
-**Resumo em uma linha**: a criação de projeto com planejamento assistido por IA (checkpoint #63) foi testada pelo Fabio no celular, aprovada, e publicada de verdade em produção (migration `0051` + deploy). Próxima pendência, já com especificação detalhada do Fabio: temporizador de hiperfoco na coluna "Em Desenvolvimento" — ainda não iniciado.
+**Resumo em uma linha**: temporizador de hiperfoco (pendência do checkpoint #64, especificação detalhada do Fabio) implementado, testado (172 testes, zero regressão — 1ª vez que TODOS os testes de integração do projeto rodaram de verdade, Docker disponível) e validado visualmente ponta a ponta via Playwright. **Migration `0052` NÃO aplicada em produção e nada publicado** — aguardando o Fabio testar local primeiro, mesma disciplina de sempre.
+
+- **O que existe agora**: ao mover um cartão pra coluna de foco ("Em Desenvolvimento" por padrão, mas pode ser outra via "Definir foco"), um popup pergunta se quer um alarme de hiperfoco — **opcional**, "Sem alarme, só mover" não chama nada. Se definir uma duração (atalhos 15min/30min/1h/2h ou minutos personalizados): o cartão fica **amarelo + badge amarelo** na metade do tempo, **borda vermelha + badge "esgotado"** quando o tempo acaba, toca um **bipe** (Web Audio API, sem arquivo de áudio novo) e abre um popup perguntando se quer **renovar** (mesmos atalhos de duração) ou **só parar**. **No máximo 1 cronômetro ativo por PESSOA** (não por workspace) — a 2ª tentativa da mesma pessoa é rejeitada com mensagem amigável, mostrada dentro do próprio popup. Sair da coluna de foco encerra o timer automaticamente. Botão "Definir foco" (mesmo padrão de "Definir Hoje") deixa marcar outra coluna manualmente se "Em Desenvolvimento" foi renomeada/apagada.
+- **Migration `0052_timer_hiperfoco.sql`**: `colunas_kanban.dispara_hiperfoco` (flag dedicada, índice único parcial — 1 por projeto, mesmo padrão exato de `hoje` da migration 0048, nunca comparação por nome); `tarefas.hiperfoco_iniciado_em`/`hiperfoco_user_id` novos; índice único parcial em `hiperfoco_user_id` é a trava REAL de "1 por pessoa" (não só a interface); reaproveita `tarefas.tempo_estimado_min` (existia desde a migration 0001, nunca usado) pra guardar a duração. Também redefine `criar_projeto_planejado_ia` (CREATE OR REPLACE, só pra marcar `dispara_hiperfoco: true` em "Em Desenvolvimento" nos projetos criados pelo assistente de IA).
+- **2 achados reais corrigidos no processo** (nenhum deles no código do timer em si):
+  1. Teste de integração pré-existente da migration 0051 (`criar-projeto-planejado-ia.test.ts`) nunca tinha rodado de verdade — ao rodar pela 1ª vez (Docker disponível nesta sessão), falhou: `ORDER BY ordem` empata entre "Hoje" e "Concluído" (mesmo valor, de propósito — a UI sempre trata "Concluído" à parte da ordem). Corrigido o teste (checar as 3 colunas abertas separado da concluída), não a migration/RPC (que já está certa e em produção).
+  2. Interação via Playwright com o menu "Mover para..." se mostrou instável com cliques sintéticos simples (fechava sozinho às vezes) — contornado clicando via `element.click()` direto no DOM (JS), sem efeito no comportamento real do app pro usuário, só na forma de testar.
+- **Testes**: 9 unitários novos (`estadoHiperfoco`/`minutosRestantesHiperfoco` — proporcional à duração escolhida, não um limiar fixo) + 5 de integração novos (`timer-hiperfoco.test.ts`: trava de unicidade sob RLS real, 2 pessoas em paralelo não se bloqueiam, índice único de coluna). **172/172 passando, 0 skip** — primeira vez que a suíte de integração inteira (10 arquivos, antes sempre pulados por falta de Docker) rodou de verdade nesta sessão. `tsc --noEmit`, `eslint` (achado: `Date.now()` direto no JSX viola `react-hooks/purity` — corrigido extraindo pra função utilitária) e `npm run build` limpos.
+- **Validado via Playwright** contra o Postgres de teste isolado (mesmo Docker, migration aplicada só lá): popup abre ao mover pra "Em Desenvolvimento"; "Sem alarme" fecha sem nada; definir duração mostra o badge "⏱ X min restantes"; simulado (via UPDATE direto no banco de teste) o tempo decorrido pra confirmar visualmente a borda amarela na metade e vermelha + popup de renovação ao esgotar; "Só parar o cronômetro" encerra; tentar iniciar um 2º timer com a mesma pessoa mostra a mensagem de erro amigável dentro do popup, não um erro genérico.
+- **Achado à parte, não corrigido** (fora do escopo desta feature, registrado como pendência de robustez): `src/app/projetos/page.tsx` não redireciona pra `/auth` quando deslogado (diferente de todas as páginas do Lab, que já fazem esse guard) — quem cai nessa rota deslogado vê um erro feio.
+- **Pendências**:
+  1. Fabio testar local (ambiente já deixado configurado, mesmo Docker/`next dev` desta sessão) antes de aplicar a migration `0052` em produção e publicar.
+  2. `git push` continua pendente de `gh auth refresh -h github.com -s workflow` (mesma pendência leve, não bloqueante).
+  3. Corrigir o guard de autenticação ausente em `/projetos` (achado acima), se o Fabio quiser numa rodada rápida.
+
+---
+
+## Estado confirmado (2026-10-02, sessão nova #64)
+
+**Resumo em uma linha**: a criação de projeto com planejamento assistido por IA (checkpoint #63) foi testada pelo Fabio no celular, aprovada, e publicada de verdade em produção (migration `0051` + deploy).
 
 - **Ambiente de teste local montado**: `next dev` nesta máquina, acessível em `http://192.168.0.18:3000`, apontando pro Postgres de teste isolado já existente no Docker (`supabase_db_Gaiamum`, porta 57322/API 57321) — migration `0051` aplicada e registrada ali antes do teste (nunca em produção nesse passo). Usuário de teste reaproveitado (`teste@gaiamum.local`), senha resetada via Admin API do GoTrue local.
 - **2 achados reais corrigidos no processo de destravar o teste físico**:
@@ -48,7 +67,7 @@
 
 ---
 
-## Estado confirmado (2026-10-02, sessão nova #62 — última atualização)
+## Estado confirmado (2026-10-02, sessão nova #62)
 
 **Resumo em uma linha**: TUDO desta sessão (checkpoints #58-#61 abaixo) foi para PRODUÇÃO de verdade — `main` recebeu o merge, o banco de produção recebeu as 3 migrations (0048, 0049, 0050) aplicadas manualmente pelo Fabio via SQL Editor, e o código foi publicado com `vercel deploy --prod` (não via GitHub — ver pendência abaixo). Além disso, o Gaiamum Lab foi escondido visualmente (pedido do Fabio: "não está funcionando, hoje só causa experiência ruim").
 
@@ -1408,6 +1427,14 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-10-02 (sessão nova #65) — Temporizador de hiperfoco implementado, testado (172 testes, 0 regressão), não publicado
+
+Resumo completo em "Estado confirmado" (seção da própria sessão #65, no topo do arquivo). Em uma linha: ao mover um cartão pra coluna de foco, popup opcional de alarme (atalhos de duração) — cartão fica amarelo na metade, vermelho + popup de renovação ao esgotar, bipe via Web Audio API; no máximo 1 cronômetro ativo por pessoa (índice único no banco, migration 0052). Validado visualmente ponta a ponta via Playwright (popup, cores, renovação, trava de unicidade mostrando erro amigável). 1ª vez que todos os testes de integração do projeto rodaram de verdade (Docker disponível) — achou e corrigiu 1 teste frágil pré-existente da migration 0051 (não um bug real). **Nada publicado** — aguardando o Fabio testar local.
+
+### 2026-10-02 (sessão nova #64) — Planejamento com IA testado, aprovado e publicado em produção
+
+Resumo completo em "Estado confirmado" (seção da própria sessão #64, no topo do arquivo). Em uma linha: destravei o teste físico do Fabio (2 achados: `/projetos` sem redirect de auth, e login client-side quebrando por `127.0.0.1` vs IP da LAN), ele testou e aprovou o roteiro do aniversário, e publiquei a migration `0051` + deploy em produção, nessa ordem, a pedido explícito dele.
 
 ### 2026-10-02 (sessão nova #63) — Criação de projeto com planejamento assistido por IA, implementada de ponta a ponta
 

@@ -43,18 +43,19 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("criarProjeto — colunas padrão não viol
     // Mesma operação (mesma forma de objeto em TODAS as linhas) que
     // criarProjeto faz depois da correção — inclui "Tarefas" (pedido do
     // Fabio, 2026-10-01: Hoje → Tarefas → Em Desenvolvimento → Concluído
-    // como padrão de fábrica de todo projeto novo).
+    // como padrão de fábrica de todo projeto novo) e `dispara_hiperfoco`
+    // (migration 0052: "Em Desenvolvimento" já nasce como coluna de foco).
     const { error: erroColunas } = await owner.cliente.from("colunas_kanban").insert([
-      { tenant_id: tenantId, projeto_id: projeto!.id, nome: "Hoje", ordem: 0, concluido: false, hoje: true },
-      { tenant_id: tenantId, projeto_id: projeto!.id, nome: "Tarefas", ordem: 1, concluido: false, hoje: false },
-      { tenant_id: tenantId, projeto_id: projeto!.id, nome: "Em Desenvolvimento", ordem: 2, concluido: false, hoje: false },
-      { tenant_id: tenantId, projeto_id: projeto!.id, nome: "Concluído", ordem: 0, concluido: true, hoje: false },
+      { tenant_id: tenantId, projeto_id: projeto!.id, nome: "Hoje", ordem: 0, concluido: false, hoje: true, dispara_hiperfoco: false },
+      { tenant_id: tenantId, projeto_id: projeto!.id, nome: "Tarefas", ordem: 1, concluido: false, hoje: false, dispara_hiperfoco: false },
+      { tenant_id: tenantId, projeto_id: projeto!.id, nome: "Em Desenvolvimento", ordem: 2, concluido: false, hoje: false, dispara_hiperfoco: true },
+      { tenant_id: tenantId, projeto_id: projeto!.id, nome: "Concluído", ordem: 0, concluido: true, hoje: false, dispara_hiperfoco: false },
     ]);
     expect(erroColunas).toBeNull();
 
     const { data: colunas } = await owner.cliente
       .from("colunas_kanban")
-      .select("nome, hoje, concluido")
+      .select("nome, hoje, concluido, dispara_hiperfoco")
       .eq("projeto_id", projeto!.id)
       .order("ordem");
 
@@ -65,6 +66,8 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("criarProjeto — colunas padrão não viol
     expect(porNome["Em Desenvolvimento"].hoje).toBe(false);
     expect(porNome["Concluído"].hoje).toBe(false);
     expect(porNome["Concluído"].concluido).toBe(true);
+    expect(porNome["Em Desenvolvimento"].dispara_hiperfoco).toBe(true);
+    expect(porNome["Hoje"].dispara_hiperfoco).toBe(false);
   });
 
   it("[REGRESSÃO] reproduz o bug original: insert em lote com formas diferentes falha com not-null em 'hoje'", async () => {
