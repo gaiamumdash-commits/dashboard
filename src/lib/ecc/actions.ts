@@ -301,6 +301,13 @@ export async function criarProjeto(formData: FormData) {
 }
 
 export async function atualizarStatusProjeto(projetoId: string, status: StatusProjeto) {
+  // Achado real (2026-10-03): faltava aqui o mesmo guard que toda outra
+  // mutação de projeto já tem — sem `garantirWorkspace()`, sessão
+  // expirada/ausente não redirecionava pro login, só lançava um erro
+  // genérico (tela de "Runtime Error" feia). Ver mesmo achado em
+  // `garantirWorkspace()` (workspace.ts) e no handoff, checkpoint #67.
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
   const supabase = await createClient();
   const { error } = await supabase.from("projetos").update({ status }).eq("id", projetoId);
 
@@ -312,6 +319,11 @@ export async function atualizarStatusProjeto(projetoId: string, status: StatusPr
 }
 
 export async function deletarProjeto(projetoId: string) {
+  // Mesmo achado de `atualizarStatusProjeto` acima — excluir projeto não
+  // tinha guard nenhum de sessão/permissão, só o RLS do banco. Alinhado ao
+  // mesmo padrão usado por todas as outras mutações de projeto.
+  const tenantId = await garantirWorkspace();
+  await exigirGestorOuOwner(tenantId, projetoId);
   const supabase = await createClient();
   const { error } = await supabase.from("projetos").delete().eq("id", projetoId);
 
@@ -928,6 +940,13 @@ function mensagemSeViolacaoDeUnicidade(error: { code?: string; message: string }
 }
 
 export async function iniciarHiperfoco(tarefaId: string, projetoId: string, minutos: number) {
+  // Achado real (2026-10-03): faltava `garantirWorkspace()` aqui — exatamente
+  // o fluxo que o Fabio testou no celular (mover cartão pra "Em
+  // Desenvolvimento" → iniciar o alarme). Sem o guard, sessão expirada
+  // disparava o `throw` cru abaixo (tela de "Runtime Error" feia) em vez de
+  // mandar pro login — mesma classe de bug corrigida em `garantirWorkspace()`
+  // (checkpoint #67), mas esta Server Action nunca a chamava.
+  await garantirWorkspace();
   const supabase = await createClient();
   const user = await obterUsuarioAtual();
   if (!user) throw new Error("Usuário não autenticado.");
@@ -956,6 +975,8 @@ export async function renovarHiperfoco(tarefaId: string, projetoId: string, minu
 }
 
 export async function encerrarHiperfoco(tarefaId: string, projetoId: string) {
+  // Mesmo achado de `iniciarHiperfoco` acima.
+  await garantirWorkspace();
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -1026,17 +1047,29 @@ export async function criarColuna(projetoId: string, formData: FormData) {
 }
 
 export async function renomearColuna(colunaId: string, projetoId: string, formData: FormData) {
+  // Mesmo achado de `iniciarHiperfoco` — faltava o guard de sessão aqui.
+  await garantirWorkspace();
   const supabase = await createClient();
   const nome = campoObrigatorio(formData, "nome");
 
   const { data: coluna } = await supabase
     .from("colunas_kanban")
-    .select("concluido")
+    .select("concluido, dispara_hiperfoco")
     .eq("id", colunaId)
     .maybeSingle();
 
   if (coluna?.concluido) {
     throw new Error('A coluna "Concluído" é fixa e não pode ser renomeada.');
+  }
+
+  // A coluna de foco ("Em Desenvolvimento") também é fixa agora (pedido do
+  // Fabio, 2026-10-03): "o foco só vai entrar na coluna em desenvolvimento,
+  // retire essa história de botar o foco em qualquer lugar" — ela deixou de
+  // ser transferível/renomeável pela interface. 2ª camada de defesa (a 1ª é
+  // a interface nem mostrar mais a opção): trigger `colunas_kanban_coluna_foco_fixa`
+  // (migration 0053) rejeita o mesmo UPDATE direto no banco.
+  if (coluna?.dispara_hiperfoco) {
+    throw new Error('A coluna de foco ("Em Desenvolvimento") é fixa e não pode ser renomeada.');
   }
 
   const { error } = await supabase.from("colunas_kanban").update({ nome }).eq("id", colunaId);
@@ -1054,6 +1087,8 @@ export async function renomearColuna(colunaId: string, projetoId: string, formDa
  * voltam todos pra coluna normal (decisão já tomada com o Fabio): só perdem
  * a marcação de turno, nada se perde e é reversível a qualquer momento. */
 export async function alternarDivisaoEmTurnos(colunaId: string, projetoId: string, dividida: boolean) {
+  // Mesmo achado de `iniciarHiperfoco` — faltava o guard de sessão aqui.
+  await garantirWorkspace();
   const supabase = await createClient();
 
   const { data: coluna } = await supabase
@@ -1117,6 +1152,8 @@ export async function alternarDivisaoEmTurnos(colunaId: string, projetoId: strin
  * constraint do banco exigiria isso); os cartões e o `turno` de cada um
  * continuam intactos, só a divisão visual é que não se aplica mais ali. */
 export async function definirColunaHoje(colunaId: string, projetoId: string) {
+  // Mesmo achado de `iniciarHiperfoco` — faltava o guard de sessão aqui.
+  await garantirWorkspace();
   const supabase = await createClient();
 
   const { data: coluna } = await supabase
@@ -1159,43 +1196,13 @@ export async function definirColunaHoje(colunaId: string, projetoId: string) {
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 }
 
-/** Marca manualmente qual coluna oferece o popup de temporizador de
- * hiperfoco (migration 0052) — mesmo padrão de `definirColunaHoje` acima.
- * "Em Desenvolvimento" já nasce marcada em `criarProjeto`, então isso só é
- * necessário se o usuário renomeou/apagou a coluna de origem e quer marcar
- * outra manualmente. Não mexe em turnos (regra exclusiva da coluna Hoje). */
-export async function definirColunaHiperfoco(colunaId: string, projetoId: string) {
-  const supabase = await createClient();
-
-  const { data: coluna } = await supabase
-    .from("colunas_kanban")
-    .select("concluido")
-    .eq("id", colunaId)
-    .maybeSingle();
-
-  if (coluna?.concluido) {
-    throw new Error('A coluna "Concluído" é fixa e não pode virar a coluna de foco.');
-  }
-
-  // Desmarca a atual do projeto (se houver) antes de marcar a nova — o
-  // índice único parcial (1 por projeto) rejeitaria as duas marcadas ao
-  // mesmo tempo.
-  const { error: erroDesmarcar } = await supabase
-    .from("colunas_kanban")
-    .update({ dispara_hiperfoco: false })
-    .eq("projeto_id", projetoId)
-    .eq("dispara_hiperfoco", true);
-  if (erroDesmarcar) {
-    throw new Error(`Falha ao trocar a coluna de foco: ${erroDesmarcar.message}`);
-  }
-
-  const { error } = await supabase.from("colunas_kanban").update({ dispara_hiperfoco: true }).eq("id", colunaId);
-  if (error) {
-    throw new Error(`Falha ao definir a coluna de foco: ${error.message}`);
-  }
-
-  revalidatePath(`/projetos/${projetoId}/tarefas`);
-}
+// `definirColunaHiperfoco` existiu aqui (permitia mover manualmente qual
+// coluna dispara o cronômetro de hiperfoco) — removida por pedido do Fabio
+// (2026-10-03): "retire essa história de botar o foco em qualquer lugar, o
+// foco só vai entrar na coluna em desenvolvimento". A coluna de foco agora é
+// fixa (não renomeável/excluível, ver `renomearColuna`/`excluirColuna` acima/
+// abaixo e a trigger da migration 0053) — não existe mais um jeito manual de
+// transferi-la pra outra coluna.
 
 export async function excluirColuna(colunaId: string, projetoId: string) {
   const tenantId = await garantirWorkspace();
@@ -1211,12 +1218,17 @@ export async function excluirColuna(colunaId: string, projetoId: string) {
 
   const { data: coluna } = await supabase
     .from("colunas_kanban")
-    .select("concluido")
+    .select("concluido, dispara_hiperfoco")
     .eq("id", colunaId)
     .maybeSingle();
 
   if (coluna?.concluido) {
     throw new Error('A coluna "Concluído" é fixa e não pode ser apagada.');
+  }
+
+  // Coluna de foco fixa (ver achado em `renomearColuna` acima).
+  if (coluna?.dispara_hiperfoco) {
+    throw new Error('A coluna de foco ("Em Desenvolvimento") é fixa e não pode ser apagada.');
   }
 
   const { count } = await supabase

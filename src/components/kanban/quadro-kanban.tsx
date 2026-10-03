@@ -10,7 +10,6 @@ import {
   alternarDivisaoEmTurnos,
   criarColuna,
   criarTarefa,
-  definirColunaHiperfoco,
   definirColunaHoje,
   deletarTarefa,
   excluirColuna,
@@ -591,29 +590,12 @@ export function QuadroKanban({
     });
   }
 
-  /** Marca manualmente qual coluna oferece o cronômetro de hiperfoco
-   * (migration 0052) — só necessário se "Em Desenvolvimento" foi
-   * renomeada/apagada, já que ela nasce marcada por padrão. Mesmo padrão
-   * otimista de `definirColunaHojeOtimista` acima, mais simples (não mexe
-   * em turnos). */
-  function definirColunaHiperfocoOtimista(colunaId: string) {
-    const colunasAnteriores = colunas;
-    const focoAnteriorId = colunas.find((c) => c.dispara_hiperfoco)?.id;
-    setColunas((atual) =>
-      atual.map((c) => {
-        if (c.id === colunaId) return { ...c, dispara_hiperfoco: true };
-        if (c.id === focoAnteriorId) return { ...c, dispara_hiperfoco: false };
-        return c;
-      }),
-    );
-
-    iniciarTransicao(() => {
-      definirColunaHiperfoco(colunaId, projetoId).catch((err) => {
-        setColunas(colunasAnteriores);
-        toast.error(mensagemDeErro(err, "Falha ao definir a coluna de foco."));
-      });
-    });
-  }
+  // `definirColunaHiperfocoOtimista` existiu aqui (permitia marcar
+  // manualmente qual coluna dispara o cronômetro de hiperfoco) — removida
+  // por pedido do Fabio (2026-10-03): o foco agora só entra na coluna "Em
+  // Desenvolvimento", que é fixa (não renomeável/excluível). Ver
+  // `renomearColunaOtimista`/`apagarColuna` abaixo, que agora bloqueiam a
+  // ação direto na interface pra essa coluna específica.
 
   function apagarColuna(colunaId: string) {
     if (!window.confirm("Apagar esta coluna?")) return;
@@ -765,6 +747,14 @@ export function QuadroKanban({
 
   function renderColuna(coluna: ColunaKanban, ehFixa: boolean) {
     const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id).sort((a, b) => a.ordem - b.ordem);
+    // A coluna de foco ("Em Desenvolvimento", `dispara_hiperfoco`) também é
+    // travada (pedido do Fabio, 2026-10-03): não pode ser renomeada,
+    // arrastada ou excluída — "o foco só vai entrar na coluna em
+    // desenvolvimento, retire essa história de botar o foco em qualquer
+    // lugar". Mesma trava de interface que "Concluído" já tinha (`ehFixa`),
+    // só que esta continua aceitando cartões/cartão novo normalmente — só a
+    // IDENTIDADE da coluna (nome/posição/existência) é fixa, não o conteúdo.
+    const colunaTravada = ehFixa || coluna.dispara_hiperfoco;
 
     function renderCartoes(tarefasDoEscopo: Tarefa[]) {
       return tarefasDoEscopo.map((tarefa) => {
@@ -875,17 +865,17 @@ export function QuadroKanban({
             />
           ) : (
             <h2
-              draggable={!ehFixa}
+              draggable={!colunaTravada}
               onDragStart={(e) => {
                 e.dataTransfer.setData("text/coluna-id", coluna.id);
                 setColunaArrastadaId(coluna.id);
               }}
               onDragEnd={() => setColunaArrastadaId(null)}
-              onClick={() => !ehFixa && setColunaEditandoId(coluna.id)}
+              onClick={() => !colunaTravada && setColunaEditandoId(coluna.id)}
               className={`text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted ${
-                ehFixa ? "" : "cursor-grab hover:text-gaiamum-text active:cursor-grabbing"
+                colunaTravada ? "" : "cursor-grab hover:text-gaiamum-text active:cursor-grabbing"
               }`}
-              title={ehFixa ? undefined : "Arraste pra reordenar, clique pra renomear"}
+              title={colunaTravada ? undefined : "Arraste pra reordenar, clique pra renomear"}
             >
               {coluna.nome} <span className="text-gaiamum-text">({tarefasDaColuna.length})</span>
               {coluna.hoje && (
@@ -899,7 +889,7 @@ export function QuadroKanban({
               {coluna.dispara_hiperfoco && (
                 <span
                   className="ml-1 rounded-full bg-gaiamum-warning/15 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-gaiamum-warning"
-                  title="Coluna de foco — mover um cartão pra cá oferece o cronômetro de hiperfoco"
+                  title="Coluna de foco fixa — mover um cartão pra cá oferece o cronômetro de hiperfoco. Não pode ser renomeada, movida ou apagada."
                 >
                   🎯 Foco
                 </span>
@@ -918,16 +908,10 @@ export function QuadroKanban({
                   Definir Hoje
                 </button>
               )}
-              {colunaEditandoId !== coluna.id && !coluna.dispara_hiperfoco && (
-                <button
-                  type="button"
-                  onClick={() => definirColunaHiperfocoOtimista(coluna.id)}
-                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-warning"
-                  title="Marcar esta como a coluna de foco — mover um cartão pra cá vai oferecer o cronômetro de hiperfoco"
-                >
-                  Definir foco
-                </button>
-              )}
+              {/* "Definir foco" existiu aqui (deixava mover manualmente qual
+                  coluna dispara o hiperfoco) — removido por pedido do Fabio
+                  (2026-10-03): o foco agora é fixo em "Em Desenvolvimento",
+                  sem jeito de transferir pra outra coluna pela interface. */}
               {/* "Somente a coluna Hoje deve oferecer a ação de dividir em
                   turnos" (2026-10-01) — regra aplicada aqui (esconde o
                   controle) E no servidor (`alternarDivisaoEmTurnos` rejeita
@@ -947,7 +931,7 @@ export function QuadroKanban({
                   ▥
                 </button>
               )}
-              {podeExcluirTarefa && colunaEditandoId !== coluna.id && (
+              {podeExcluirTarefa && colunaEditandoId !== coluna.id && !coluna.dispara_hiperfoco && (
                 <button
                   type="button"
                   onClick={() => apagarColuna(coluna.id)}

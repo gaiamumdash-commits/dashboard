@@ -137,8 +137,10 @@ export type ColunaKanban = {
   // Identidade de sistema (migration 0052), mesmo padrão de `hoje` acima —
   // NÃO depende do nome da coluna. Controla se mover um cartão pra cá
   // oferece o popup de temporizador de hiperfoco. "Em Desenvolvimento"
-  // nasce marcada por padrão (`criarProjeto`), mas pode ser movida pra
-  // outra coluna via `definirColunaHiperfoco`. No máximo 1 por projeto.
+  // nasce marcada por padrão (`criarProjeto`). Diferente de `hoje`: a
+  // partir da migration 0053 (pedido do Fabio, 2026-10-03) esta coluna é
+  // FIXA — não pode ser renomeada/apagada, e não existe mais jeito de
+  // mover a marca pra outra coluna pela interface. No máximo 1 por projeto.
   dispara_hiperfoco: boolean;
 };
 

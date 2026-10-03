@@ -123,6 +123,9 @@ export async function enviarAnexoTarefa(tarefaId: string, projetoId: string, for
 }
 
 export async function removerAnexo(anexoId: string, caminhoRevalidar: string) {
+  // Achado real (2026-10-03): faltava o mesmo guard de sessão que toda
+  // outra mutação neste arquivo já tem — ver achado espelhado em actions.ts.
+  await garantirWorkspace();
   const supabase = await createClient();
 
   const { data: anexo, error: erroBusca } = await supabase
