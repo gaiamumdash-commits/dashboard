@@ -10,7 +10,19 @@
 
 ---
 
-## Estado confirmado (2026-10-05, sessão nova #70 — última atualização)
+## Estado confirmado (2026-10-05, sessão #71 — última atualização)
+
+**Resumo em uma linha**: redesenho visual do Kanban (`/projetos/[id]/tarefas`) **implementado e commitado localmente (`2b13db4`), ainda NÃO publicado** (sem push, sem deploy) — falta a validação visual do Fabio em produção.
+
+- **Retomada**: a sessão anterior parou no meio (11:31), sem commit e sem atualizar este handoff. O mockup foi reanexado e salvo em `docs/gaiamum/mockups/kanban-mockup-aprovado-2026-10-05.jpg` (a pendência bloqueante da sessão #70 está resolvida).
+- **O que entrou**: cabeçalho do projeto (selo de saúde reaproveitando `calcularSaudeProjeto`, ações Páginas/Visão 360°/Decisões/Indicadores + `MenuAcoesProjeto` ⋯ com Freeze/Configurações, mesmas regras de permissão); `ProgressoDoQuadro` no topo (a barra que ficava no rodapé subiu, com a mesma fórmula); `FaixaDoDia` (hoje, próximo compromisso via `FaixaProximoCompromisso` em Suspense, prazos de hoje, foco ativo com barra); `BarraFerramentasQuadro` (+ Tarefa foca o campo de entrada existente; busca/filtros/Minhas tarefas são filtros só visuais no cliente, `filtrarTarefasDoQuadro`); colunas com ícone por identidade (flags, nunca nome), ações no `MenuSuspenso` ⋮, "Hoje" com borda azul, selo "🎯 Foco", "Concluído" recolhido com "🎉 N tarefas concluídas" + "Mostrar cartões". Lógica pura em `src/lib/ecc/kanban-cabecalho.ts` + 19 testes.
+- **Diferença de propósito em relação ao mockup**: o botão "Planejar hoje" da coluna Tarefas NÃO foi criado — a ação existente se chama "Definir Hoje" e fica no menu ⋮, porque ela marca QUAL coluna é a Hoje (não planeja o dia). Confirmar com o Fabio se ele aceita.
+- **Testes**: `tsc --noEmit` limpo, `eslint` sem erros (3 avisos antigos em `src/lib/ecc/lab/`, fora desta frente), 163/163 testes unitários, `npm run build` ok.
+- **Próximo passo**: push + `vercel deploy --prod` (só com o ok do Fabio) e validação visual dele comparando com o mockup — o ambiente local continua com `.env.local` apontando pra produção, então a validação visual é em produção, como no Painel geral.
+
+---
+
+## Estado confirmado (2026-10-05, sessão nova #70)
 
 **Resumo em uma linha**: redesenho da home ("Painel geral", `src/app/page.tsx`) pra bater com o design system que o Fabio trouxe — **CONCLUÍDO, aprovado pelo Fabio (print de produção) e publicado em `gaiamum.com.br`**. 1ª rodada por descrição, 2ª rodada reescrita inteira depois do print real, 3ª rodada (deploy) depois de destravar uma cadeia de problemas de ambiente que não tinham nada a ver com o código (ver "Destravando a validação visual" abaixo). `tsc`/`eslint`/`vitest`/`build` limpos. **Próxima frente, já combinada**: redesenho visual da página Kanban (`/projetos/[id]/tarefas`) — prompt completo do Fabio salvo em `docs/gaiamum/PROMPT-REDESIGN-KANBAN-2026-10-05.md`, com uma pendência bloqueante (reanexar a imagem do mockup) — ver seção própria no fim deste bloco.
 
