@@ -1,0 +1,1 @@
+- [Fluxo de publicação](project_publish-flow.md) — push com AIOX_ACTIVE_AGENT=devops, vercel deploy --prod, checar /auth (não /login)
