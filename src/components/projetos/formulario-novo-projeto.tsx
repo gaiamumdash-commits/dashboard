@@ -27,6 +27,21 @@ const ESTILO_BOTAO_PRIMARIO =
 const ESTILO_INPUT =
   "w-full rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-sm text-gaiamum-text outline-none focus:border-gaiamum-primary";
 
+/** Saída sempre visível em toda etapa da IA: cria o projeto só com nome e
+ * descrição, sem tarefas sugeridas — também é a saída quando a IA falha. */
+function BotaoPularIA({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="self-center text-sm text-gaiamum-text-muted underline underline-offset-2 hover:text-gaiamum-text disabled:opacity-60"
+    >
+      Pular a IA e criar o projeto agora
+    </button>
+  );
+}
+
 function estadoInicial() {
   return {
     aberto: false,
@@ -108,7 +123,14 @@ export function FormularioNovoProjeto() {
     }
     setEstado((atual) => ({ ...atual, erro: null }));
     iniciarTransicao(async () => {
-      const resultado = await gerarSugestoesProjetoIA(estado.contexto, respostasEsclarecimento);
+      let resultado: Awaited<ReturnType<typeof gerarSugestoesProjetoIA>>;
+      try {
+        resultado = await gerarSugestoesProjetoIA(estado.contexto, respostasEsclarecimento);
+      } catch {
+        // Falha inesperada (rede, timeout da função) — nunca um beco sem
+        // saída: a pessoa sempre pode pular a IA e criar o projeto.
+        resultado = { status: "erro", mensagem: "A IA não respondeu agora. Tente de novo ou pule a IA e crie o projeto." };
+      }
       if (resultado.status === "erro") {
         setEstado((atual) => ({ ...atual, erro: resultado.mensagem }));
       } else if (resultado.status === "precisa_esclarecimento") {
@@ -244,6 +266,13 @@ export function FormularioNovoProjeto() {
                     autoFocus
                     value={estado.nome}
                     onChange={(e) => setEstado((atual) => ({ ...atual, nome: e.target.value }))}
+                    onKeyDown={(e) => {
+                      // Enter cria direto, sem IA — o caminho mais rápido.
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        criarPorContaPropria();
+                      }
+                    }}
                     className={ESTILO_INPUT}
                   />
                 </label>
@@ -256,13 +285,16 @@ export function FormularioNovoProjeto() {
                   />
                 </label>
 
+                {/* IA é opcional, nunca obrigatória (pedido do Fabio,
+                    2026-10-05): criar direto é o botão principal; o
+                    planejamento com IA vem depois, como escolha. */}
                 <div className="mt-2 flex flex-col gap-2">
-                  <p className="text-sm font-medium text-gaiamum-text">Quer ajuda para planejar este projeto?</p>
-                  <button type="button" onClick={irParaContexto} disabled={pendente} className={ESTILO_BOTAO_PRIMARIO}>
-                    ✨ Planejar com IA
+                  <button type="button" onClick={criarPorContaPropria} disabled={pendente} className={ESTILO_BOTAO_PRIMARIO}>
+                    {pendente ? "Criando..." : "Criar projeto"}
                   </button>
-                  <button type="button" onClick={criarPorContaPropria} disabled={pendente} className={ESTILO_BOTAO_SECUNDARIO}>
-                    {pendente ? "Criando..." : "Criar por conta própria"}
+                  <p className="mt-2 text-xs text-gaiamum-text-muted">Opcional: quer que a IA sugira as tarefas iniciais?</p>
+                  <button type="button" onClick={irParaContexto} disabled={pendente} className={ESTILO_BOTAO_SECUNDARIO}>
+                    ✨ Planejar com IA
                   </button>
                 </div>
               </div>
@@ -290,6 +322,7 @@ export function FormularioNovoProjeto() {
                     {pendente ? "Gerando..." : "Gerar sugestões"}
                   </button>
                 </div>
+                <BotaoPularIA onClick={criarPorContaPropria} disabled={pendente} />
               </div>
             )}
 
@@ -319,6 +352,7 @@ export function FormularioNovoProjeto() {
                     {pendente ? "Gerando..." : "Gerar sugestões"}
                   </button>
                 </div>
+                <BotaoPularIA onClick={criarPorContaPropria} disabled={pendente} />
               </div>
             )}
 
