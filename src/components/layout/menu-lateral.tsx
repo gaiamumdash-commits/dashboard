@@ -13,6 +13,8 @@ import { MenuLateralRetratil } from "@/components/layout/menu-lateral-retratil";
 import { MenuMobile } from "@/components/layout/menu-mobile";
 import { EmblemaPatente } from "@/components/lab/emblema-patente";
 import { BotaoInstalarAppMenu } from "@/components/instalar-app/convite-instalar-app";
+import { SeletorWorkspace } from "@/components/layout/seletor-workspace";
+import { listarWorkspacesDoUsuario } from "@/lib/ecc/workspaces-servidor";
 import { LAB_VISIVEL } from "@/lib/ecc/lab/flags";
 
 /** Busca a contagem de não lidas separada num componente próprio, dentro de
@@ -29,6 +31,14 @@ async function SinoComContagem({ alinhamento }: { alinhamento?: "left" | "right"
 /** Mesmo padrão do sino acima: busca própria dentro de `<Suspense>`, sem
  * bloquear o resto do menu. `null` (sem selo nenhum) até a pessoa conquistar
  * a primeira patente no Gaiamum Lab. */
+/** Mesmo padrão do sino: busca própria dentro de `<Suspense>`. Some pra
+ * quem tem um workspace só (a imensa maioria). */
+async function SeletorWorkspaceComDados() {
+  const { workspaces, atual } = await listarWorkspacesDoUsuario();
+  if (workspaces.length < 2) return null;
+  return <SeletorWorkspace workspaces={workspaces} atual={atual} />;
+}
+
 async function PatenteComEmblema() {
   // Patentes são do Lab (o selo leva pra /lab/progresso) — com o Lab
   // escondido, o selo some junto (pedido do Fabio, 2026-10-05).
@@ -121,7 +131,10 @@ export function MenuLateral({
           </Suspense>
         </div>
 
-        <div className="mb-4 px-2">
+        <div className="mb-4 flex flex-col gap-3 px-2 empty:hidden">
+          <Suspense fallback={null}>
+            <SeletorWorkspaceComDados />
+          </Suspense>
           <Suspense fallback={null}>
             <PatenteComEmblema />
           </Suspense>
@@ -176,6 +189,11 @@ export function MenuLateral({
         emailConta={
           <Suspense fallback={null}>
             <EmailDaConta />
+          </Suspense>
+        }
+        seletorWorkspace={
+          <Suspense fallback={null}>
+            <SeletorWorkspaceComDados />
           </Suspense>
         }
       />

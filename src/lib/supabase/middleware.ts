@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { COOKIE_WORKSPACE_PREFERIDO, escolherMembership, type MembershipCandidata } from '@/lib/ecc/workspaces'
 
 const HEADER_USUARIO = 'x-supabase-user'
 const HEADER_MEMBERSHIP = 'x-gaiamum-membership'
@@ -83,12 +84,20 @@ export async function updateSession(request: NextRequest) {
   try {
     if (user) {
       const bruto = request.cookies.get(COOKIE_MEMBERSHIP)?.value
+      // Workspace escolhido no seletor do menu (lib/ecc/workspaces.ts) —
+      // se o cache de 5min aponta pra OUTRO workspace, ele é descartado na
+      // hora (senão a troca demoraria até 5min pra valer).
+      const tenantPreferido = request.cookies.get(COOKIE_WORKSPACE_PREFERIDO)?.value ?? null
       let membership: MembershipCache | null = null
 
       if (bruto) {
         try {
           const parseado = JSON.parse(bruto)
-          if (parseado?.userId === user.id && membershipValida(parseado)) {
+          if (
+            parseado?.userId === user.id &&
+            membershipValida(parseado) &&
+            (!tenantPreferido || parseado.tenantId === tenantPreferido)
+          ) {
             membership = { tenantId: parseado.tenantId, papel: parseado.papel, escopo: parseado.escopo }
           }
         } catch {
@@ -97,13 +106,15 @@ export async function updateSession(request: NextRequest) {
       }
 
       if (!membership) {
-        const { data } = await supabase
-          .from('memberships')
-          .select('tenant_id, papel, escopo')
-          .eq('user_id', user.id)
-          .order('criado_em', { ascending: true })
-          .limit(1)
-          .maybeSingle()
+        const [{ data: todas }, { data: lab }] = await Promise.all([
+          supabase.from('memberships').select('tenant_id, papel, escopo, criado_em').eq('user_id', user.id),
+          supabase.from('lab_tenants').select('tenant_id').eq('user_id', user.id),
+        ])
+        const data = escolherMembership(
+          (todas as MembershipCandidata[] | null) ?? [],
+          tenantPreferido,
+          new Set(((lab as { tenant_id: string }[] | null) ?? []).map((l) => l.tenant_id)),
+        )
 
         if (data) {
           membership = { tenantId: data.tenant_id as string, papel: data.papel as string, escopo: data.escopo as string }
@@ -112,6 +123,12 @@ export async function updateSession(request: NextRequest) {
             JSON.stringify({ userId: user.id, ...membership }),
             { maxAge: MEMBERSHIP_MAX_AGE_S, httpOnly: true, secure: true, sameSite: 'lax', path: '/' },
           )
+          // Preferência de um workspace do qual a pessoa saiu (ou foi
+          // removida): apaga, senão o cache acima nunca bateria e esta
+          // consulta rodaria em toda página.
+          if (tenantPreferido && data.tenant_id !== tenantPreferido) {
+            supabaseResponse.cookies.delete(COOKIE_WORKSPACE_PREFERIDO)
+          }
         } else {
           supabaseResponse.cookies.delete(COOKIE_MEMBERSHIP)
         }

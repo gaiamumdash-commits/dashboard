@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { COOKIE_WORKSPACE_PREFERIDO, escolherMembership, type MembershipCandidata } from "@/lib/ecc/workspaces";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import type { EscopoMembership, Papel } from "@/lib/ecc/tipos";
 
@@ -59,14 +60,19 @@ export const buscarMembershipAtual = cache(async (): Promise<MembershipAtual | n
     }
   }
 
+  // Mesma regra do middleware (lib/ecc/workspaces.ts): o workspace escolhido
+  // no seletor, senão o mais antigo que não é o sandbox do Lab.
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("memberships")
-    .select("tenant_id, papel, escopo")
-    .eq("user_id", user.id)
-    .order("criado_em", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: todas }, { data: lab }, cookieStore] = await Promise.all([
+    supabase.from("memberships").select("tenant_id, papel, escopo, criado_em").eq("user_id", user.id),
+    supabase.from("lab_tenants").select("tenant_id").eq("user_id", user.id),
+    cookies(),
+  ]);
+  const data = escolherMembership(
+    (todas as MembershipCandidata[] | null) ?? [],
+    cookieStore.get(COOKIE_WORKSPACE_PREFERIDO)?.value ?? null,
+    new Set(((lab as { tenant_id: string }[] | null) ?? []).map((l) => l.tenant_id)),
+  );
 
   if (!data) return null;
 

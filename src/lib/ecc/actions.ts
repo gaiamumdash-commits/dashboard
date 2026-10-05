@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { tagMetasSmart } from "@/lib/ecc/metas";
 import { vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
+import { definirWorkspacePreferido } from "@/lib/ecc/workspaces-servidor";
 import { notificarEquipe } from "@/lib/ecc/notificacoes-equipe";
 import { registrarAtividade } from "@/lib/ecc/atividade";
 import { HORIZONTES } from "@/lib/ecc/smart";
@@ -1649,6 +1650,10 @@ export async function aceitarConvite(token: string) {
   }
 
   await vincularUsuarioAoConvite(convite as Convite, user.id);
+
+  // Quem já tinha outro workspace (caso da Angeline, 2026-10-05) entra
+  // direto no de quem convidou — antes continuava caindo no mais antigo.
+  await definirWorkspacePreferido(convite.tenant_id as string);
 
   redirect("/projetos");
 }

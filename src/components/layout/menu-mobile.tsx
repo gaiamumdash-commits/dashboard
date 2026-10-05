@@ -30,6 +30,7 @@ export function MenuMobile({
   linkLab,
   linkExtra,
   emailConta,
+  seletorWorkspace,
 }: {
   temMetasSmart: boolean;
   acessoCompleto?: boolean;
@@ -38,6 +39,8 @@ export function MenuMobile({
   linkLab?: ReactNode;
   linkExtra?: ReactNode;
   emailConta?: ReactNode;
+  /** Só aparece pra quem participa de mais de um workspace. */
+  seletorWorkspace?: ReactNode;
 }) {
   const [aberto, setAberto] = useState(false);
 
@@ -68,6 +71,7 @@ export function MenuMobile({
             onClick={(e) => e.stopPropagation()}
             className="absolute inset-x-0 top-14 flex max-h-[calc(100vh-3.5rem)] flex-col gap-1 overflow-y-auto border-b border-gaiamum-border bg-gaiamum-surface px-4 py-4 shadow-lg"
           >
+            <div className="mb-2 empty:hidden">{seletorWorkspace}</div>
             <LinksNavegacao
               temMetasSmart={temMetasSmart}
               acessoCompleto={acessoCompleto}
