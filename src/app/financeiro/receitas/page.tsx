@@ -6,6 +6,7 @@ import { obterPapelAtual } from "@/lib/ecc/equipe";
 import { contarMetasSmart } from "@/lib/ecc/metas";
 import { primeiroDiaDoMesAtual } from "@/lib/ecc/kanban";
 import type { Receita } from "@/lib/ecc/tipos";
+import { agruparReceitasPorPeriodo, rotuloDoMes } from "@/lib/ecc/receitas-regras";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ListaReceitas } from "@/components/financeiro/lista-receitas";
 import { FormularioReceita } from "@/components/financeiro/formulario-receita";
@@ -26,17 +27,21 @@ export default async function PaginaReceitas() {
   const mesReferencia = primeiroDiaDoMesAtual();
 
   const [{ data: receitasDoMes }, { data: projetos }, totalMetasSmart] = await Promise.all([
+    // Mês atual + meses futuros + o que ficou pra trás sem receber.
     supabase
       .from("receitas")
       .select("*")
       .eq("tenant_id", tenantId)
-      .eq("mes_referencia", mesReferencia)
+      .or(`mes_referencia.gte.${mesReferencia},recebida.eq.false`)
       .order("data_prevista", { ascending: true }),
     supabase.from("projetos").select("id, nome, arquivado").eq("tenant_id", tenantId).order("nome", { ascending: true }),
     contarMetasSmart(tenantId),
   ]);
 
-  const lista = (receitasDoMes as Receita[] | null) ?? [];
+  const { atrasadas, doMes: lista, proximosMeses } = agruparReceitasPorPeriodo(
+    (receitasDoMes as Receita[] | null) ?? [],
+    mesReferencia,
+  );
   const listaProjetos = (projetos as { id: string; nome: string; arquivado: boolean }[] | null) ?? [];
   // Nomes de TODOS os projetos (inclusive arquivados) pra etiqueta da lista;
   // só os ativos aparecem como opção no formulário.
@@ -63,9 +68,32 @@ export default async function PaginaReceitas() {
           <FormularioReceita projetos={projetosAtivos} />
         </div>
 
-        <div className="mt-8">
-          <ListaReceitas receitas={lista} nomesProjetos={nomesProjetos} />
-        </div>
+        {atrasadas.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-warning">Atrasadas de meses anteriores</h2>
+            <div className="mt-3">
+              <ListaReceitas receitas={atrasadas} nomesProjetos={nomesProjetos} />
+            </div>
+          </section>
+        )}
+
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">Este mês</h2>
+          <div className="mt-3">
+            <ListaReceitas receitas={lista} nomesProjetos={nomesProjetos} />
+          </div>
+        </section>
+
+        {proximosMeses.map(({ mesReferencia: mes, receitas }) => (
+          <section key={mes} className="mt-8">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
+              {rotuloDoMes(mes)} · {formatarMoeda(receitas.reduce((soma, r) => soma + r.valor, 0))}
+            </h2>
+            <div className="mt-3">
+              <ListaReceitas receitas={receitas} nomesProjetos={nomesProjetos} />
+            </div>
+          </section>
+        ))}
       </main>
     </div>
   );

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { lerValorMonetario, primeiroDiaDoMesDe, validarNovaReceita } from "@/lib/ecc/receitas-regras";
+import {
+  agruparReceitasPorPeriodo,
+  lerValorMonetario,
+  primeiroDiaDoMesDe,
+  rotuloDoMes,
+  validarNovaReceita,
+} from "@/lib/ecc/receitas-regras";
 
 const BASE = { descricao: "Site do cliente X", valor: "1500", dataPrevista: "2026-10-20" };
 
@@ -20,6 +26,34 @@ describe("lerValorMonetario", () => {
     expect(lerValorMonetario("abc")).toBeNaN();
     expect(lerValorMonetario("")).toBeNaN();
     expect(lerValorMonetario("-10")).toBeNaN();
+  });
+});
+
+describe("agruparReceitasPorPeriodo", () => {
+  const r = (mes_referencia: string, recebida = false, id = mes_referencia) => ({ id, mes_referencia, recebida });
+
+  it("separa mês atual e próximos meses em ordem (parcelas lançadas de uma vez)", () => {
+    const g = agruparReceitasPorPeriodo([r("2026-12-01"), r("2026-10-01"), r("2026-11-01")], "2026-10-01");
+    expect(g.doMes.map((x) => x.id)).toEqual(["2026-10-01"]);
+    expect(g.proximosMeses.map((m) => m.mesReferencia)).toEqual(["2026-11-01", "2026-12-01"]);
+  });
+
+  it("junta várias receitas do mesmo mês futuro", () => {
+    const g = agruparReceitasPorPeriodo([r("2026-11-01", false, "a"), r("2026-11-01", false, "b")], "2026-10-01");
+    expect(g.proximosMeses).toHaveLength(1);
+    expect(g.proximosMeses[0].receitas.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+
+  it("mês anterior não recebido aparece como atrasado; já recebido some", () => {
+    const g = agruparReceitasPorPeriodo([r("2026-09-01", false, "pendente"), r("2026-09-01", true, "ok")], "2026-10-01");
+    expect(g.atrasadas.map((x) => x.id)).toEqual(["pendente"]);
+    expect(g.doMes).toEqual([]);
+  });
+});
+
+describe("rotuloDoMes", () => {
+  it("escreve mês por extenso", () => {
+    expect(rotuloDoMes("2026-11-01")).toBe("novembro de 2026");
   });
 });
 

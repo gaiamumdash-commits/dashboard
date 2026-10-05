@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { criarReceita } from "@/lib/ecc/receitas";
-import { ROTULO_CATEGORIA_RECEITA } from "@/lib/ecc/receitas-regras";
+import { toast } from "sonner";
+import { ROTULO_CATEGORIA_RECEITA, primeiroDiaDoMesDe, rotuloDoMes } from "@/lib/ecc/receitas-regras";
+import { hojeISOBrasil } from "@/lib/ecc/kanban";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import { BotaoFormulario } from "@/components/botao-formulario";
 
@@ -20,6 +22,12 @@ export function FormularioReceita({ projetos }: { projetos: { id: string; nome: 
         setErro(null);
         try {
           await criarReceita(formData);
+          const dataPrevista = String(formData.get("data_prevista") ?? "");
+          toast.success(
+            primeiroDiaDoMesDe(dataPrevista) === primeiroDiaDoMesDe(hojeISOBrasil())
+              ? "Receita salva em Este mês."
+              : `Receita salva em ${rotuloDoMes(primeiroDiaDoMesDe(dataPrevista))}.`,
+          );
         } catch (e) {
           setErro(mensagemDeErro(e, "Falha ao lançar receita."));
         }

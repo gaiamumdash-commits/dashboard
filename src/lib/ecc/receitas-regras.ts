@@ -33,6 +33,41 @@ export function primeiroDiaDoMesDe(dataISO: string): string {
   return `${dataISO.slice(0, 7)}-01`;
 }
 
+/** "2026-11-01" → "novembro de 2026". */
+export function rotuloDoMes(mesReferencia: string): string {
+  return new Date(`${mesReferencia}T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+}
+
+export type ReceitasAgrupadas<T> = {
+  /** De meses anteriores e ainda não recebidas — dinheiro que deveria ter
+   * entrado e não entrou não pode sumir da tela só porque o mês virou. */
+  atrasadas: T[];
+  doMes: T[];
+  /** Meses futuros, em ordem, cada um com suas receitas (achado real do
+   * Fabio, 2026-10-05: ele lança as parcelas do seguro-desemprego de uma
+   * vez, e as de novembro/dezembro "sumiam" porque a tela só mostrava o mês
+   * atual). */
+  proximosMeses: { mesReferencia: string; receitas: T[] }[];
+};
+
+export function agruparReceitasPorPeriodo<T extends { mes_referencia: string; recebida: boolean }>(
+  receitas: T[],
+  mesAtual: string,
+): ReceitasAgrupadas<T> {
+  const atrasadas = receitas.filter((r) => r.mes_referencia < mesAtual && !r.recebida);
+  const doMes = receitas.filter((r) => r.mes_referencia === mesAtual);
+  const porMes = new Map<string, T[]>();
+  for (const r of receitas) {
+    if (r.mes_referencia > mesAtual) {
+      const lista = porMes.get(r.mes_referencia) ?? [];
+      lista.push(r);
+      porMes.set(r.mes_referencia, lista);
+    }
+  }
+  const proximosMeses = [...porMes.keys()].sort().map((mesReferencia) => ({ mesReferencia, receitas: porMes.get(mesReferencia)! }));
+  return { atrasadas, doMes, proximosMeses };
+}
+
 /** Aceita "1500", "1500.5" e também "1.500,50" (jeito brasileiro de digitar),
  * porque o campo pode vir de um input de texto num celular. Devolve `NaN`
  * pra qualquer coisa que não seja número. */
