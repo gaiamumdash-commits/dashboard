@@ -10,6 +10,7 @@ import {
   novaSugestaoManual,
   ConfirmacaoPlanejamentoSchema,
   LIMITE_MAXIMO_SUGESTOES,
+  LIMITE_MAXIMO_ITENS_PLANEJAMENTO,
   LIMITE_MAXIMO_CHECKLIST_POR_TAREFA,
   LIMITE_MAXIMO_PERGUNTAS_ESCLARECIMENTO,
   type SugestaoTarefaIA,
@@ -104,8 +105,8 @@ describe("construirPromptPlanejamento", () => {
 
 describe("seleção na prévia", () => {
   const base: SugestaoTarefaIA[] = [
-    { idTemp: "a", titulo: "Definir data", descricao: "", recomendacao: "essencial", checklist: [] },
-    { idTemp: "b", titulo: "Contratar DJ", descricao: "", recomendacao: "opcional", checklist: [] },
+    { idTemp: "a", titulo: "Definir data", descricao: "", recomendacao: "essencial", checklist: [], marco: false },
+    { idTemp: "b", titulo: "Contratar DJ", descricao: "", recomendacao: "opcional", checklist: [], marco: false },
   ];
 
   it("prepararPreviaParaSelecao começa com tudo desmarcado", () => {
@@ -152,10 +153,17 @@ describe("ConfirmacaoPlanejamentoSchema — validação da prévia editada na co
     expect(resultado.success).toBe(false);
   });
 
-  it("rejeita mais tarefas que o limite máximo", () => {
-    const tarefas = Array.from({ length: LIMITE_MAXIMO_SUGESTOES + 1 }, (_, i) => ({ titulo: `Tarefa ${i}` }));
+  it("rejeita mais itens que o limite máximo (marcos + tarefas)", () => {
+    const tarefas = Array.from({ length: LIMITE_MAXIMO_ITENS_PLANEJAMENTO + 1 }, (_, i) => ({ titulo: `Tarefa ${i}` }));
     const resultado = ConfirmacaoPlanejamentoSchema.safeParse({ nome: "Projeto", idempotencyKey: "12345678", tarefas });
     expect(resultado.success).toBe(false);
+  });
+
+  it("aceita até o limite e guarda o marco de cada item", () => {
+    const tarefas = Array.from({ length: LIMITE_MAXIMO_ITENS_PLANEJAMENTO }, (_, i) => ({ titulo: `Item ${i}`, marco: i === 0 }));
+    const resultado = ConfirmacaoPlanejamentoSchema.safeParse({ nome: "Projeto", idempotencyKey: "12345678", tarefas });
+    expect(resultado.success).toBe(true);
+    if (resultado.success) expect(resultado.data.tarefas.map((t) => t.marco).slice(0, 2)).toEqual([true, false]);
   });
 
   it("rejeita payload sem idempotencyKey", () => {

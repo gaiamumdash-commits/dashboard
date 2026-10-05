@@ -9,6 +9,7 @@ import { verificarRateLimitIA } from "@/lib/ecc/ia-rate-limit";
 import { registrarConsumoIA } from "@/lib/ecc/ia-consumo";
 import { gerarJsonComGemini, mensagemDeErroGemini, MODELO_GEMINI_PADRAO } from "@/lib/ecc/gemini";
 import {
+  AdicionarPlanejamentoSchema,
   ConfirmacaoPlanejamentoSchema,
   SCHEMA_RESPOSTA_PLANEJAMENTO_IA,
   TAMANHO_MAXIMO_CONTEXTO,
@@ -149,7 +150,7 @@ export async function criarProjetoComPlanejamentoIA(input: unknown): Promise<Res
     // Só título/descrição/checklist seguem pro banco — nenhum id de
     // tenant/usuário/coluna/responsável do "lado da IA" é aceito aqui
     // (a função no banco resolve tudo isso sozinha).
-    p_tarefas: tarefas.map((t) => ({ titulo: t.titulo, descricao: t.descricao || null, checklist: t.checklist })),
+    p_tarefas: tarefas.map((t) => ({ titulo: t.titulo, descricao: t.descricao || null, checklist: t.checklist, marco: t.marco })),
   });
 
   if (error || !projetoId) {
@@ -160,4 +161,43 @@ export async function criarProjetoComPlanejamentoIA(input: unknown): Promise<Res
   revalidatePath(`/projetos/${projetoId}/tarefas`);
 
   return { status: "ok", projetoId: projetoId as string };
+}
+
+export type ResultadoAdicionarPlanejamento = { status: "ok"; criadas: number } | { status: "erro"; mensagem: string };
+
+/**
+ * "Planejar com IA" dentro de um projeto que já existe (menu ⋯ do projeto):
+ * adiciona os marcos/tarefas selecionados no fim da coluna "Tarefas", numa
+ * operação atômica e idempotente (RPC `adicionar_tarefas_planejadas`,
+ * migration 0055). Quem pode (dono do workspace ou gestor do projeto) é
+ * checado DENTRO da função no banco — aqui só revalida o formato.
+ */
+export async function adicionarTarefasPlanejadas(input: unknown): Promise<ResultadoAdicionarPlanejamento> {
+  const tenantId = await garantirWorkspace();
+  const user = await obterUsuarioAtual();
+  if (!user) {
+    return { status: "erro", mensagem: "Usuário não autenticado." };
+  }
+
+  const validado = AdicionarPlanejamentoSchema.safeParse(input);
+  if (!validado.success) {
+    return { status: "erro", mensagem: "Os dados do planejamento ficaram num formato inesperado — recarregue e tente de novo." };
+  }
+
+  const { projetoId, idempotencyKey, tarefas } = validado.data;
+  const supabase = await createClient();
+
+  const { data: criadas, error } = await supabase.rpc("adicionar_tarefas_planejadas", {
+    p_tenant_id: tenantId,
+    p_projeto_id: projetoId,
+    p_idempotency_key: idempotencyKey,
+    p_tarefas: tarefas.map((t) => ({ titulo: t.titulo, descricao: t.descricao || null, checklist: t.checklist, marco: t.marco })),
+  });
+
+  if (error) {
+    return { status: "erro", mensagem: `Não deu pra adicionar as tarefas: ${error.message}. Sua prévia não foi perdida — tente de novo.` };
+  }
+
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+  return { status: "ok", criadas: (criadas as number | null) ?? 0 };
 }

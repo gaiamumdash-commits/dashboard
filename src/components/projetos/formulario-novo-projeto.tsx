@@ -1,24 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { criarProjeto } from "@/lib/ecc/actions";
 import { criarProjetoComPlanejamentoIA, gerarSugestoesProjetoIA } from "@/lib/ecc/planejamento-ia-actions";
-import {
-  contarSelecionadas,
-  limparSelecao,
-  novaSugestaoManual,
-  prepararPreviaParaSelecao,
-  selecionarEssenciais,
-  selecionarTodas,
-  type SugestaoNaPrevia,
-} from "@/lib/ecc/planejamento-ia";
+import { contarSelecionadas, prepararPreviaParaSelecao, type SugestaoNaPrevia, type SugestaoTarefaIA } from "@/lib/ecc/planejamento-ia";
 import { gerarIdCliente } from "@/lib/ecc/kanban";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import { GravadorVozAgenda } from "@/components/agenda/gravador-voz-agenda";
+import { PreviaPlanejamento } from "@/components/projetos/previa-planejamento";
+import { PassoPromptCopiavel } from "@/components/projetos/passo-prompt-copiavel";
 
-type Passo = "inicial" | "contexto" | "esclarecimento" | "previa";
+/** `prompt` = "Planejar na sua IA" (prompt copiável, caminho principal da
+ * IA, custo zero); `contexto`/`esclarecimento` = IA do Gaiamum (Gemini),
+ * caminho secundário. Os dois terminam na mesma `previa`. */
+type Passo = "inicial" | "prompt" | "contexto" | "esclarecimento" | "previa";
+
+const CHAVE_RASCUNHO_PROMPT = "gaiamum-rascunho-plano:novo-projeto";
 
 const ESTILO_BOTAO_SECUNDARIO =
   "rounded-lg border border-gaiamum-border px-4 py-2 text-sm font-medium text-gaiamum-text-muted transition hover:border-gaiamum-primary hover:text-gaiamum-text";
@@ -46,29 +45,27 @@ function estadoInicial() {
   return {
     aberto: false,
     passo: "inicial" as Passo,
+    /** De onde veio a prévia — o "Voltar" da prévia volta pro caminho certo. */
+    origemPrevia: "prompt" as "prompt" | "contexto",
     nome: "",
     descricao: "",
     contexto: "",
     perguntas: [] as string[],
     respostas: [] as string[],
     previa: [] as SugestaoNaPrevia[],
-    expandidas: new Set<string>(),
+    /** A IA do Gaiamum falhou — oferece o prompt copiável como saída. */
+    iaInternaFalhou: false,
     erro: null as string | null,
     idempotencyKey: gerarIdCliente(),
   };
 }
 
 /**
- * Criação de projeto — substitui o formulário inline simples por um modal
- * com dois caminhos: "Criar por conta própria" (igual a sempre, sem nenhuma
- * chamada de IA) ou "Planejar com IA" (descrever o objetivo por texto/voz →
- * revisar/selecionar sugestões → confirmar). Pedido do Fabio, handoff
- * canônico checkpoint #62.
- *
- * Todo o estado do assistente fica aqui (um único componente) de propósito:
- * o fluxo inteiro é transitório e descartável até a confirmação — não há
- * necessidade de Context/estado global, e manter tudo junto deixa óbvio que
- * "navegar entre etapas preserva as escolhas" (é só não desmontar nada).
+ * Criação de projeto: "Criar projeto" direto é o caminho principal (IA nunca
+ * é obrigatória — pedido do Fabio, 2026-10-05). Planejar com IA é opcional e
+ * tem 2 caminhos: "Na sua IA" (prompt copiável, Fase 1 da frente de 05/10) e
+ * "IA do Gaiamum" (Gemini, secundário). Todo estado fica aqui — o fluxo é
+ * descartável até a confirmação.
  */
 export function FormularioNovoProjeto() {
   const [estado, setEstado] = useState(estadoInicial);
@@ -76,23 +73,29 @@ export function FormularioNovoProjeto() {
   const router = useRouter();
 
   function abrir() {
-    setEstado(estadoInicial());
-    setEstado((atual) => ({ ...atual, aberto: true }));
+    setEstado({ ...estadoInicial(), aberto: true });
   }
 
   function fechar() {
     setEstado(estadoInicial());
   }
 
-  function voltar(passoAnterior: Passo) {
-    setEstado((atual) => ({ ...atual, passo: passoAnterior, erro: null }));
+  function irPara(passo: Passo) {
+    setEstado((atual) => ({ ...atual, passo, erro: null }));
+  }
+
+  function setPrevia(acao: SetStateAction<SugestaoNaPrevia[]>) {
+    setEstado((atual) => ({ ...atual, previa: typeof acao === "function" ? acao(atual.previa) : acao }));
+  }
+
+  function exigirNome(): boolean {
+    if (estado.nome.trim()) return true;
+    setEstado((atual) => ({ ...atual, erro: "Informe o nome do projeto." }));
+    return false;
   }
 
   function criarPorContaPropria() {
-    if (!estado.nome.trim()) {
-      setEstado((atual) => ({ ...atual, erro: "Informe o nome do projeto." }));
-      return;
-    }
+    if (!exigirNome()) return;
     iniciarTransicao(async () => {
       try {
         const formData = new FormData();
@@ -108,12 +111,9 @@ export function FormularioNovoProjeto() {
     });
   }
 
-  function irParaContexto() {
-    if (!estado.nome.trim()) {
-      setEstado((atual) => ({ ...atual, erro: "Informe o nome do projeto." }));
-      return;
-    }
-    setEstado((atual) => ({ ...atual, passo: "contexto", erro: null }));
+  function receberPlanoColado(sugestoes: SugestaoTarefaIA[], descartados: number) {
+    if (descartados > 0) toast.message(`${descartados} item(ns) do plano ficaram de fora (sem título ou acima do limite de 30).`);
+    setEstado((atual) => ({ ...atual, passo: "previa", origemPrevia: "prompt", previa: prepararPreviaParaSelecao(sugestoes), erro: null }));
   }
 
   function gerarSugestoes(respostasEsclarecimento?: { pergunta: string; resposta: string }[]) {
@@ -121,18 +121,18 @@ export function FormularioNovoProjeto() {
       setEstado((atual) => ({ ...atual, erro: "Conte um pouco sobre o que você quer realizar." }));
       return;
     }
-    setEstado((atual) => ({ ...atual, erro: null }));
+    setEstado((atual) => ({ ...atual, erro: null, iaInternaFalhou: false }));
     iniciarTransicao(async () => {
       let resultado: Awaited<ReturnType<typeof gerarSugestoesProjetoIA>>;
       try {
         resultado = await gerarSugestoesProjetoIA(estado.contexto, respostasEsclarecimento);
       } catch {
         // Falha inesperada (rede, timeout da função) — nunca um beco sem
-        // saída: a pessoa sempre pode pular a IA e criar o projeto.
-        resultado = { status: "erro", mensagem: "A IA não respondeu agora. Tente de novo ou pule a IA e crie o projeto." };
+        // saída: dá pra usar a própria IA ou pular a IA.
+        resultado = { status: "erro", mensagem: "A IA do Gaiamum não respondeu agora." };
       }
       if (resultado.status === "erro") {
-        setEstado((atual) => ({ ...atual, erro: resultado.mensagem }));
+        setEstado((atual) => ({ ...atual, erro: resultado.mensagem, iaInternaFalhou: true }));
       } else if (resultado.status === "precisa_esclarecimento") {
         setEstado((atual) => ({
           ...atual,
@@ -141,17 +141,15 @@ export function FormularioNovoProjeto() {
           respostas: resultado.perguntas.map(() => ""),
         }));
       } else {
-        setEstado((atual) => ({ ...atual, passo: "previa", previa: prepararPreviaParaSelecao(resultado.sugestoes) }));
+        setEstado((atual) => ({ ...atual, passo: "previa", origemPrevia: "contexto", previa: prepararPreviaParaSelecao(resultado.sugestoes) }));
       }
     });
   }
 
   function enviarEsclarecimento() {
-    const respostasEsclarecimento = estado.perguntas.map((pergunta, indice) => ({
-      pergunta,
-      resposta: estado.respostas[indice]?.trim() || "(não respondido)",
-    }));
-    gerarSugestoes(respostasEsclarecimento);
+    gerarSugestoes(
+      estado.perguntas.map((pergunta, indice) => ({ pergunta, resposta: estado.respostas[indice]?.trim() || "(não respondido)" })),
+    );
   }
 
   function regenerar() {
@@ -159,51 +157,10 @@ export function FormularioNovoProjeto() {
     gerarSugestoes();
   }
 
-  function atualizarSugestao(idTemp: string, patch: Partial<SugestaoNaPrevia>) {
-    setEstado((atual) => ({ ...atual, previa: atual.previa.map((s) => (s.idTemp === idTemp ? { ...s, ...patch } : s)) }));
-  }
-
-  function alternarExpandida(idTemp: string) {
-    setEstado((atual) => {
-      const expandidas = new Set(atual.expandidas);
-      if (expandidas.has(idTemp)) expandidas.delete(idTemp);
-      else expandidas.add(idTemp);
-      return { ...atual, expandidas };
-    });
-  }
-
-  function removerItemChecklist(idTemp: string, indice: number) {
-    setEstado((atual) => ({
-      ...atual,
-      previa: atual.previa.map((s) => (s.idTemp === idTemp ? { ...s, checklist: s.checklist.filter((_, i) => i !== indice) } : s)),
-    }));
-  }
-
-  function adicionarItemChecklist(idTemp: string, texto: string) {
-    if (!texto.trim()) return;
-    setEstado((atual) => ({
-      ...atual,
-      previa: atual.previa.map((s) => (s.idTemp === idTemp ? { ...s, checklist: [...s.checklist, texto.trim()] } : s)),
-    }));
-  }
-
-  function adicionarTarefaManual() {
-    const nova = novaSugestaoManual();
-    setEstado((atual) => ({
-      ...atual,
-      previa: [...atual.previa, nova],
-      expandidas: new Set(atual.expandidas).add(nova.idTemp),
-    }));
-  }
-
-  function removerSugestao(idTemp: string) {
-    setEstado((atual) => ({ ...atual, previa: atual.previa.filter((s) => s.idTemp !== idTemp) }));
-  }
-
   function confirmar() {
     const selecionadas = estado.previa.filter((s) => s.selecionada);
     if (selecionadas.some((s) => !s.titulo.trim())) {
-      setEstado((atual) => ({ ...atual, erro: "Toda tarefa selecionada precisa de um título." }));
+      setEstado((atual) => ({ ...atual, erro: "Todo item selecionado precisa de um título." }));
       return;
     }
     setEstado((atual) => ({ ...atual, erro: null }));
@@ -212,16 +169,14 @@ export function FormularioNovoProjeto() {
         nome: estado.nome,
         descricao: estado.descricao,
         idempotencyKey: estado.idempotencyKey,
-        tarefas: selecionadas.map((s) => ({ titulo: s.titulo, descricao: s.descricao, checklist: s.checklist })),
+        tarefas: selecionadas.map((s) => ({ titulo: s.titulo, descricao: s.descricao, checklist: s.checklist, marco: s.marco })),
       });
       if (resultado.status === "erro") {
-        // Prévia preservada de propósito — não reseta `estado` aqui, só
-        // mostra o erro; a pessoa pode tentar confirmar de novo sem perder
-        // nada do que já revisou/editou.
+        // Prévia preservada de propósito — só mostra o erro.
         setEstado((atual) => ({ ...atual, erro: resultado.mensagem }));
         return;
       }
-      toast.success(selecionadas.length > 0 ? `Projeto criado com ${selecionadas.length} tarefa(s).` : "Projeto criado.");
+      toast.success(selecionadas.length > 0 ? `Projeto criado com ${selecionadas.length} item(ns).` : "Projeto criado.");
       fechar();
       router.push(`/projetos/${resultado.projetoId}/tarefas`);
     });
@@ -256,7 +211,20 @@ export function FormularioNovoProjeto() {
               </button>
             </div>
 
-            {estado.erro && <p className="mb-3 text-sm text-gaiamum-danger">{estado.erro}</p>}
+            {estado.erro && (
+              <div className="mb-3 flex flex-col gap-2">
+                <p className="text-sm text-gaiamum-danger">{estado.erro}</p>
+                {estado.iaInternaFalhou && (
+                  <button
+                    type="button"
+                    onClick={() => setEstado((atual) => ({ ...atual, passo: "prompt", erro: null, iaInternaFalhou: false }))}
+                    className={`self-start ${ESTILO_BOTAO_SECUNDARIO}`}
+                  >
+                    📋 Planejar na sua IA em vez disso
+                  </button>
+                )}
+              </div>
+            )}
 
             {estado.passo === "inicial" && (
               <div className="flex flex-col gap-4">
@@ -285,19 +253,46 @@ export function FormularioNovoProjeto() {
                   />
                 </label>
 
-                {/* IA é opcional, nunca obrigatória (pedido do Fabio,
-                    2026-10-05): criar direto é o botão principal; o
-                    planejamento com IA vem depois, como escolha. */}
                 <div className="mt-2 flex flex-col gap-2">
                   <button type="button" onClick={criarPorContaPropria} disabled={pendente} className={ESTILO_BOTAO_PRIMARIO}>
                     {pendente ? "Criando..." : "Criar projeto"}
                   </button>
-                  <p className="mt-2 text-xs text-gaiamum-text-muted">Opcional: quer que a IA sugira as tarefas iniciais?</p>
-                  <button type="button" onClick={irParaContexto} disabled={pendente} className={ESTILO_BOTAO_SECUNDARIO}>
-                    ✨ Planejar com IA
+                  <p className="mt-2 text-xs text-gaiamum-text-muted">Opcional: quer ajuda da IA pra planejar as tarefas?</p>
+                  <button
+                    type="button"
+                    onClick={() => exigirNome() && irPara("prompt")}
+                    disabled={pendente}
+                    className={`${ESTILO_BOTAO_SECUNDARIO} text-left`}
+                  >
+                    📋 Planejar na sua IA <span className="text-xs font-normal">· ChatGPT, Gemini, Claude… com conversa de verdade</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exigirNome() && irPara("contexto")}
+                    disabled={pendente}
+                    className={`${ESTILO_BOTAO_SECUNDARIO} text-left`}
+                  >
+                    ✨ IA do Gaiamum <span className="text-xs font-normal">· rápido, sem sair daqui</span>
                   </button>
                 </div>
               </div>
+            )}
+
+            {estado.passo === "prompt" && (
+              <PassoPromptCopiavel
+                nomeProjeto={estado.nome}
+                objetivoInicial={estado.contexto || estado.descricao}
+                chaveRascunho={CHAVE_RASCUNHO_PROMPT}
+                aoLerPlano={receberPlanoColado}
+                rodape={
+                  <div className="flex flex-col gap-3">
+                    <button type="button" onClick={() => irPara("inicial")} className={`self-start ${ESTILO_BOTAO_SECUNDARIO}`}>
+                      ← Voltar
+                    </button>
+                    <BotaoPularIA onClick={criarPorContaPropria} disabled={pendente} />
+                  </div>
+                }
+              />
             )}
 
             {estado.passo === "contexto" && (
@@ -315,7 +310,7 @@ export function FormularioNovoProjeto() {
                 />
                 <GravadorVozAgenda onTranscricaoFinal={(texto) => setEstado((atual) => ({ ...atual, contexto: texto }))} />
                 <div className="mt-2 flex items-center justify-between">
-                  <button type="button" onClick={() => voltar("inicial")} className={ESTILO_BOTAO_SECUNDARIO}>
+                  <button type="button" onClick={() => irPara("inicial")} className={ESTILO_BOTAO_SECUNDARIO}>
                     ← Voltar
                   </button>
                   <button type="button" onClick={() => gerarSugestoes()} disabled={pendente} className={ESTILO_BOTAO_PRIMARIO}>
@@ -345,7 +340,7 @@ export function FormularioNovoProjeto() {
                   </label>
                 ))}
                 <div className="mt-2 flex items-center justify-between">
-                  <button type="button" onClick={() => voltar("contexto")} className={ESTILO_BOTAO_SECUNDARIO}>
+                  <button type="button" onClick={() => irPara("contexto")} className={ESTILO_BOTAO_SECUNDARIO}>
                     ← Voltar
                   </button>
                   <button type="button" onClick={enviarEsclarecimento} disabled={pendente} className={ESTILO_BOTAO_PRIMARIO}>
@@ -358,128 +353,23 @@ export function FormularioNovoProjeto() {
 
             {estado.passo === "previa" && (
               <div className="flex flex-col gap-3">
-                <p className="text-sm font-medium text-gaiamum-text">Escolha o que faz sentido para seu projeto.</p>
-
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => setEstado((a) => ({ ...a, previa: selecionarEssenciais(a.previa) }))} className={ESTILO_BOTAO_SECUNDARIO}>
-                    Selecionar essenciais
-                  </button>
-                  <button type="button" onClick={() => setEstado((a) => ({ ...a, previa: selecionarTodas(a.previa) }))} className={ESTILO_BOTAO_SECUNDARIO}>
-                    Selecionar todas
-                  </button>
-                  <button type="button" onClick={() => setEstado((a) => ({ ...a, previa: limparSelecao(a.previa) }))} className={ESTILO_BOTAO_SECUNDARIO}>
-                    Limpar seleção
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  {estado.previa.map((sugestao) => (
-                    <div key={sugestao.idTemp} className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised p-3">
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={sugestao.selecionada}
-                          onChange={(e) => atualizarSugestao(sugestao.idTemp, { selecionada: e.target.checked })}
-                          className="mt-1.5 h-5 w-5 shrink-0 accent-gaiamum-primary"
-                        />
-                        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                          <div className="flex items-center gap-2">
-                            <input
-                              value={sugestao.titulo}
-                              onChange={(e) => atualizarSugestao(sugestao.idTemp, { titulo: e.target.value })}
-                              placeholder="Título da tarefa"
-                              className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-gaiamum-text outline-none focus:border-gaiamum-primary"
-                            />
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                sugestao.recomendacao === "essencial"
-                                  ? "bg-gaiamum-primary/15 text-gaiamum-primary"
-                                  : "bg-gaiamum-border/50 text-gaiamum-text-muted"
-                              }`}
-                            >
-                              {sugestao.recomendacao === "essencial" ? "Essencial" : "Opcional"}
-                            </span>
-                          </div>
-                          <textarea
-                            value={sugestao.descricao}
-                            onChange={(e) => atualizarSugestao(sugestao.idTemp, { descricao: e.target.value })}
-                            placeholder="Descrição curta (opcional)"
-                            rows={1}
-                            className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-gaiamum-text-muted outline-none focus:border-gaiamum-primary"
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() => alternarExpandida(sugestao.idTemp)}
-                            className="self-start text-xs text-gaiamum-text-muted underline hover:text-gaiamum-text"
-                          >
-                            {estado.expandidas.has(sugestao.idTemp)
-                              ? "Ocultar checklist"
-                              : sugestao.checklist.length > 0
-                                ? `Ver checklist (${sugestao.checklist.length})`
-                                : "+ Adicionar checklist"}
-                          </button>
-
-                          {estado.expandidas.has(sugestao.idTemp) && (
-                            <div className="flex flex-col gap-1 rounded border border-dashed border-gaiamum-border p-2">
-                              {sugestao.checklist.map((item, indice) => (
-                                <div key={indice} className="flex items-center gap-2">
-                                  <span className="text-xs text-gaiamum-text-muted">☐</span>
-                                  <span className="flex-1 text-xs text-gaiamum-text">{item}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => removerItemChecklist(sugestao.idTemp, indice)}
-                                    className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ))}
-                              <input
-                                placeholder="+ Adicionar passo"
-                                onKeyDown={(e) => {
-                                  if (e.key !== "Enter") return;
-                                  e.preventDefault();
-                                  adicionarItemChecklist(sugestao.idTemp, e.currentTarget.value);
-                                  e.currentTarget.value = "";
-                                }}
-                                className="rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-gaiamum-text outline-none focus:border-gaiamum-primary"
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removerSugestao(sugestao.idTemp)}
-                          title="Remover sugestão"
-                          className="shrink-0 text-gaiamum-text-muted hover:text-gaiamum-danger"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <button type="button" onClick={adicionarTarefaManual} className={`self-start ${ESTILO_BOTAO_SECUNDARIO}`}>
-                  + Adicionar tarefa manualmente
-                </button>
-
-                <p className="text-sm text-gaiamum-text-muted">Você selecionou {totalSelecionadas} tarefa(s).</p>
+                <PreviaPlanejamento previa={estado.previa} setPrevia={setPrevia} />
 
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <button type="button" onClick={() => voltar("contexto")} className={ESTILO_BOTAO_SECUNDARIO}>
+                  <button type="button" onClick={() => irPara(estado.origemPrevia)} className={ESTILO_BOTAO_SECUNDARIO}>
                     ← Voltar
                   </button>
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={regenerar} disabled={pendente} className={ESTILO_BOTAO_SECUNDARIO}>
-                      Regenerar
-                    </button>
+                    {estado.origemPrevia === "contexto" && (
+                      <button type="button" onClick={regenerar} disabled={pendente} className={ESTILO_BOTAO_SECUNDARIO}>
+                        Regenerar
+                      </button>
+                    )}
                     <button type="button" onClick={confirmar} disabled={pendente} className={ESTILO_BOTAO_PRIMARIO}>
                       {pendente
                         ? "Criando..."
                         : totalSelecionadas > 0
-                          ? `Criar projeto com as tarefas selecionadas (${totalSelecionadas})`
+                          ? `Criar projeto com os itens selecionados (${totalSelecionadas})`
                           : "Criar projeto sem tarefas"}
                     </button>
                   </div>

@@ -227,7 +227,7 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
                 </LinkAcaoProjeto>
               </>
             )}
-            {podeExcluirTarefa && <MenuAcoesProjeto projetoId={projetoId} />}
+            {podeExcluirTarefa && <MenuAcoesProjeto projetoId={projetoId} nomeProjeto={(projeto as Projeto).nome} />}
           </div>
         </div>
 

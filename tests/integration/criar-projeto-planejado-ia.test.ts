@@ -125,8 +125,10 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("criar_projeto_planejado_ia", () => {
     await service.from("tenants").delete().eq("id", outroTenantId);
   });
 
-  it("mais de 20 tarefas é rejeitado pela função (defesa em profundidade além do limite já aplicado em TS)", async () => {
-    const tarefas = Array.from({ length: 21 }, (_, i) => ({ titulo: `Tarefa ${i}`, descricao: null, checklist: [] }));
+  // Limite subiu de 20 pra 30 na migration 0055 (marcos + tarefas do prompt
+  // copiável).
+  it("mais de 30 itens é rejeitado pela função (defesa em profundidade além do limite já aplicado em TS)", async () => {
+    const tarefas = Array.from({ length: 31 }, (_, i) => ({ titulo: `Tarefa ${i}`, descricao: null, checklist: [] }));
     const { data, error } = await owner.cliente.rpc("criar_projeto_planejado_ia", {
       p_tenant_id: tenantId,
       p_nome: "Projeto com tarefas demais",

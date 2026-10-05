@@ -13,6 +13,10 @@ import { Type, type Schema } from "@google/genai";
  */
 
 export const LIMITE_MAXIMO_SUGESTOES = 20;
+/** Teto de itens (marcos + tarefas) numa confirmação — maior que o da IA
+ * interna porque o prompt copiável (conversa longa na IA da pessoa) traz
+ * marcos além das tarefas. O banco reforça o mesmo número (migration 0055). */
+export const LIMITE_MAXIMO_ITENS_PLANEJAMENTO = 30;
 export const LIMITE_MAXIMO_CHECKLIST_POR_TAREFA = 15;
 export const LIMITE_MAXIMO_PERGUNTAS_ESCLARECIMENTO = 3;
 export const TAMANHO_MAXIMO_CONTEXTO = 4000;
@@ -33,6 +37,9 @@ export type SugestaoTarefaIA = {
   descricao: string;
   recomendacao: RecomendacaoTarefaIA;
   checklist: string[];
+  /** Grande etapa do projeto — vira cartão com `is_marco` (só o caminho do
+   * prompt copiável traz marcos; a IA interna sempre manda `false`). */
+  marco: boolean;
 };
 
 /** Resultado de uma geração — a IA ou devolve uma prévia pronta, ou pede até
@@ -155,6 +162,7 @@ export function interpretarRespostaBrutaIA(jsonBruto: string): ResultadoGeracaoS
         .slice(0, LIMITE_MAXIMO_CHECKLIST_POR_TAREFA)
         .map((item) => truncar(item, TAMANHO_MAXIMO_ITEM_CHECKLIST))
         .filter((item) => item.length > 0),
+      marco: false,
     }))
     .filter((s) => s.titulo.length > 0);
 
@@ -233,7 +241,7 @@ export function limparSelecao(previa: SugestaoNaPrevia[]): SugestaoNaPrevia[] {
 /** Nova sugestão em branco, pra "adicionar tarefa manualmente" na prévia —
  * nasce já selecionada (a pessoa acabou de pedir por ela). */
 export function novaSugestaoManual(): SugestaoNaPrevia {
-  return { idTemp: gerarIdTempSugestao(), titulo: "", descricao: "", recomendacao: "opcional", checklist: [], selecionada: true };
+  return { idTemp: gerarIdTempSugestao(), titulo: "", descricao: "", recomendacao: "opcional", checklist: [], marco: false, selecionada: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -247,13 +255,21 @@ export const TarefaConfirmadaSchema = z.object({
   titulo: z.string().trim().min(1).max(TAMANHO_MAXIMO_TITULO),
   descricao: z.string().trim().max(TAMANHO_MAXIMO_DESCRICAO).optional().default(""),
   checklist: z.array(z.string().trim().max(TAMANHO_MAXIMO_ITEM_CHECKLIST)).max(LIMITE_MAXIMO_CHECKLIST_POR_TAREFA).optional().default([]),
+  marco: z.boolean().optional().default(false),
 });
 
 export const ConfirmacaoPlanejamentoSchema = z.object({
   nome: z.string().trim().min(1).max(140),
   descricao: z.string().trim().max(1000).optional().default(""),
   idempotencyKey: z.string().trim().min(8).max(100),
-  tarefas: z.array(TarefaConfirmadaSchema).max(LIMITE_MAXIMO_SUGESTOES),
+  tarefas: z.array(TarefaConfirmadaSchema).max(LIMITE_MAXIMO_ITENS_PLANEJAMENTO),
 });
 
 export type ConfirmacaoPlanejamento = z.infer<typeof ConfirmacaoPlanejamentoSchema>;
+
+/** Mesma validação, pro planejamento dentro de um projeto que já existe. */
+export const AdicionarPlanejamentoSchema = z.object({
+  projetoId: z.string().uuid(),
+  idempotencyKey: z.string().trim().min(8).max(100),
+  tarefas: z.array(TarefaConfirmadaSchema).min(1).max(LIMITE_MAXIMO_ITENS_PLANEJAMENTO),
+});
