@@ -10,7 +10,24 @@
 
 ---
 
-## Estado confirmado (2026-10-04, sessão nova #69 — última atualização)
+## Estado confirmado (2026-10-05, sessão nova #70 — última atualização)
+
+**Resumo em uma linha**: redesenho da home ("Painel geral", `src/app/page.tsx`) pra bater com o design system que o Fabio trouxe (print em anexo na sessão anterior) — faixa de saudação com alertas, "Seu dia", "Financeiro do mês", "Meta principal", "Projetos em foco", "Próximos passos". Planejado via `EnterPlanMode` (mexia em conceito de dado novo, não só CSS), implementado, testado (tsc/eslint/vitest/build limpos), **ainda não commitado/publicado** — falta a validação visual (ver pendência abaixo).
+
+- **Investigação antes de codar confirmou 3 achados reais** (detalhados no plano salvo em `C:\Users\proff\.claude\plans\proud-painting-hanrahan.md`):
+  1. O Financeiro (`contas_a_pagar`) só modela SAÍDAS — não existe receita/entrada no schema. Confirmado com o Fabio (ele reforçou: receita hoje é rara/variável, só quando fecha trabalho com cliente ou vende via tráfego pago — campo de receitas fica pra depois). Decisão: "Entradas"/"Saldo previsto" do design ficam com rótulo "Em breve" (sem inventar número); "Comprometido %" foi redefinido como `pago / total do mês` (dado real, não a leitura clássica de "% da renda").
+  2. "Status" do design (No caminho/Atenção) não é `Projeto.status` (que já existe — ativo/pausado/concluído, ciclo de vida escolhido pela pessoa, controlado em `cartao-projeto.tsx`). É um conceito novo de **saúde**, calculado automaticamente a partir de tarefas abertas atrasadas — sem campo novo no banco.
+  3. "Meta principal": `metas_smart` tem índice único `(tenant_id, horizonte)` — no máximo 1 meta por horizonte, nunca mais de 2 no total. A principal escolhida é a de `longo_prazo` (visão maior); sem campo novo de "é a principal".
+- **Módulo novo de lógica pura**: `src/lib/ecc/painel-geral.ts` (saudação por horário, primeiro nome a partir do e-mail — mesmo padrão de `email.split("@")[0]` já usado em `detalhe-tarefa.tsx`/`reengajamento-lab`, saúde do projeto, seleção de meta principal, progresso agregado, próximo marco, prazo relativo Hoje/Amanhã/dia da semana, alertas prioritários) + `__tests__/painel-geral.test.ts` (27 testes novos, mesmo padrão de `kanban.ts`/`visao-360.ts`).
+- **Achado real de pureza (mesma classe do checkpoint #65)**: `Date.now()` chamado direto dentro do Server Component (`page.tsx`) e de um componente de apresentação (`FinanceiroDoMes`) violava `react-hooks/purity` no eslint — corrigido extraindo pra 2 funções de lib (`tarefasNaJanelaDeDias`, `contasVencendoEmDias`), chamadas de fora do corpo de render.
+- **5 componentes novos** em `src/components/painel/` (faixa-saudacao, seu-dia, financeiro-do-mes, meta-principal, projetos-em-foco, proximos-passos) — `page.tsx` ficou como orquestrador fino, reaproveitando `BarraProgresso` (já existia, com o caranguejo animado), `CLASSE_FUNDO_QUADRO`, `listarCompromissosDoDia` (`agenda.ts`, mesma função já usada na coluna "Compromissos do dia" do Kanban) e `gerarExplicacaoAlinhamento`/Visão 360 (botão "Ver análise completa" linka pro projeto em "Atenção" mais crítico — **nenhuma chamada de IA agregada nova**, reaproveita o recurso que já existia por projeto).
+- **Testes**: `tsc --noEmit`, `eslint` (zero erros depois da correção de pureza acima) e `npm test` (144/144 passando, 55 de integração pulados por falta de Docker nesta sessão — não corrigido nem quebrado, mesma situação de sempre sem o Docker up) limpos. `npm run build` gerou as 39 rotas sem erro.
+- **Pendência real, não corrigida nesta sessão**: validação visual (comparar com o print) não foi feita — tentei logar/cadastrar um usuário de teste contra o Postgres isolado do Docker local (confirmado rodando, `supabase_db_Gaiamum`) via Playwright, mas o fluxo de "Cadastre-se" na tela de auth não reagiu ao clique (sem erro visível, só não trocou de modo — não investigado a fundo, pode ser relacionado aos erros de WebSocket HMR do `next dev` que apareceram em paralelo, possivelmente por 2 instâncias de dev server competindo na porta 3000 nesta máquina). Não tentei resetar senha de usuário existente nem ler `.env.local`/segredos pra não tocar em credencial sem necessidade clara. Servidor de teste que iniciei foi encerrado ao final da sessão.
+- **Nada commitado nem publicado ainda** — código pronto na árvore de trabalho (`main`, sem branch nova), esperando: (a) validação visual (minha, assim que destravar o ambiente de teste, ou do próprio Fabio em produção/local), (b) autorização implícita já dada ("pode comitar e subir sem pedir autorização a cada vez") será exercida depois da validação visual, não antes.
+
+---
+
+## Estado confirmado (2026-10-04, sessão nova #69)
 
 **Resumo em uma linha**: achado real na própria pendência do checkpoint #68 (a migration 0047 não devia ser reaplicada — já estava superada pela 0049) + 4 frentes novas a pedido do Fabio (mensagem de voz com vários pontos): coluna "Compromissos do dia" agora alcançável/visível no celular (faltava `data-coluna-card`/`snap-center`) e ganhou uma barrinha "Hoje · Amanhã" pra espiar o dia seguinte; quadro Kanban sem teto de largura (`max-w-6xl` removido) e menu lateral de desktop virou retrátil (clique recolhe/expande, preferência persistida); alça de arrastar cartão aumentada pra alvo de toque de 44×44px (achado real: o alvo antigo era pequeno demais pro dedo). **Rede desta máquina ficou instável/fora do ar por boa parte da sessão** — trabalho local (código, testes, Docker) seguiu normalmente; push/deploy ficaram pendentes até a rede normalizar (ver nota no fim).
 
@@ -1491,6 +1508,10 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-10-05 (sessão nova #70) — Redesenho do Painel geral implementado e testado, validação visual pendente, nada publicado
+
+Resumo completo em "Estado confirmado" (seção da própria sessão #70, no topo do arquivo). Em uma linha: implementei o redesenho da home combinado na sessão anterior (faixa de saudação, Seu dia, Financeiro do mês, Meta principal, Projetos em foco, Próximos passos), planejado via `EnterPlanMode` por envolver conceito de dado novo (saúde do projeto, meta principal) — tudo calculado, sem schema novo. Achado real confirmado com o Fabio: Financeiro só tem saídas, sem receita (fica pra depois); "Entradas"/"Saldo previsto" do design ficam "Em breve". `tsc`/`eslint`/`vitest` (144 passando)/`build` limpos. Não consegui validar visualmente contra o print (ambiente de teste local não deixou eu logar via Playwright — não investigado a fundo, não bloqueante); nada commitado/publicado ainda.
 
 ### 2026-10-02 (sessão nova #65) — Temporizador de hiperfoco implementado, testado (172 testes, 0 regressão), não publicado
 
