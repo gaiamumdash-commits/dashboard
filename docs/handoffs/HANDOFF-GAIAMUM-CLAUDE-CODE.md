@@ -12,7 +12,7 @@
 
 ## Estado confirmado (2026-10-05, sessão #71 — última atualização)
 
-**Resumo em uma linha**: redesenho visual do Kanban (`/projetos/[id]/tarefas`) **implementado e commitado localmente (`2b13db4`), ainda NÃO publicado** (sem push, sem deploy) — falta a validação visual do Fabio em produção.
+**Resumo em uma linha**: redesenho visual do Kanban (`/projetos/[id]/tarefas`) **implementado (`2b13db4`) e publicado em `gaiamum.com.br`** (push ok, CI verde, `vercel deploy --prod` com alias atualizado, smoke test `/auth` e `/projetos` → 200) — falta só a validação visual do Fabio em produção.
 
 - **Retomada**: a sessão anterior parou no meio (11:31), sem commit e sem atualizar este handoff. O mockup foi reanexado e salvo em `docs/gaiamum/mockups/kanban-mockup-aprovado-2026-10-05.jpg` (a pendência bloqueante da sessão #70 está resolvida).
 - **O que entrou**: cabeçalho do projeto (selo de saúde reaproveitando `calcularSaudeProjeto`, ações Páginas/Visão 360°/Decisões/Indicadores + `MenuAcoesProjeto` ⋯ com Freeze/Configurações, mesmas regras de permissão); `ProgressoDoQuadro` no topo (a barra que ficava no rodapé subiu, com a mesma fórmula); `FaixaDoDia` (hoje, próximo compromisso via `FaixaProximoCompromisso` em Suspense, prazos de hoje, foco ativo com barra); `BarraFerramentasQuadro` (+ Tarefa foca o campo de entrada existente; busca/filtros/Minhas tarefas são filtros só visuais no cliente, `filtrarTarefasDoQuadro`); colunas com ícone por identidade (flags, nunca nome), ações no `MenuSuspenso` ⋮, "Hoje" com borda azul, selo "🎯 Foco", "Concluído" recolhido com "🎉 N tarefas concluídas" + "Mostrar cartões". Lógica pura em `src/lib/ecc/kanban-cabecalho.ts` + 19 testes.
