@@ -36,6 +36,31 @@ export function contasVencendoEmDias(
   return { quantidade: vencendo.length, valorTotal: vencendo.reduce((soma, c) => soma + c.valor, 0) };
 }
 
+export type FinanceiroDoMes = {
+  entradas: number;
+  saidas: number;
+  saldoPrevisto: number;
+  comprometido: number | null;
+};
+
+/** Números do card "Financeiro do mês". `entradas` é sempre 0 por ora — não
+ * é um placeholder "em breve": é o valor real, porque não existe
+ * receita/entrada no schema ainda (achado confirmado com o Fabio,
+ * 2026-10-05 — ele cadastra os primeiros recebimentos variáveis quando
+ * fechar um trabalho/vender o produto). `saldoPrevisto` é a diferença de
+ * verdade (entradas - saídas), por isso fica negativo enquanto não houver
+ * receita cadastrada — reflete a realidade, não esconde ela. `comprometido`
+ * é `saídas/entradas`; sem nenhuma entrada mas com saída, o comprometimento
+ * é 100% (gastando sem nenhuma renda registrada); sem saída nem entrada,
+ * `null` (nada pra medir). */
+export function calcularFinanceiroDoMes(contasDoMes: Pick<ContaAPagar, "valor">[]): FinanceiroDoMes {
+  const entradas = 0;
+  const saidas = contasDoMes.reduce((soma, c) => soma + c.valor, 0);
+  const saldoPrevisto = entradas - saidas;
+  const comprometido = entradas > 0 ? Math.min(100, Math.round((100 * saidas) / entradas)) : saidas > 0 ? 100 : null;
+  return { entradas, saidas, saldoPrevisto, comprometido };
+}
+
 /** Lógica pura (sem I/O, sem Server Component/Action) por trás do "Painel
  * geral" (`src/app/page.tsx`) — mesmo padrão de `kanban.ts`/`visao-360.ts`:
  * decisões testáveis isoladas das queries. */

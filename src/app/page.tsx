@@ -18,7 +18,7 @@ import {
   tarefasNaJanelaDeDias,
 } from "@/lib/ecc/painel-geral";
 import { MenuLateral } from "@/components/layout/menu-lateral";
-import { FaixaSaudacao } from "@/components/painel/faixa-saudacao";
+import { CardEstrategista } from "@/components/painel/card-estrategista";
 import { SeuDia } from "@/components/painel/seu-dia";
 import { FinanceiroDoMes } from "@/components/painel/financeiro-do-mes";
 import { MetaPrincipal } from "@/components/painel/meta-principal";
@@ -107,10 +107,16 @@ export default async function PaginaInicial() {
     .filter((p) => p.status === "ativo")
     .map((projeto) => {
       const tarefasDoProjeto = tarefasAbertas.filter((t) => t.projeto_id === projeto.id);
+      const tarefasAtrasadas = tarefasDoProjeto.filter((t) => urgenciaDoPrazo(t, false) === "atrasado").length;
+      const proximoPrazo = tarefasDoProjeto
+        .filter((t) => t.data_limite)
+        .sort((a, b) => new Date(a.data_limite as string).getTime() - new Date(b.data_limite as string).getTime())[0];
       return {
         projeto,
         saude: calcularSaudeProjeto(tarefasDoProjeto, colunasConcluidoIds),
         tarefasAbertas: tarefasDoProjeto.length,
+        tarefasAtrasadas,
+        proximoPrazoTitulo: proximoPrazo?.titulo ?? null,
       };
     })
     .sort((a, b) => (a.saude === b.saude ? 0 : a.saude === "atencao" ? -1 : 1));
@@ -145,53 +151,79 @@ export default async function PaginaInicial() {
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
       <MenuLateral temMetasSmart={temMetasSmart} souOwner={souOwner} />
-      <main className="mx-auto flex max-w-6xl flex-1 flex-col gap-10 px-4 py-10">
-        <FaixaSaudacao
-          saudacao={saudacaoPorHorario(new Date())}
-          nome={primeiroNome(user.email ?? "")}
+      <main className="mx-auto flex max-w-6xl flex-1 flex-col gap-8 px-4 py-10">
+        <div>
+          <h1 className="text-3xl font-semibold text-gaiamum-text">Painel geral</h1>
+          <p className="mt-1 text-gaiamum-text-muted">Seu centro de decisões, execução e crescimento.</p>
+          <p className="mt-3 text-sm text-gaiamum-text">
+            {saudacaoPorHorario(new Date())}, {primeiroNome(user.email ?? "")}. Aqui está o que merece sua atenção
+            hoje.
+          </p>
+        </div>
+
+        <CardEstrategista
           alertas={alertas}
           hrefAnaliseCompleta={projetoEmDestaque ? `/projetos/${projetoEmDestaque.id}/visao-360` : null}
         />
 
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">Seu dia</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">Seu dia</h2>
+            <Link href="/agenda" className="text-sm text-gaiamum-primary hover:underline">
+              Abrir agenda →
+            </Link>
+          </div>
           <SeuDia tarefasHoje={tarefasHojeCount} compromissos={compromissosHoje} prazoSemana={prazoSemana} />
         </section>
 
-        {souOwner && (
-          <section>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-              Financeiro do mês
-            </h2>
-            <FinanceiroDoMes contasDoMes={listaContasDoMes} />
+        <div className="grid gap-8 lg:grid-cols-3">
+          {souOwner && (
+            <section className="lg:col-span-2">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
+                  Financeiro do mês
+                </h2>
+                <Link href="/financeiro" className="text-sm text-gaiamum-primary hover:underline">
+                  Ver financeiro →
+                </Link>
+              </div>
+              <FinanceiroDoMes contasDoMes={listaContasDoMes} />
+            </section>
+          )}
+
+          <section className={souOwner ? "lg:col-span-1" : "lg:col-span-3"}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
+                Meta principal
+              </h2>
+              <Link href="/onboarding" className="text-sm text-gaiamum-primary hover:underline">
+                Ver metas →
+              </Link>
+            </div>
+            <MetaPrincipal meta={metaPrincipal} progresso={progressoMeta} marco={marcoMeta} />
           </section>
-        )}
+        </div>
 
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-            Meta principal
-          </h2>
-          <MetaPrincipal meta={metaPrincipal} progresso={progressoMeta} marco={marcoMeta} />
-        </section>
+        <div className="grid gap-8 lg:grid-cols-3">
+          <section className="lg:col-span-2">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
+                Projetos em foco
+              </h2>
+              <Link href="/projetos" className="text-sm text-gaiamum-primary hover:underline">
+                Ver todos →
+              </Link>
+            </div>
+            <ProjetosEmFoco projetos={projetosEmFoco} />
+          </section>
 
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-              Projetos em foco
+          <section className="lg:col-span-1">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
+              Próximos passos
             </h2>
-            <Link href="/projetos" className="text-sm text-gaiamum-primary hover:underline">
-              Ver todos →
-            </Link>
-          </div>
-          <ProjetosEmFoco projetos={projetosEmFoco} />
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-            Próximos passos
-          </h2>
-          <ProximosPassos passos={passosUnificados} />
-        </section>
+            <ProximosPassos passos={passosUnificados} />
+          </section>
+        </div>
       </main>
     </div>
   );

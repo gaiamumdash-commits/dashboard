@@ -9,6 +9,7 @@ import {
   prazoImportanteDaSemana,
   prazoRelativo,
   montarAlertasPrioritarios,
+  calcularFinanceiroDoMes,
 } from "@/lib/ecc/painel-geral";
 import type { MetaSmart, Tarefa } from "@/lib/ecc/tipos";
 
@@ -191,6 +192,28 @@ describe("prazoRelativo", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-05T10:00:00-03:00"));
     expect(prazoRelativo("2026-10-20T18:00:00-03:00")).toBe("20/10");
+  });
+});
+
+describe("calcularFinanceiroDoMes", () => {
+  it("entradas sempre 0 — não existe receita no schema ainda", () => {
+    expect(calcularFinanceiroDoMes([{ valor: 100 }]).entradas).toBe(0);
+  });
+
+  it("saídas é a soma de todas as contas do mês", () => {
+    expect(calcularFinanceiroDoMes([{ valor: 100 }, { valor: 50 }]).saidas).toBe(150);
+  });
+
+  it("saldo previsto fica negativo sem nenhuma entrada cadastrada", () => {
+    expect(calcularFinanceiroDoMes([{ valor: 100 }]).saldoPrevisto).toBe(-100);
+  });
+
+  it("comprometido é 100% quando há saída mas nenhuma entrada", () => {
+    expect(calcularFinanceiroDoMes([{ valor: 100 }]).comprometido).toBe(100);
+  });
+
+  it("comprometido é null sem saída nem entrada (nada pra medir)", () => {
+    expect(calcularFinanceiroDoMes([]).comprometido).toBeNull();
   });
 });
 

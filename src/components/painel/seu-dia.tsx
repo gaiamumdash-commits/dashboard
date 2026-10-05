@@ -1,28 +1,33 @@
 import Link from "next/link";
+import { IconeCircular, type CorIcone } from "@/components/painel/icone-circular";
 import type { ResultadoCompromissosDoDia } from "@/lib/ecc/agenda";
 import type { Tarefa } from "@/lib/ecc/tipos";
 
 function CardSeuDia({
-  icone,
-  rotulo,
+  cor,
+  simbolo,
   numero,
+  rotulo,
   detalhe,
   href,
 }: {
-  icone: string;
-  rotulo: string;
+  cor: CorIcone;
+  simbolo: string;
   numero: string;
+  rotulo: string;
   detalhe?: string;
   href?: string;
 }) {
   const conteudo = (
-    <div className="flex h-full flex-col gap-1 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-gaiamum-text-muted">
-        <span aria-hidden>{icone}</span>
-        {rotulo}
+    <div className="flex items-center gap-3 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-4">
+      <IconeCircular cor={cor}>{simbolo}</IconeCircular>
+      <div className="min-w-0 flex-1">
+        <p className="text-xl font-semibold text-gaiamum-text">
+          {numero} <span className="text-sm font-normal text-gaiamum-text-muted">{rotulo}</span>
+        </p>
+        {detalhe && <p className="truncate text-xs text-gaiamum-text-muted">{detalhe}</p>}
       </div>
-      <p className="mt-1 text-3xl font-semibold text-gaiamum-text">{numero}</p>
-      {detalhe && <p className="text-sm text-gaiamum-text-muted">{detalhe}</p>}
+      {href && <span aria-hidden className="shrink-0 text-gaiamum-text-muted">→</span>}
     </div>
   );
 
@@ -55,18 +60,20 @@ export function SeuDia({
 
   return (
     <div className="grid gap-4 sm:grid-cols-3">
-      <CardSeuDia icone="✅" rotulo="Tarefas para hoje" numero={String(tarefasHoje)} href="/projetos" />
+      <CardSeuDia cor="verde" simbolo="✓" numero={String(tarefasHoje)} rotulo="tarefas para hoje" href="/projetos" />
       <CardSeuDia
-        icone="📅"
-        rotulo="Compromissos agendados"
+        cor="azul"
+        simbolo="📅"
         numero={compromissos.status === "conectado" ? String(compromissos.compromissos.length) : "—"}
+        rotulo="compromissos agendados"
         detalhe={detalheCompromissos}
-        href={compromissos.status === "oculto" ? "/agenda" : undefined}
+        href={compromissos.status === "oculto" ? "/agenda" : "/agenda"}
       />
       <CardSeuDia
-        icone="🚩"
-        rotulo="Prazo importante da semana"
+        cor="amarelo"
+        simbolo="⏱"
         numero={String(prazoSemana.quantidade)}
+        rotulo="prazo importante nesta semana"
         detalhe={prazoSemana.maisProximo?.titulo}
       />
     </div>
