@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { RegisterServiceWorker } from "@/components/register-service-worker";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SCRIPT_CAPTURA_INSTALACAO } from "@/lib/instalar-app";
 import "./globals.css";
 
 // Aplica o tema salvo antes do primeiro paint, pra não piscar o tema errado.
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_CAPTURA_INSTALACAO }} />
       </head>
       <body>
         {children}

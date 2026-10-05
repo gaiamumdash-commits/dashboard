@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { LinksNavegacao } from "@/components/layout/links-navegacao";
 import { BotaoSair } from "@/components/layout/botao-sair";
+import { BotaoInstalarAppMenu } from "@/components/instalar-app/convite-instalar-app";
 import { SeletorTema } from "@/components/theme-toggle";
 
 /** Cabeçalho + painel visíveis abaixo de `sm` (640px) OU em qualquer
@@ -76,6 +77,7 @@ export function MenuMobile({
               extra={linkExtra}
             />
             <div className="mt-2 flex flex-col gap-2 border-t border-gaiamum-border pt-3">
+              <BotaoInstalarAppMenu />
               {emailConta}
               <div className="flex items-center justify-between">
                 <SeletorTema />

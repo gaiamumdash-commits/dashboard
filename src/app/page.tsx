@@ -21,6 +21,7 @@ import { MenuLateral } from "@/components/layout/menu-lateral";
 import { CardEstrategista } from "@/components/painel/card-estrategista";
 import { SeuDia } from "@/components/painel/seu-dia";
 import { FinanceiroDoMes } from "@/components/painel/financeiro-do-mes";
+import { ConviteInstalarApp } from "@/components/instalar-app/convite-instalar-app";
 import { MetaPrincipal } from "@/components/painel/meta-principal";
 import { ProjetosEmFoco, type ProjetoEmFoco } from "@/components/painel/projetos-em-foco";
 import { ProximosPassos, type PassoUnificado } from "@/components/painel/proximos-passos";
@@ -171,6 +172,8 @@ export default async function PaginaInicial() {
             hoje.
           </p>
         </div>
+
+        <ConviteInstalarApp />
 
         <CardEstrategista
           alertas={alertas}

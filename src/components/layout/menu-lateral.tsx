@@ -12,6 +12,7 @@ import { LinksNavegacao } from "@/components/layout/links-navegacao";
 import { MenuLateralRetratil } from "@/components/layout/menu-lateral-retratil";
 import { MenuMobile } from "@/components/layout/menu-mobile";
 import { EmblemaPatente } from "@/components/lab/emblema-patente";
+import { BotaoInstalarAppMenu } from "@/components/instalar-app/convite-instalar-app";
 import { LAB_VISIVEL } from "@/lib/ecc/lab/flags";
 
 /** Busca a contagem de não lidas separada num componente próprio, dentro de
@@ -142,6 +143,7 @@ export function MenuLateral({
         </div>
 
         <div className="mt-3 flex shrink-0 flex-col border-t border-gaiamum-border pt-3">
+          <BotaoInstalarAppMenu />
           <Suspense fallback={null}>
             <EmailDaConta />
           </Suspense>
