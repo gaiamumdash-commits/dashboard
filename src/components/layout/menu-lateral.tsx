@@ -30,6 +30,9 @@ async function SinoComContagem({ alinhamento }: { alinhamento?: "left" | "right"
  * bloquear o resto do menu. `null` (sem selo nenhum) até a pessoa conquistar
  * a primeira patente no Gaiamum Lab. */
 async function PatenteComEmblema() {
+  // Patentes são do Lab (o selo leva pra /lab/progresso) — com o Lab
+  // escondido, o selo some junto (pedido do Fabio, 2026-10-05).
+  if (!LAB_VISIVEL) return null;
   const user = await obterUsuarioAtual();
   if (!user) return null;
   const patentes = await listarPatentesDoUsuario(user.id);

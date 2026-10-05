@@ -5,20 +5,24 @@ import { cache } from "react";
 import { revalidatePath } from "next/cache";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import type { NotificacaoApp } from "@/lib/ecc/tipos";
+import { LAB_VISIVEL } from "@/lib/ecc/lab/flags";
 
 const LIMITE_NOTIFICACOES_RECENTES = 20;
+
+/** Com o Lab escondido (`LAB_VISIVEL`, pedido do Fabio 2026-10-05: "o café do
+ * mangue está ali esperando... é para tirar essas notificações"), os avisos
+ * de reengajamento do Lab somem do sino — da lista E da contagem. Não apaga
+ * nada do banco: voltam a aparecer se o Lab voltar. */
+const TIPOS_OCULTOS = LAB_VISIVEL ? [] : ["lab_reengajamento"];
 
 export async function listarNotificacoesRecentes(): Promise<NotificacaoApp[]> {
   const user = await obterUsuarioAtual();
   if (!user) return [];
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("notificacoes_app")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("criado_em", { ascending: false })
-    .limit(LIMITE_NOTIFICACOES_RECENTES);
+  let consulta = supabase.from("notificacoes_app").select("*").eq("user_id", user.id);
+  if (TIPOS_OCULTOS.length > 0) consulta = consulta.not("tipo", "in", `(${TIPOS_OCULTOS.join(",")})`);
+  const { data } = await consulta.order("criado_em", { ascending: false }).limit(LIMITE_NOTIFICACOES_RECENTES);
 
   return (data as NotificacaoApp[] | null) ?? [];
 }
@@ -38,11 +42,13 @@ const contarNaoLidasCache = cache(async (): Promise<number> => {
   if (!user) return 0;
 
   const supabase = await createClient();
-  const { count } = await supabase
+  let consulta = supabase
     .from("notificacoes_app")
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
     .eq("lida", false);
+  if (TIPOS_OCULTOS.length > 0) consulta = consulta.not("tipo", "in", `(${TIPOS_OCULTOS.join(",")})`);
+  const { count } = await consulta;
 
   return count ?? 0;
 });

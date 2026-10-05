@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { listarUsuariosEmRiscoDeEvasao } from "@/lib/ecc/lab/analitica";
 import { enviarEmailReengajamentoLab } from "@/lib/ecc/notificacoes";
 import { gerarIdCorrelacao, registrarErro, registrarInfo } from "@/lib/observabilidade";
+import { LAB_VISIVEL } from "@/lib/ecc/lab/flags";
 
 /** Roda 1x/dia (vercel.json) — reengajamento não-punitivo do Gaiamum Lab:
  * usuários há 48h+ sem atividade e ainda sem a patente Explorador recebem
@@ -16,6 +17,12 @@ import { gerarIdCorrelacao, registrarErro, registrarInfo } from "@/lib/observabi
 export async function GET(request: NextRequest) {
   if (!autorizacaoCronValida(request.headers.get("authorization"), process.env.CRON_SECRET ?? "")) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  // Lab escondido (`LAB_VISIVEL`): não manda e-mail nem notificação
+  // chamando a pessoa pra uma área que ela nem enxerga no app.
+  if (!LAB_VISIVEL) {
+    return NextResponse.json({ ok: true, pulado: "lab-oculto" });
   }
 
   const idExecucao = gerarIdCorrelacao();

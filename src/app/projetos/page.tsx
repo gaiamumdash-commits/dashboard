@@ -7,6 +7,7 @@ import type { Projeto } from "@/lib/ecc/tipos";
 import { FormularioNovoProjeto } from "@/components/projetos/formulario-novo-projeto";
 import { CartaoProjeto } from "@/components/projetos/cartao-projeto";
 import { MenuLateral } from "@/components/layout/menu-lateral";
+import { ConviteInstalarApp } from "@/components/instalar-app/convite-instalar-app";
 
 export default async function PaginaProjetos({
   searchParams,
@@ -45,6 +46,14 @@ export default async function PaginaProjetos({
         souOwner={souOwner}
       />
       <main className="mx-auto max-w-5xl flex-1 px-4 py-12">
+        {/* Os dois caminhos do onboarding (salvar metas ou "Pular") caem
+            aqui, não no Painel geral — achado real do Fabio testando uma
+            conta nova (2026-10-05): o convite só no Painel nunca era visto. */}
+        {!verArquivados && (
+          <div className="mb-8 empty:hidden">
+            <ConviteInstalarApp />
+          </div>
+        )}
         <div className="mb-8 flex items-start justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-gaiamum-text">
