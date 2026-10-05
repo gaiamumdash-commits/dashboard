@@ -7,12 +7,12 @@
 -- vez — está envolvido em begin;...commit; (mesma rotina já usada pras
 -- migrations 0048-0052).
 --
--- O QUE É E POR QUE ESTÁ PENDENTE: as migrations 0046 e 0047 já existem no
--- repo desde 2026-09-30 (Consolidação P0), mas nunca foram aplicadas em
--- produção — ficaram pra trás por engano num dos lotes manuais anteriores,
--- enquanto 0048-0052 (criadas depois) foram aplicadas normalmente. Achado
--- confirmado por fora, com `curl` direto contra a API REST de produção
--- (não por suposição) — ver handoff, checkpoint #68.
+-- O QUE É E POR QUE ESTÁ PENDENTE: a migration 0046 já existe no repo desde
+-- 2026-09-30 (Consolidação P0), mas nunca foi aplicada em produção — ficou
+-- pra trás por engano num dos lotes manuais anteriores, enquanto 0048-0052
+-- (criadas depois) foram aplicadas normalmente. Achado confirmado por fora,
+-- com `curl` direto contra a API REST de produção (não por suposição) —
+-- ver handoff, checkpoint #68.
 --
 -- CONSEQUÊNCIA PRÁTICA de não ter a 0046: toda chamada de IA no app (criar
 -- projeto com planejamento assistido, transcrição de voz, explicação do
@@ -21,19 +21,22 @@
 -- Gemini à toa se não conseguir checar a cota), e ela quebra porque a
 -- tabela/função que ela usa não existe.
 --
--- CONSEQUÊNCIA PRÁTICA de não ter a 0047 (ESTA É DE SEGURANÇA, não só a IA):
--- qualquer convidado com acesso só a 1 projeto (`escopo = 'projeto'`) que
--- chamar a função `membros_do_tenant` direto do navegador (contornando a
--- interface) recebe o e-mail de TODO o workspace, inclusive do owner —
--- vazamento de PII. Prioridade de segurança, não só a IA.
+-- ⚠️ CORREÇÃO (2026-10-04): este arquivo chegou a incluir também a migration
+-- 0047 (segurança — vazamento de e-mail entre membros do workspace), mas
+-- ela foi REMOVIDA daqui: a 1ª tentativa de aplicar falhou
+-- (`cannot change return type of existing function`), o que revelou que a
+-- correção de segurança da 0047 JÁ está em produção — reimplementada do
+-- zero, de forma independente, pela migration 0049 (aplicada há dias,
+-- junto com 0048/0050/0051/0052). Nada foi alterado no banco nessa
+-- tentativa (o erro abortou a transação inteira). Ver nota no topo do
+-- arquivo `supabase/migrations/0047_restringe_membros_do_tenant_por_escopo.sql`.
 --
 -- A 0053 (nova, desta sessão) trava a coluna de foco ("Em Desenvolvimento")
 -- pra não poder ser renomeada/apagada — pedido do Fabio, já testada contra
 -- o Postgres de teste isolado antes de entrar aqui.
 --
--- Seguro aplicar as 3 agora, fora de ordem cronológica do nome do arquivo:
--- nenhuma delas depende de nada criado nas migrations 0048-0052 (que já
--- estão em produção).
+-- Seguro aplicar as 2 agora: nenhuma delas depende de nada criado nas
+-- migrations 0048-0052 (que já estão em produção).
 -- ============================================================================
 
 begin;
@@ -83,36 +86,8 @@ revoke execute on function ia_registrar_tentativa(text, text, timestamptz, integ
 revoke execute on function ia_registrar_tentativa(text, text, timestamptz, integer) from anon;
 revoke execute on function ia_registrar_tentativa(text, text, timestamptz, integer) from authenticated;
 
--- ============================================================================
--- Migration 0047_restringe_membros_do_tenant_por_escopo.sql
--- ============================================================================
-
-create or replace function membros_do_tenant(t_id uuid)
-returns table (user_id uuid, email text, papel text)
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select m.user_id, u.email, m.papel
-  from memberships m
-  join auth.users u on u.id = m.user_id
-  where m.tenant_id = t_id
-    and t_id in (select current_tenant_ids())
-    and (
-      tem_acesso_completo(t_id)
-      or m.papel = 'owner'
-      or exists (
-        select 1
-        from projeto_membros pm_eu
-        join projeto_membros pm_alvo
-          on pm_alvo.projeto_id = pm_eu.projeto_id
-        where pm_eu.tenant_id = t_id
-          and pm_eu.user_id = auth.uid()
-          and pm_alvo.user_id = m.user_id
-      )
-    );
-$$;
+-- (Migration 0047 removida daqui — já superada pela 0049, que está em
+-- produção. Ver explicação no topo deste arquivo.)
 
 -- ============================================================================
 -- Migration 0053_coluna_foco_fixa.sql

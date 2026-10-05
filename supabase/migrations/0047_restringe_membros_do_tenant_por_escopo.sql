@@ -1,3 +1,27 @@
+-- ⚠️ SUPERADA — NÃO APLICAR EM PRODUÇÃO (achado real, 2026-10-04).
+--
+-- Esta migration nunca chegou a ser aplicada em produção (ficou pra trás
+-- por engano num lote manual anterior), mas a correção que ela trazia foi
+-- reimplementada do zero, de forma independente e mais completa, pela
+-- migration `0049_privacidade_membros_e_resolucao_notificacao.sql` — que
+-- essa sim ESTÁ em produção. A 0049 faz `drop function` + `create function`
+-- com a MESMA regra de restrição por escopo desta migration, mais uma
+-- coluna nova (`nome_exibicao`) e lógica adicional de mascarar e-mail.
+--
+-- Tentar aplicar esta migration (0047) por cima da 0049 falha —
+-- `ERROR: 42P13: cannot change return type of existing function` — porque
+-- o formato de retorno não bate mais (3 colunas aqui vs. 4 na 0049). Se
+-- alguém "corrigir" isso com um DROP FUNCTION antes, o resultado seria uma
+-- REGRESSÃO: perderia `nome_exibicao` (que o app já depende dele existir,
+-- ver `MembroTenant` em tipos.ts) e a função privilegiada
+-- `emails_para_notificacao` que a 0049 também criou.
+--
+-- Mantida aqui só por valor histórico/arqueológico — nunca aplicar.
+--
+-- ============================================================================
+-- Texto original (histórico) abaixo:
+-- ============================================================================
+--
 -- Gaiamum — Fechamento do P0 (2026-09-30): corrige achado de segurança
 -- descoberto durante a validação do P0 (não fazia parte do escopo
 -- original), confirmado contra Postgres real em
