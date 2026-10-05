@@ -61,6 +61,37 @@ antes de gravar. Tem rate limit (`ia_registrar_tentativa`, migration 0046) e
 validação zod da resposta. **A prévia, a seleção, o saneamento e a criação
 em lote são reaproveitados 100%.** Muda só a origem da resposta.
 
+### Decisão do Fabio (mesma sessão, depois da proposta)
+
+> "se não tiver IA ou ficar caro, porque tem dado erro direto, pode só gerar
+> o prompt e a pessoa copia e cola em sua IA preferida e você cria um campo
+> para colar a resposta e trabalhar ela nos cartões e sugestões no
+> calendário e nas colunas etc"
+
+Consequências pra proposta abaixo:
+- **O prompt copiável (caminho B) é o caminho PRINCIPAL**, não um extra. Ele
+  funciona sem nenhuma IA no servidor.
+- O Gemini interno (caminho A) só continua se for barato e estável. A IA
+  interna "tem dado erro direto", então **investigar a causa do erro atual
+  é parte do início da frente** (rate limit? cota da chave? modelo?). Se
+  não houver correção barata, o caminho A sai da tela. Se ficar, qualquer
+  erro dele cai automaticamente no caminho B ("A IA daqui não respondeu,
+  copie o prompt e use a sua"), nunca num beco sem saída.
+- O resultado colado alimenta, além dos cartões:
+  - **Calendário**: compromissos sugeridos (reuniões de alinhamento,
+    revisões de marco, prazos) aparecem na prévia como itens de Agenda
+    selecionáveis, criados só se marcados, pelo fluxo de Agenda que já
+    existe (que sincroniza com o Google quando conectado). Data e hora só
+    se a pessoa informou na conversa; senão o item vem sem data e a prévia
+    pede pra escolher.
+  - **Colunas**: a IA pode sugerir colunas extras de fluxo (ex.: "Aguardando
+    aprovação"), mostradas como sugestão selecionável. As colunas fixas e
+    regras atuais (Concluído, Hoje, Em Desenvolvimento/Foco, nova coluna
+    nascendo depois de Hoje) não mudam. Cada tarefa pode indicar a coluna
+    sugerida; sem coluna válida, vai pra "Tarefas".
+- Com isso o bloco `===GAIAMUM===` ganha `compromissos` e `colunas`
+  (opcionais), ao lado de `tarefas`, `marcos` e `recomendacoes`.
+
 ### Visão de sócio (produto, gestão de projetos, IA)
 
 **1. Os dois caminhos convivem; não é trocar um pelo outro.**
@@ -159,12 +190,15 @@ continua com teto. Como bônus, o caminho B não depende do Gemini estar no ar.
   colar, parser com marcadores, prévia/seleção existente, tarefas e marcos na
   coluna Tarefas. Vale na criação e dentro do projeto.
 - **Fase 2**: recomendações salvas em Página; prazos relativos → datas
-  ajustáveis na prévia; alarme padrão por cartão.
+  ajustáveis na prévia; alarme padrão por cartão; compromissos sugeridos na
+  Agenda; colunas sugeridas.
 - **Fase 3**: cartões de "Convidar [papel]" ligados ao fluxo de equipe;
   sugestão de quadro separado.
 
 ### Decisões em aberto (perguntar ao Fabio)
-1. Manter o caminho A (Gemini interno) ao lado do B? Sugestão: sim.
+1. ~~Manter o caminho A ao lado do B?~~ **Decidido**: B é o principal; A só
+   se a investigação do erro atual mostrar que dá pra mantê-lo barato e
+   estável (ver "Decisão do Fabio" acima).
 2. Qual IA gratuita indicar nos atalhos? Sugestão: ChatGPT, Gemini e Claude,
    todos com plano gratuito, só como links.
 3. Fase 1 sozinha já pode ir pra produção? Sugestão: sim; ela já entrega o
