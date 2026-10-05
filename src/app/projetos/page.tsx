@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { ConvitesPendentes } from "@/components/equipe/convites-pendentes";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { temAcessoCompleto, obterPapelAtual } from "@/lib/ecc/equipe";
@@ -50,9 +52,16 @@ export default async function PaginaProjetos({
             aqui, não no Painel geral — achado real do Fabio testando uma
             conta nova (2026-10-05): o convite só no Painel nunca era visto. */}
         {!verArquivados && (
-          <div className="mb-8 empty:hidden">
-            <ConviteInstalarApp />
-          </div>
+          <>
+            <div className="mb-8 empty:hidden">
+              <Suspense fallback={null}>
+                <ConvitesPendentes />
+              </Suspense>
+            </div>
+            <div className="mb-8 empty:hidden">
+              <ConviteInstalarApp />
+            </div>
+          </>
         )}
         <div className="mb-8 flex items-start justify-between">
           <div>

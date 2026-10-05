@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { iniciarLoginGoogle } from "@/lib/ecc/auth-google";
+import { CampoSenha } from "@/components/campo-senha";
 
 /** Depois de "Criar conta", a MESMA mensagem pros dois casos — e-mail novo
  * (o Supabase manda o link de confirmação) e e-mail que já tinha conta (o
@@ -231,13 +232,10 @@ function FormularioAuth() {
           {modo !== "recuperacao" && (
             <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
               Senha
-              <input
-                type="password"
-                required
-                minLength={6}
+              <CampoSenha
                 value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none focus:border-gaiamum-primary"
+                onChange={setSenha}
+                autoComplete={modo === "cadastro" ? "new-password" : "current-password"}
               />
             </label>
           )}

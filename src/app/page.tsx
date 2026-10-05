@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ConvitesPendentes } from "@/components/equipe/convites-pendentes";
 import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { buscarMembershipAtual } from "@/lib/ecc/membership";
 import { contarMetasSmart, onboardingDeMetasFoiPulado } from "@/lib/ecc/metas";
@@ -172,6 +174,10 @@ export default async function PaginaInicial() {
             hoje.
           </p>
         </div>
+
+        <Suspense fallback={null}>
+          <ConvitesPendentes />
+        </Suspense>
 
         <ConviteInstalarApp />
 

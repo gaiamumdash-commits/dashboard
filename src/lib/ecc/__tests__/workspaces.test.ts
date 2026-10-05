@@ -14,6 +14,16 @@ describe("escolherMembership", () => {
     expect(escolherMembership([novo, antigo], null, semLab)?.tenant_id).toBe("antigo");
   });
 
+  it("sem preferência, o workspace PRÓPRIO (owner) vence o convite mais antigo", () => {
+    const proprio = { ...m("proprio", "2026-10-06T00:00:00Z"), papel: "owner" };
+    expect(escolherMembership([antigo, proprio, novo], null, semLab)?.tenant_id).toBe("proprio");
+  });
+
+  it("preferência explícita vence até o workspace próprio", () => {
+    const proprio = { ...m("proprio", "2026-10-06T00:00:00Z"), papel: "owner" };
+    expect(escolherMembership([antigo, proprio, novo], "novo", semLab)?.tenant_id).toBe("novo");
+  });
+
   it("com preferência válida → a preferida (caso da Angeline depois de aceitar o convite)", () => {
     expect(escolherMembership([antigo, novo], "novo", semLab)?.tenant_id).toBe("novo");
   });

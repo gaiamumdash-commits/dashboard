@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { CampoSenha } from "@/components/campo-senha";
 
 export default function PaginaRedefinirSenha() {
   const router = useRouter();
@@ -44,26 +45,12 @@ export default function PaginaRedefinirSenha() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
             Nova senha
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none focus:border-gaiamum-primary"
-            />
+            <CampoSenha value={senha} onChange={setSenha} autoComplete="new-password" />
           </label>
 
           <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
             Confirmar senha
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={confirmacao}
-              onChange={(e) => setConfirmacao(e.target.value)}
-              className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2 text-gaiamum-text outline-none focus:border-gaiamum-primary"
-            />
+            <CampoSenha value={confirmacao} onChange={setConfirmacao} autoComplete="new-password" />
           </label>
 
           {erro && <p className="text-sm text-gaiamum-danger">{erro}</p>}

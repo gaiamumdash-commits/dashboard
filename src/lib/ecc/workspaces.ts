@@ -25,8 +25,11 @@ export type MembershipCandidata = {
  * Qual membership vale como "workspace atual":
  * 1. a preferida (cookie), se o usuário ainda faz parte dela e não é o
  *    sandbox do Lab;
- * 2. senão, a mais antiga que não é do Lab (comportamento de sempre);
- * 3. senão, a mais antiga de todas (nunca deixa o usuário sem nada).
+ * 2. senão, o workspace PRÓPRIO mais antigo (papel owner) — quem tem o seu
+ *    e também foi convidado pra outros abre no seu por padrão (caso da
+ *    Angeline: o convite antigo de setembro, vazio, era o mais antigo);
+ * 3. senão, a mais antiga que não é do Lab (comportamento de sempre);
+ * 4. senão, a mais antiga de todas (nunca deixa o usuário sem nada).
  */
 export function escolherMembership<T extends MembershipCandidata>(
   memberships: T[],
@@ -41,7 +44,7 @@ export function escolherMembership<T extends MembershipCandidata>(
     const preferida = reais.find((m) => m.tenant_id === tenantPreferido);
     if (preferida) return preferida;
   }
-  return reais[0] ?? ordenadas[0];
+  return reais.find((m) => m.papel === "owner") ?? reais[0] ?? ordenadas[0];
 }
 
 /** Workspaces que aparecem no seletor: todos menos o sandbox do Lab, na
