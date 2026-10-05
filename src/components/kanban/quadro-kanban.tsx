@@ -25,16 +25,45 @@ import {
   renomearColuna,
   reordenarColunas,
 } from "@/lib/ecc/actions";
+import {
+  FILTRO_QUADRO_VAZIO,
+  contarEmFoco,
+  filtrarTarefasDoQuadro,
+  filtroQuadroAtivo,
+  focoAtivoDoUsuario,
+  prazosDeHoje,
+  resumirProgressoQuadro,
+  type FiltroQuadro,
+} from "@/lib/ecc/kanban-cabecalho";
 import { PopupHiperfocoIniciar } from "@/components/kanban/popup-hiperfoco-iniciar";
+import { DetalheTarefa } from "@/components/kanban/detalhe-tarefa";
+import { CartaoTarefa } from "@/components/kanban/cartao-tarefa";
+import { BarraFerramentasQuadro, FaixaDoDia, ProgressoDoQuadro } from "@/components/kanban/cabecalho-quadro";
+import { ItemMenu, MenuSuspenso } from "@/components/ui/menu-suspenso";
+import {
+  IconeCheckCirculo,
+  IconeChevronBaixo,
+  IconeChevronCima,
+  IconeLua,
+  IconeNascerDoSol,
+  IconePontosVertical,
+  IconeRelogio,
+  IconeSol,
+} from "@/components/kanban/icones-kanban";
 
 const TURNOS: { valor: Turno; rotulo: string }[] = [
   { valor: "manha", rotulo: "🌅 Manhã" },
   { valor: "tarde", rotulo: "🌤️ Tarde" },
   { valor: "noite", rotulo: "🌙 Noite" },
 ];
-import { DetalheTarefa } from "@/components/kanban/detalhe-tarefa";
-import { CartaoTarefa } from "@/components/kanban/cartao-tarefa";
-import { BarraProgresso } from "@/components/ui/barra-progresso";
+
+/** Cabeçalho de cada turno dentro de "Hoje" (redesenho 2026-10-05) — os
+ * rótulos com emoji de `TURNOS` continuam sendo os do menu "Mover para...". */
+const CABECALHO_TURNO: Record<Turno, { nome: string; minusculo: string; icone: ReactNode }> = {
+  manha: { nome: "Manhã", minusculo: "manhã", icone: <IconeNascerDoSol className="h-3.5 w-3.5 text-gaiamum-warning" /> },
+  tarde: { nome: "Tarde", minusculo: "tarde", icone: <IconeSol className="h-3.5 w-3.5 text-gaiamum-warning" /> },
+  noite: { nome: "Noite", minusculo: "noite", icone: <IconeLua className="h-3.5 w-3.5 text-gaiamum-accent" /> },
+};
 
 // Zonas de auto-scroll durante um arrasto de cartão por TOQUE — pedido do
 // Fabio (2026-09-30): "rolagem automática perto do topo/rodapé" e "alcançar
@@ -63,6 +92,9 @@ export function QuadroKanban({
   souOwner,
   tarefasComContaGerada,
   colunaCompromissos,
+  faixaCompromisso,
+  rotuloHoje,
+  hojeChave,
 }: {
   projetoId: string;
   colunasIniciais: ColunaKanban[];
@@ -80,6 +112,13 @@ export function QuadroKanban({
   tarefasComContaGerada: string[];
   /** Coluna fixa à esquerda (compromissos do dia) — montada no servidor. */
   colunaCompromissos?: ReactNode;
+  /** Item "Próximo compromisso" da faixa do dia — Server Component em
+   * `<Suspense>`, montado na página (mesmo gate de acesso da coluna acima). */
+  faixaCompromisso?: ReactNode;
+  /** "domingo, 5 de outubro" — calculado no servidor (fuso Brasil). */
+  rotuloHoje: string;
+  /** "AAAA-MM-DD" de hoje no fuso Brasil — pra "prazo importante hoje". */
+  hojeChave: string;
 }) {
   const [tarefas, setTarefas] = useState(tarefasIniciais);
   const [tarefasIniciaisAnteriores, setTarefasIniciaisAnteriores] = useState(tarefasIniciais);
@@ -137,6 +176,10 @@ export function QuadroKanban({
   // coluna antes deste popup abrir, "Sem alarme" só fecha sem nenhuma
   // Server Action.
   const [tarefaIniciandoHiperfocoId, setTarefaIniciandoHiperfocoId] = useState<string | null>(null);
+  // Filtro VISUAL da toolbar (redesenho 2026-10-05) — só decide quais
+  // cartões aparecem; nunca altera `tarefas`, ordem nem banco. Não persiste:
+  // toda visita nova começa sem filtro.
+  const [filtro, setFiltro] = useState<FiltroQuadro>(FILTRO_QUADRO_VAZIO);
 
   // Mantém o estado local em dia com o que o servidor manda depois de um
   // router.refresh() (ex.: ao fechar o modal de detalhe da tarefa, que edita
@@ -746,8 +789,44 @@ export function QuadroKanban({
   const colunasAbertas = colunas.filter((c) => !c.concluido);
   const colunaFixa = colunas.find((c) => c.concluido) ?? null;
   const todasAsColunasNaOrdem = colunaFixa ? [...colunasAbertas, colunaFixa] : colunasAbertas;
-  const tarefasConcluidas = colunaFixa ? tarefas.filter((t) => t.coluna_id === colunaFixa.id).length : 0;
-  const percentualConcluido = tarefas.length > 0 ? Math.round((tarefasConcluidas / tarefas.length) * 100) : 0;
+  // Cabeçalho redesenhado (2026-10-05) — tudo derivado do estado local (o
+  // mesmo que os cartões usam), então acompanha cada movimento otimista.
+  const resumoProgresso = resumirProgressoQuadro(tarefas, colunaFixa?.id ?? null);
+  const emFoco = contarEmFoco(tarefas, colunas);
+  const prazosHoje = prazosDeHoje(tarefas, new Set(colunas.filter((c) => c.concluido).map((c) => c.id)), hojeChave);
+  const focoAtivo = focoAtivoDoUsuario(tarefas, usuarioAtualId);
+  const colunaDeFoco = colunas.find((c) => c.dispara_hiperfoco) ?? null;
+  const filtrando = filtroQuadroAtivo(filtro);
+  const idsVisiveis = filtrando
+    ? new Set(
+        filtrarTarefasDoQuadro(tarefas, filtro, {
+          tarefasDoUsuario: new Set(
+            tarefaMembrosIniciais.filter((m) => m.user_id === usuarioAtualId).map((m) => m.tarefa_id),
+          ),
+          etiquetasPorTarefa: tarefaEtiquetasIniciais.reduce((mapa, te) => {
+            const conjunto = mapa.get(te.tarefa_id) ?? new Set<string>();
+            conjunto.add(te.etiqueta_id);
+            return mapa.set(te.tarefa_id, conjunto);
+          }, new Map<string, Set<string>>()),
+        }).map((t) => t.id),
+      )
+    : null;
+
+  /** "+ Tarefa" da toolbar — sem fluxo próprio: leva até o campo "+
+   * Adicionar tarefa" da coluna de entrada (a 1ª aberta que não é "Hoje" nem
+   * a de foco — "Tarefas" num projeto padrão; senão a 1ª aberta) e foca
+   * nele. A criação em si continua sendo `criarCartaoOtimista`, igual a
+   * digitar direto no campo. */
+  function focarNovaTarefa() {
+    const alvo = colunasAbertas.find((c) => !c.hoje && !c.dispara_hiperfoco) ?? colunasAbertas[0];
+    if (!alvo) return;
+    const chave = alvo.dividida_em_turnos ? `${alvo.id}:manha` : alvo.id;
+    const campo = quadroRef.current?.querySelector<HTMLInputElement>(`[data-input-novo-cartao="${chave}"]`);
+    if (!campo) return;
+    campo.focus({ preventScroll: true });
+    campo.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    setColunaFocoId(alvo.id);
+  }
   // Opções do seletor/setas de navegação móvel (cabeçalho abaixo) — achado
   // real (2026-10-04): "Compromissos do dia" é um ReactNode solto (nunca
   // fez parte de `colunas`/`todasAsColunasNaOrdem`, que só tem
@@ -771,6 +850,11 @@ export function QuadroKanban({
 
   function renderColuna(coluna: ColunaKanban, ehFixa: boolean) {
     const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id).sort((a, b) => a.ordem - b.ordem);
+    // Filtro visual da toolbar: só decide o que aparece — a contagem total e
+    // todo cálculo de ordem (arrasto/"Mover para...") seguem sobre a lista
+    // completa (`tarefas`).
+    const visiveis = (lista: Tarefa[]) => (idsVisiveis ? lista.filter((t) => idsVisiveis.has(t.id)) : lista);
+    const rotuloContagem = (lista: Tarefa[]) => (idsVisiveis ? `${visiveis(lista).length}/${lista.length}` : `${lista.length}`);
     // A coluna de foco ("Em Desenvolvimento", `dispara_hiperfoco`) também é
     // travada (pedido do Fabio, 2026-10-03): não pode ser renomeada,
     // arrastada ou excluída — "o foco só vai entrar na coluna em
@@ -779,6 +863,7 @@ export function QuadroKanban({
     // só que esta continua aceitando cartões/cartão novo normalmente — só a
     // IDENTIDADE da coluna (nome/posição/existência) é fixa, não o conteúdo.
     const colunaTravada = ehFixa || coluna.dispara_hiperfoco;
+    const concluidoRecolhido = ehFixa && concluidosOcultos;
 
     function renderCartoes(tarefasDoEscopo: Tarefa[]) {
       return tarefasDoEscopo.map((tarefa) => {
@@ -818,7 +903,9 @@ export function QuadroKanban({
       return (
         <input
           name="titulo"
-          placeholder="+ Adicionar cartão"
+          // Âncora do botão "+ Tarefa" da toolbar (`focarNovaTarefa`).
+          data-input-novo-cartao={turno ? `${coluna.id}:${turno}` : coluna.id}
+          placeholder={turno ? `+ Adicionar tarefa para ${CABECALHO_TURNO[turno].minusculo}` : "+ Adicionar tarefa"}
           title="💡 GTD: se leva menos de 2 minutos, resolva agora — nem precisa virar cartão."
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
@@ -826,10 +913,30 @@ export function QuadroKanban({
             criarCartaoOtimista(coluna.id, e.currentTarget.value, turno);
             e.currentTarget.value = "";
           }}
-          className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-gaiamum-text-muted outline-none transition hover:border-gaiamum-border focus:border-gaiamum-primary focus:bg-gaiamum-surface-raised focus:text-gaiamum-text"
+          className={`w-full rounded-lg border px-2.5 py-1.5 text-[13px] text-gaiamum-text-muted outline-none transition placeholder:text-gaiamum-text-muted/90 focus:border-gaiamum-primary focus:bg-gaiamum-surface-raised focus:text-gaiamum-text ${
+            turno
+              ? "border-gaiamum-border/70 bg-gaiamum-surface-raised/40 hover:border-gaiamum-border-forte"
+              : "border-transparent bg-transparent hover:border-gaiamum-border hover:bg-gaiamum-surface-raised/40"
+          }`}
         />
       );
     }
+
+    // Ícone do cabeçalho pela IDENTIDADE da coluna (flags), nunca pelo nome.
+    const iconeColuna = ehFixa ? (
+      <IconeCheckCirculo className="h-[18px] w-[18px] text-gaiamum-success" />
+    ) : coluna.dispara_hiperfoco ? (
+      <span className="text-base leading-none">🎯</span>
+    ) : coluna.hoje ? (
+      <IconeSol className="h-[18px] w-[18px] text-gaiamum-warning" />
+    ) : (
+      <IconeRelogio className="h-[18px] w-[18px] text-gaiamum-text-muted" />
+    );
+
+    // Larguras do mockup aprovado: "Hoje" um pouco mais larga (é o centro do
+    // dia), Concluído recolhido estreito (não cresce à toa); as demais —
+    // inclusive colunas criadas pela pessoa — no tamanho padrão.
+    const larguraDesktop = concluidoRecolhido ? "sm:w-44" : coluna.hoje ? "sm:w-60" : "sm:w-56";
 
     return (
       <div
@@ -853,28 +960,22 @@ export function QuadroKanban({
         }}
         // Largura: 85vw (quase a tela toda) só em retrato estreito (<640px);
         // a partir de 640px (`sm:`) — que já cobre celular DEITADO, não só
-        // desktop — volta a 256px fixo, permitindo várias colunas lado a
-        // lado ("ao deitar, aproveitar a largura pra mostrar mais colunas").
+        // desktop — largura fixa por tipo de coluna (ver `larguraDesktop`),
+        // várias lado a lado.
         // Altura: SEMPRE limitada com scroll próprio, via `style.maxHeight`
         // (não um arbitrary value do Tailwind baseado em `var()` — isso
         // confunde o scanner do Tailwind/Lightning CSS e gera warning de
-        // build) —
-        // o NIVELAMENTO entre colunas ("todas na altura da maior", pedido
-        // de 2026-10-01) não é calculado em JS, é o container pai
-        // (`display:grid`, `items-stretch` a partir de `sm:`) esticando
-        // cada coluna até a altura da linha — puramente CSS, recalculado
-        // automaticamente pelo navegador a cada render (criar/mover/excluir
-        // cartão), sem nenhum código adicional de recálculo. Essa coluna
-        // continua com overflow-y-auto própria pra nunca ultrapassar o teto
-        // de altura, mesmo esticada — é esse teto que vira "a altura
-        // nivelada" quando pelo menos 1 coluna tem conteúdo suficiente pra
-        // alcançá-lo (ver `--altura-maxima-coluna-kanban` em globals.css).
-        className={`flex w-[85vw] max-w-sm shrink-0 snap-center flex-col gap-2.5 overflow-y-auto rounded-xl border border-gaiamum-border bg-gaiamum-surface p-3 transition sm:w-64 sm:snap-align-none ${
-          colunaArrastadaId === coluna.id ? "opacity-50" : ""
-        } ${colunaAlvoToqueId === coluna.id ? "ring-2 ring-gaiamum-primary" : ""}`}
+        // build). O NIVELAMENTO entre colunas ("todas na altura da maior",
+        // pedido de 2026-10-01) é o container pai (`display:grid`,
+        // `items-stretch` a partir de `sm:`) esticando cada coluna — CSS
+        // puro, ver `--altura-maxima-coluna-kanban` em globals.css.
+        // "Hoje" com borda azul mais evidente (destaque do mockup aprovado).
+        className={`flex w-[85vw] max-w-sm shrink-0 snap-center flex-col gap-2 overflow-y-auto rounded-xl bg-gaiamum-surface p-2.5 transition sm:snap-align-none ${larguraDesktop} ${
+          coluna.hoje ? "border-2 border-gaiamum-primary/80 shadow-lg shadow-gaiamum-primary/10" : "border border-gaiamum-border"
+        } ${colunaArrastadaId === coluna.id ? "opacity-50" : ""} ${colunaAlvoToqueId === coluna.id ? "ring-2 ring-gaiamum-primary" : ""}`}
         style={{ maxHeight: "var(--altura-maxima-coluna-kanban)" }}
       >
-        <div className="sticky top-0 z-10 -mx-3 -mt-3 flex items-center justify-between gap-2 bg-gaiamum-surface px-3 pt-3 pb-1.5">
+        <div className="sticky top-0 z-10 -mx-2.5 -mt-2.5 flex items-center gap-1.5 bg-gaiamum-surface px-3 pb-1.5 pt-3">
           {colunaEditandoId === coluna.id ? (
             <input
               name="nome"
@@ -896,101 +997,119 @@ export function QuadroKanban({
               }}
               onDragEnd={() => setColunaArrastadaId(null)}
               onClick={() => !colunaTravada && setColunaEditandoId(coluna.id)}
-              className={`text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted ${
-                colunaTravada ? "" : "cursor-grab hover:text-gaiamum-text active:cursor-grabbing"
+              className={`flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold text-gaiamum-text ${
+                colunaTravada ? "" : "cursor-grab hover:text-gaiamum-primary active:cursor-grabbing"
               }`}
               title={colunaTravada ? undefined : "Arraste pra reordenar, clique pra renomear"}
             >
-              {coluna.nome} <span className="text-gaiamum-text">({tarefasDaColuna.length})</span>
-              {coluna.hoje && (
-                <span
-                  className="ml-1 rounded-full bg-gaiamum-primary/15 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-gaiamum-primary"
-                  title="Coluna Hoje — só ela pode ser dividida em turnos, e é onde novas colunas nascem"
-                >
-                  📌 Hoje
-                </span>
-              )}
-              {coluna.dispara_hiperfoco && (
-                <span
-                  className="ml-1 rounded-full bg-gaiamum-warning/15 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-gaiamum-warning"
-                  title="Coluna de foco fixa — mover um cartão pra cá oferece o cronômetro de hiperfoco. Não pode ser renomeada, movida ou apagada."
-                >
-                  🎯 Foco
-                </span>
-              )}
+              <span aria-hidden className="flex shrink-0 items-center">
+                {iconeColuna}
+              </span>
+              <span className="truncate">{coluna.nome}</span>
+              <span className="shrink-0 font-medium text-gaiamum-text-muted">({rotuloContagem(tarefasDaColuna)})</span>
             </h2>
           )}
-          {!ehFixa && (
-            <div className="flex shrink-0 items-center gap-2">
-              {colunaEditandoId !== coluna.id && !coluna.hoje && (
-                <button
-                  type="button"
-                  onClick={() => definirColunaHojeOtimista(coluna.id)}
-                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-primary"
-                  title='Marcar esta como a coluna "Hoje" — só ela pode dividir em turnos, e é onde novas colunas nascem'
-                >
-                  Definir Hoje
-                </button>
-              )}
-              {/* "Definir foco" existiu aqui (deixava mover manualmente qual
-                  coluna dispara o hiperfoco) — removido por pedido do Fabio
-                  (2026-10-03): o foco agora é fixo em "Em Desenvolvimento",
-                  sem jeito de transferir pra outra coluna pela interface. */}
-              {/* "Somente a coluna Hoje deve oferecer a ação de dividir em
-                  turnos" (2026-10-01) — regra aplicada aqui (esconde o
-                  controle) E no servidor (`alternarDivisaoEmTurnos` rejeita
-                  a chamada; o CHECK constraint da migration 0048 rejeita a
-                  escrita direta no banco mesmo contornando a Server Action). */}
-              {colunaEditandoId !== coluna.id && coluna.hoje && (
-                <button
-                  type="button"
-                  onClick={() => alternarDivisaoTurnosOtimista(coluna.id, !coluna.dividida_em_turnos)}
-                  className={`text-xs ${
-                    coluna.dividida_em_turnos
-                      ? "text-gaiamum-primary hover:text-gaiamum-primary-dark"
-                      : "text-gaiamum-text-muted hover:text-gaiamum-text"
-                  }`}
-                  title={coluna.dividida_em_turnos ? "Desfazer divisão em Manhã/Tarde/Noite" : "Dividir em Manhã/Tarde/Noite"}
-                >
-                  ▥
-                </button>
-              )}
-              {podeExcluirTarefa && colunaEditandoId !== coluna.id && !coluna.dispara_hiperfoco && (
-                <button
-                  type="button"
-                  onClick={() => apagarColuna(coluna.id)}
-                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-                  title="Excluir coluna"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+          {coluna.hoje && colunaEditandoId !== coluna.id && (
+            <span
+              className="shrink-0 rounded-md border border-gaiamum-primary/40 bg-gaiamum-primary/15 px-1.5 py-0.5 text-[11px] font-semibold text-gaiamum-primary"
+              title="Coluna Hoje — só ela pode ser dividida em turnos, e é onde novas colunas nascem"
+            >
+              Hoje
+            </span>
           )}
           {/* Exclusivo da coluna "Concluído" (pedido do Fabio, 2026-10-01):
               ela só cresce ao longo de um projeto — some os cartões (sem
               apagar nada) pra ela parar de "puxar" a altura das outras
-              colunas e devolver o foco pro que ainda falta fazer; um toque
-              mostra tudo de novo. */}
+              colunas; um toque mostra tudo de novo. */}
           {ehFixa && tarefasDaColuna.length > 0 && (
             <button
               type="button"
               onClick={() => setConcluidosOcultos((atual) => !atual)}
-              className="shrink-0 text-xs text-gaiamum-text-muted hover:text-gaiamum-primary"
+              aria-label={concluidosOcultos ? "Mostrar os cartões concluídos" : "Ocultar os cartões concluídos"}
               title={
                 concluidosOcultos
                   ? "Mostrar os cartões concluídos (só pra conferência)"
                   : "Ocultar os cartões concluídos de novo"
               }
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gaiamum-text-muted transition hover:bg-gaiamum-surface-raised hover:text-gaiamum-text"
             >
-              {concluidosOcultos ? "👁 Mostrar" : "🙈 Ocultar"}
+              {concluidosOcultos ? <IconeChevronBaixo /> : <IconeChevronCima />}
             </button>
+          )}
+          {/* Ações da coluna no menu ⋮ (antes eram textos/ícones soltos no
+              cabeçalho) — mesmas ações, mesmas condições de exibição:
+              "Definir Hoje" (nome mantido — "Planejar hoje" mudaria o
+              sentido: isto marca QUAL coluna é a "Hoje", não planeja o dia),
+              dividir em turnos (só na "Hoje" — regra aplicada também no
+              servidor e por CHECK constraint, migration 0048), excluir (só
+              quem pode excluir; nunca a de foco). "Definir foco" segue
+              removido (pedido do Fabio, 2026-10-03). */}
+          {!ehFixa && colunaEditandoId !== coluna.id && (
+            <MenuSuspenso
+              rotulo={`Ações da coluna ${coluna.nome}`}
+              icone={<IconePontosVertical className="h-4 w-4" />}
+              classeBotao="h-7 w-7"
+              itens={(fechar) => (
+                <>
+                  {!colunaTravada && (
+                    <ItemMenu
+                      onClick={() => {
+                        fechar();
+                        setColunaEditandoId(coluna.id);
+                      }}
+                    >
+                      Renomear coluna
+                    </ItemMenu>
+                  )}
+                  {coluna.hoje ? (
+                    <ItemMenu
+                      ativo={coluna.dividida_em_turnos}
+                      onClick={() => {
+                        fechar();
+                        alternarDivisaoTurnosOtimista(coluna.id, !coluna.dividida_em_turnos);
+                      }}
+                    >
+                      ▥ {coluna.dividida_em_turnos ? "Desfazer divisão em turnos" : "Dividir em Manhã/Tarde/Noite"}
+                    </ItemMenu>
+                  ) : (
+                    <ItemMenu
+                      onClick={() => {
+                        fechar();
+                        definirColunaHojeOtimista(coluna.id);
+                      }}
+                    >
+                      Definir Hoje
+                    </ItemMenu>
+                  )}
+                  {podeExcluirTarefa && !coluna.dispara_hiperfoco && (
+                    <ItemMenu
+                      perigo
+                      onClick={() => {
+                        fechar();
+                        apagarColuna(coluna.id);
+                      }}
+                    >
+                      Excluir coluna
+                    </ItemMenu>
+                  )}
+                </>
+              )}
+            />
           )}
         </div>
 
+        {coluna.dispara_hiperfoco && (
+          <span
+            className="-mt-0.5 inline-flex items-center gap-1 self-start rounded-md border border-gaiamum-warning/40 bg-gaiamum-warning/15 px-2 py-0.5 text-[11px] font-semibold text-gaiamum-warning"
+            title="Coluna de foco fixa — mover um cartão pra cá oferece o cronômetro de hiperfoco. Não pode ser renomeada, movida ou apagada."
+          >
+            🎯 Foco
+          </span>
+        )}
+
         {coluna.dividida_em_turnos ? (
           <div className="flex flex-col gap-3">
-            {TURNOS.map(({ valor, rotulo }) => {
+            {TURNOS.map(({ valor }) => {
               const tarefasDoTurno = tarefasDaColuna.filter((t) => (t.turno ?? null) === valor);
               return (
                 <div
@@ -1003,32 +1122,46 @@ export function QuadroKanban({
                     const tarefaId = e.dataTransfer.getData("text/tarefa-id");
                     if (tarefaId) moverPara(tarefaId, coluna.id, valor);
                   }}
-                  className="flex flex-col gap-2 rounded-lg border border-dashed border-gaiamum-border p-2"
+                  className="flex flex-col gap-1.5 rounded-lg"
                 >
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-                    {rotulo} <span className="text-gaiamum-text">({tarefasDoTurno.length})</span>
+                  <h3 className="flex items-center gap-1.5 px-0.5 text-[11px] font-semibold uppercase tracking-wide text-gaiamum-text-muted">
+                    {CABECALHO_TURNO[valor].icone}
+                    {CABECALHO_TURNO[valor].nome} <span>({rotuloContagem(tarefasDoTurno)})</span>
                   </h3>
-                  {renderCartoes(tarefasDoTurno)}
+                  {renderCartoes(visiveis(tarefasDoTurno))}
                   {renderInputNovoCartao(valor)}
                 </div>
               );
             })}
           </div>
-        ) : ehFixa && concluidosOcultos && tarefasDaColuna.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setConcluidosOcultos(false)}
-            className="rounded-lg border border-dashed border-gaiamum-border py-3 text-xs text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-primary"
-          >
-            {tarefasDaColuna.length} cartão(ões) oculto(s) — toque pra ver
-          </button>
+        ) : concluidoRecolhido ? (
+          tarefasDaColuna.length > 0 ? (
+            <div className="flex flex-col gap-3 px-0.5 pt-1">
+              <p className="flex items-center gap-2 text-sm text-gaiamum-text">
+                <span aria-hidden>🎉</span>
+                <span>
+                  <span className="font-semibold">{tarefasDaColuna.length}</span>{" "}
+                  {tarefasDaColuna.length === 1 ? "tarefa concluída" : "tarefas concluídas"}
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setConcluidosOcultos(false)}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised/50 py-2 text-xs font-medium text-gaiamum-text transition hover:border-gaiamum-primary hover:text-gaiamum-primary"
+              >
+                Mostrar cartões
+                <IconeChevronBaixo className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <p className="px-0.5 pt-1 text-xs text-gaiamum-text-muted">Nenhuma tarefa concluída ainda.</p>
+          )
         ) : (
           <>
-            {renderCartoes(tarefasDaColuna)}
+            {renderCartoes(visiveis(tarefasDaColuna))}
             {/* Concluído é uma coluna só de "chegada" (pedido do Fabio,
                 2026-10-01): nela nunca se cria cartão novo direto, só se
-                recebe por arrasto/"Mover para...". Pra criar, a pessoa cria
-                em outra coluna e transporta pra cá. Reforçado também no
+                recebe por arrasto/"Mover para...". Reforçado também no
                 servidor (criarTarefa) e por trigger no banco (migration
                 0050) — não é só esconder este campo. */}
             {!ehFixa && renderInputNovoCartao(null)}
@@ -1049,6 +1182,39 @@ export function QuadroKanban({
     // explícito (o padrão do flexbox é `min-width: auto`, que deixa o
     // conteúdo ditar o tamanho mínimo).
     <div className="min-w-0">
+      {/* Cabeçalho do quadro (redesenho 2026-10-05, mockup aprovado):
+          progresso → faixa do dia → toolbar. Compacto de propósito — o
+          quadro continua sendo o protagonista da tela. */}
+      <div className="mb-4 flex flex-col gap-4">
+        <ProgressoDoQuadro resumo={resumoProgresso} emFoco={emFoco} />
+        <FaixaDoDia
+          rotuloHoje={rotuloHoje}
+          slotCompromisso={faixaCompromisso ?? null}
+          prazos={prazosHoje}
+          foco={focoAtivo}
+          aoIrParaFoco={() => colunaDeFoco && irParaColuna(colunaDeFoco.id)}
+        />
+        <BarraFerramentasQuadro
+          filtro={filtro}
+          aoMudarFiltro={setFiltro}
+          etiquetasDoTenant={etiquetasDoTenant}
+          aoNovaTarefa={focarNovaTarefa}
+          aoAbrirVisaoGeral={() => setVisaoGeralAberta(true)}
+        />
+        {filtrando && idsVisiveis && (
+          <p className="-mt-1 text-xs text-gaiamum-text-muted">
+            Mostrando {idsVisiveis.size} de {tarefas.length} cartões.{" "}
+            <button
+              type="button"
+              onClick={() => setFiltro(FILTRO_QUADRO_VAZIO)}
+              className="font-medium text-gaiamum-primary underline-offset-2 hover:underline"
+            >
+              Limpar filtros
+            </button>
+          </p>
+        )}
+      </div>
+
       {/* Cabeçalho de navegação — celular (colunas empilhadas por
           scroll-snap) e também celular/tablet EM PAISAGEM. "Mostrar título,
           contagem e indicação da coluna atual", "seletor de coluna como
@@ -1183,7 +1349,7 @@ export function QuadroKanban({
           isso. */}
       <div
         ref={quadroRef}
-        className="grid min-w-0 auto-cols-[85vw] grid-flow-col items-start justify-start gap-3 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory sm:auto-cols-[16rem] sm:items-stretch sm:snap-none"
+        className="grid min-w-0 auto-cols-[85vw] grid-flow-col items-start justify-start gap-3 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory sm:auto-cols-max sm:items-stretch sm:snap-none"
       >
         {/* `key` + `display:contents` (não afeta o layout de grid) — achado
             incidental pré-existente (não introduzido nesta rodada): React
@@ -1248,11 +1414,9 @@ export function QuadroKanban({
         )}
       </div>
 
-      {tarefas.length > 0 && (
-        <div className="mt-6 max-w-md">
-          <BarraProgresso percentual={percentualConcluido} rotulo={`Cartões concluídos (${tarefasConcluidas}/${tarefas.length})`} />
-        </div>
-      )}
+      {/* A barra "Cartões concluídos (X/Y)" que ficava aqui no rodapé subiu
+          pro cabeçalho (`ProgressoDoQuadro`, mesma fórmula) — redesenho
+          2026-10-05: "praticamente escondida na parte inferior". */}
 
       {arrastoToque && (
         <div

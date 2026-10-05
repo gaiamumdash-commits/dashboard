@@ -1,4 +1,4 @@
-import { listarCompromissosDoDia } from "@/lib/ecc/agenda";
+import { listarCompromissosDoDiaNaRequisicao } from "@/lib/ecc/agenda-requisicao";
 import { listarContasDoDia } from "@/lib/ecc/financeiro";
 import { ID_COLUNA_COMPROMISSOS } from "@/lib/ecc/kanban";
 import { chaveDiaAtual } from "@/lib/ecc/semana";
@@ -25,7 +25,9 @@ import { ColunaCompromissosDoDiaCliente } from "@/components/kanban/coluna-compr
 export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }) {
   const chaveHoje = chaveDiaAtual();
   const [resultado, contasDoDia] = await Promise.all([
-    listarCompromissosDoDia(tenantId, chaveHoje),
+    // Deduplicada na requisição — a faixa do dia (`FaixaProximoCompromisso`)
+    // lê o mesmo resultado sem uma 2ª chamada ao Google.
+    listarCompromissosDoDiaNaRequisicao(tenantId, chaveHoje),
     listarContasDoDia(tenantId, chaveHoje),
   ]);
 
@@ -44,9 +46,11 @@ export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }
     // sem isso, esta coluna fixa não participava do nivelamento por
     // conteúdo real e carregava um "chão" artificial mesmo vazia.
     // `snap-center` + `data-coluna-card` — ver achado no comentário acima.
+    // `sm:w-52` — mais estreita que as colunas de trabalho (mockup aprovado,
+    // 2026-10-05: "não deve dominar horizontalmente a página").
     <div
       data-coluna-card={ID_COLUNA_COMPROMISSOS}
-      className="flex w-[85vw] max-w-sm shrink-0 snap-center flex-col gap-2.5 overflow-y-auto rounded-xl border border-gaiamum-primary/40 bg-gaiamum-surface p-3 sm:w-64 sm:snap-align-none"
+      className="flex w-[85vw] max-w-sm shrink-0 snap-center flex-col gap-2 overflow-y-auto rounded-xl border border-gaiamum-border bg-gaiamum-surface p-2.5 sm:w-52 sm:snap-align-none"
       style={{ maxHeight: "var(--altura-maxima-coluna-kanban)" }}
     >
       <ColunaCompromissosDoDiaCliente

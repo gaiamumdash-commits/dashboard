@@ -7,11 +7,30 @@ import { listarMembrosComAcessoAoProjeto, obterPapelAtual, temAcessoCompleto } f
 import type { Anexo, ChecklistItem, ColunaKanban, Projeto, Tarefa, TarefaEtiqueta, TarefaMembro } from "@/lib/ecc/tipos";
 import { listarEtiquetasDoTenant } from "@/lib/ecc/etiquetas";
 import { contarMetasSmart } from "@/lib/ecc/metas";
-import { CLASSE_FUNDO_QUADRO } from "@/lib/ecc/kanban";
+import { CLASSE_FUNDO_QUADRO, hojeISOBrasil } from "@/lib/ecc/kanban";
+import { calcularSaudeProjeto } from "@/lib/ecc/painel-geral";
 import { QuadroKanban } from "@/components/kanban/quadro-kanban";
 import { ColunaCompromissosDoDia } from "@/components/kanban/coluna-compromissos-do-dia";
-import { BotaoFreeze } from "@/components/kanban/botao-freeze";
+import { FaixaProximoCompromisso, FaixaProximoCompromissoCarregando } from "@/components/kanban/faixa-proximo-compromisso";
+import { MenuAcoesProjeto } from "@/components/kanban/menu-acoes-projeto";
+import { CLASSE_SAUDE, ROTULO_SAUDE } from "@/components/painel/projetos-em-foco";
 import { MenuLateral } from "@/components/layout/menu-lateral";
+
+/** Botão de ação do cabeçalho do projeto (Páginas, Visão 360°, Decisões,
+ * Indicadores) — visual do mockup aprovado do Kanban (2026-10-05). */
+function LinkAcaoProjeto({ href, icone, children }: { href: string; icone: string; children: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gaiamum-border bg-gaiamum-surface px-2.5 text-[13px] font-medium text-gaiamum-text transition hover:border-gaiamum-primary sm:h-9 sm:px-3"
+    >
+      <span aria-hidden className="text-sm leading-none">
+        {icone}
+      </span>
+      {children}
+    </Link>
+  );
+}
 
 export default async function PaginaTarefas({ params }: { params: Promise<{ id: string }> }) {
   const { id: projetoId } = await params;
@@ -110,6 +129,24 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
   }
   const tarefasComContaGerada = (contasGeradas ?? []).map((c) => c.tarefa_id as string);
 
+  // Selo de saúde ("No caminho"/"Atenção") — regra que JÁ existe e já é
+  // usada no Painel geral (`calcularSaudeProjeto`: "Atenção" com pelo menos
+  // 1 tarefa aberta atrasada). Nenhuma regra nova pra este redesenho.
+  const colunasConcluidoIds = new Set(((colunas as ColunaKanban[]) ?? []).filter((c) => c.concluido).map((c) => c.id));
+  const saude = calcularSaudeProjeto(listaTarefas, colunasConcluidoIds);
+  const hojeChave = hojeISOBrasil();
+  // "Segunda, 5 de Outubro" — formato do mockup aprovado (dia da semana sem
+  // "-feira", dia e mês com inicial maiúscula, "de" minúsculo).
+  const partesHoje = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).formatToParts(new Date(`${hojeChave}T12:00:00Z`));
+  const parteHoje = (tipo: Intl.DateTimeFormatPartTypes) => partesHoje.find((p) => p.type === tipo)?.value ?? "";
+  const maiuscula = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1);
+  const rotuloHoje = `${maiuscula(parteHoje("weekday").replace("-feira", ""))}, ${parteHoje("day")} de ${maiuscula(parteHoje("month"))}`;
+
   return (
     // `overflow-x-hidden` — rede de segurança contra rolagem horizontal da
     // PÁGINA INTEIRA (achado real de teste, Playwright 390px): mesmo com
@@ -141,64 +178,60 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
           quadro é feito pra usar toda a largura disponível: mais colunas
           visíveis ao mesmo tempo lado a lado em vez de sobrar espaço vazio
           nas bordas numa tela grande. */}
-      <main className="mx-auto w-full min-w-0 flex-1 px-4 py-10">
-        <div className={`-mx-4 -mt-10 mb-8 h-2 sm:-mx-4 ${CLASSE_FUNDO_QUADRO[(projeto as Projeto).cor_fundo]}`} />
+      <main className="mx-auto w-full min-w-0 flex-1 px-4 pb-8 pt-5 sm:px-6">
+        {/* Cor de fundo escolhida nas Configurações do quadro — mantida como
+            filete fino no topo (redesenho 2026-10-05: o mockup não tem a
+            faixa grossa, mas a cor continua sendo o sinal visual do projeto). */}
+        <div className={`-mx-4 -mt-5 mb-4 h-1 sm:-mx-6 ${CLASSE_FUNDO_QUADRO[(projeto as Projeto).cor_fundo]}`} />
 
         <Link href="/projetos" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">
           ← Projetos
         </Link>
 
-        <div className="mt-2 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-semibold text-gaiamum-text">{(projeto as Projeto).nome}</h1>
+        {/* `lg:flex-nowrap`: ações na mesma linha do título, à direita, como
+            no mockup — se o título for longo, é ele que quebra de linha. No
+            celular as ações ficam compactas (h-8) logo abaixo do título. */}
+        <div className="mt-1 flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
+          <div className="min-w-0 lg:flex-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="text-[1.375rem] font-bold leading-tight text-gaiamum-text sm:text-[1.625rem] 2xl:text-[2rem]">
+                {(projeto as Projeto).nome}
+              </h1>
+              <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium sm:text-xs ${CLASSE_SAUDE[saude]}`}>
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />
+                {ROTULO_SAUDE[saude]}
+              </span>
+            </div>
             {(projeto as Projeto).descricao && (
-              <p className="mt-1 text-gaiamum-text-muted">{(projeto as Projeto).descricao}</p>
+              <p className="mt-0.5 text-sm text-gaiamum-text-muted">{(projeto as Projeto).descricao}</p>
             )}
           </div>
-          <div className="flex shrink-0 flex-wrap items-start gap-2">
-            <Link
-              href={`/projetos/${projetoId}/paginas`}
-              className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-            >
-              📄 Páginas
-            </Link>
+          {/* Mesmas regras de exibição de antes: Páginas pra todos; Visão
+              360°/Decisões/Indicadores só owner; Freeze/Configurações (agora
+              no ⋯) só owner ou gestor do projeto. O servidor/RLS continua
+              sendo a segurança real — isto só esconde botões. */}
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 lg:mt-1.5 lg:flex-nowrap">
+            <LinkAcaoProjeto href={`/projetos/${projetoId}/paginas`} icone="📄">
+              Páginas
+            </LinkAcaoProjeto>
             {papelAtual === "owner" && (
               <>
-                <Link
-                  href={`/projetos/${projetoId}/visao-360`}
-                  className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-                >
-                  🧭 Visão 360°
-                </Link>
-                <Link
-                  href={`/projetos/${projetoId}/decisoes`}
-                  className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-                >
-                  📋 Decisões
-                </Link>
-                <Link
-                  href={`/projetos/${projetoId}/indicadores`}
-                  className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-                >
-                  📊 Indicadores
-                </Link>
+                <LinkAcaoProjeto href={`/projetos/${projetoId}/visao-360`} icone="🧭">
+                  Visão 360°
+                </LinkAcaoProjeto>
+                <LinkAcaoProjeto href={`/projetos/${projetoId}/decisoes`} icone="📋">
+                  Decisões
+                </LinkAcaoProjeto>
+                <LinkAcaoProjeto href={`/projetos/${projetoId}/indicadores`} icone="📊">
+                  Indicadores
+                </LinkAcaoProjeto>
               </>
             )}
-            {podeExcluirTarefa && (
-              <>
-                <BotaoFreeze projetoId={projetoId} />
-                <Link
-                  href={`/projetos/${projetoId}/configuracoes`}
-                  className="rounded-lg border border-gaiamum-border px-3 py-1.5 text-sm text-gaiamum-text-muted hover:border-gaiamum-primary hover:text-gaiamum-text"
-                >
-                  ⚙ Configurações
-                </Link>
-              </>
-            )}
+            {podeExcluirTarefa && <MenuAcoesProjeto projetoId={projetoId} />}
           </div>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-4">
           <QuadroKanban
             projetoId={projetoId}
             colunasIniciais={(colunas as ColunaKanban[]) ?? []}
@@ -221,6 +254,15 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
                 </Suspense>
               ) : null
             }
+            faixaCompromisso={
+              acessoCompleto ? (
+                <Suspense fallback={<FaixaProximoCompromissoCarregando />}>
+                  <FaixaProximoCompromisso tenantId={tenantId} />
+                </Suspense>
+              ) : null
+            }
+            rotuloHoje={rotuloHoje}
+            hojeChave={hojeChave}
           />
         </div>
       </main>

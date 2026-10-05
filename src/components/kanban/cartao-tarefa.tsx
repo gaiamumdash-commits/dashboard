@@ -14,11 +14,86 @@ import type {
   TarefaMembro,
   Turno,
 } from "@/lib/ecc/tipos";
-import { CLASSE_COR_ETIQUETA, CLASSE_PRAZO, estadoHiperfoco, minutosRestantesHiperfoco, tocarAlarmeHiperfoco, urgenciaDoPrazo } from "@/lib/ecc/kanban";
+import {
+  CLASSE_COR_ETIQUETA,
+  CLASSE_PRAZO,
+  estadoHiperfoco,
+  tocarAlarmeHiperfoco,
+  urgenciaDoPrazo,
+  type EstadoHiperfoco,
+} from "@/lib/ecc/kanban";
+import { formatarCronometro, fracaoDecorridaHiperfoco, segundosRestantesHiperfoco } from "@/lib/ecc/kanban-cabecalho";
 import { atualizarTituloTarefa, encerrarHiperfoco, renovarHiperfoco } from "@/lib/ecc/actions";
 import { AvatarIniciais } from "@/components/avatar-iniciais";
 import { MoverParaMenu } from "@/components/kanban/mover-para-menu";
 import { PopupHiperfocoVencido } from "@/components/kanban/popup-hiperfoco-vencido";
+import { ItemMenu, MenuSuspenso } from "@/components/ui/menu-suspenso";
+import {
+  IconeAlca,
+  IconeAmpulheta,
+  IconeBandeira,
+  IconeChecklist,
+  IconeClipe,
+  IconePlay,
+  IconePontos,
+} from "@/components/kanban/icones-kanban";
+
+const CLASSE_CHIP = "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium leading-4";
+const CLASSE_CHIP_NEUTRO = `${CLASSE_CHIP} border-gaiamum-border bg-gaiamum-surface text-gaiamum-text-muted`;
+
+/** Área do cronômetro de hiperfoco dentro do cartão (visual do mockup
+ * aprovado, 2026-10-05: "18:42 restantes" + barrinha). Só EXIBE o estado do
+ * cronômetro que já existe (migration 0052) — o estado em si (metade/
+ * esgotado), o alarme e o popup continuam sendo decididos pelo
+ * `CartaoTarefa` com o intervalo de 15s de sempre. Este componente tem o
+ * próprio relógio de 1s só pra contagem mm:ss andar suave, e ele só existe
+ * enquanto há um cronômetro ativo — nenhum outro cartão re-renderiza. */
+function AreaCronometroFoco({
+  iniciadoEm,
+  minutos,
+  estado,
+}: {
+  iniciadoEm: string;
+  minutos: number;
+  estado: EstadoHiperfoco;
+}) {
+  const [, setTique] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTique((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const segundos = segundosRestantesHiperfoco(iniciadoEm, minutos);
+  const fracao = fracaoDecorridaHiperfoco(iniciadoEm, minutos);
+  const tom =
+    estado === "esgotado"
+      ? { borda: "border-gaiamum-danger/60", icone: "bg-gaiamum-danger", barra: "bg-gaiamum-danger", texto: "text-gaiamum-danger" }
+      : estado === "metade"
+        ? { borda: "border-gaiamum-warning/60", icone: "bg-gaiamum-warning", barra: "bg-gaiamum-warning", texto: "text-gaiamum-warning" }
+        : { borda: "border-gaiamum-border", icone: "bg-gaiamum-primary", barra: "bg-gaiamum-primary", texto: "text-gaiamum-text" };
+
+  return (
+    <div
+      className={`mt-2 flex items-center gap-2.5 rounded-lg border bg-gaiamum-surface px-2.5 py-2 ${tom.borda}`}
+      title="Cronômetro de foco"
+    >
+      <span aria-hidden className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white ${tom.icone}`}>
+        <IconePlay className="ml-0.5 h-3.5 w-3.5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-baseline gap-1.5">
+          <span className={`text-lg font-semibold leading-none tabular-nums ${tom.texto}`}>
+            {estado === "esgotado" ? "00:00" : formatarCronometro(segundos)}
+          </span>
+          <span className="text-xs text-gaiamum-text-muted">{estado === "esgotado" ? "esgotado" : "restantes"}</span>
+        </p>
+        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-gaiamum-surface-raised">
+          <div className={`h-full rounded-full transition-[width] duration-1000 ${tom.barra}`} style={{ width: `${Math.round(fracao * 100)}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const TURNOS: { valor: Turno; rotulo: string }[] = [
   { valor: "manha", rotulo: "🌅 Manhã" },
@@ -311,6 +386,8 @@ export function CartaoTarefa({
     onAbrir();
   }
 
+  const temCronometro = Boolean(tarefa.hiperfoco_iniciado_em && tarefa.tempo_estimado_min);
+
   return (
     <div
       ref={cardRef}
@@ -336,8 +413,14 @@ export function CartaoTarefa({
         aoSoltarSobre(tarefaArrastadaId, posicaoDrop ?? "depois");
         setPosicaoDrop(null);
       }}
-      className={`relative cursor-grab overflow-visible rounded-xl border-2 bg-gaiamum-surface-raised shadow-sm transition hover:shadow-md active:cursor-grabbing ${
-        souResponsavel ? "border-gaiamum-border-forte border-l-4 border-l-gaiamum-primary" : "border-gaiamum-border-forte"
+      // Redesenho 2026-10-05 (mockup aprovado): cartão mais leve — borda de
+      // 1px no tom da coluna em vez da borda dupla forte, fundo um nível
+      // acima da coluna. Toda a semântica de borda continua a mesma:
+      // responsável (traço azul à esquerda), indicador de drop (traço azul
+      // em cima/embaixo) e cronômetro (azul ativo → amarelo na metade →
+      // vermelho esgotado, `!` pra prevalecer sobre as demais).
+      className={`group relative cursor-grab overflow-visible rounded-lg border bg-gaiamum-surface-raised shadow-sm transition hover:border-gaiamum-border-forte hover:shadow-md active:cursor-grabbing ${
+        souResponsavel ? "border-gaiamum-border border-l-[3px] border-l-gaiamum-primary" : "border-gaiamum-border"
       } ${emArrastoToque ? "opacity-40" : ""} ${
         (posicaoDrop ?? indicadorDrop) === "antes"
           ? "border-t-2 border-t-gaiamum-primary"
@@ -345,24 +428,23 @@ export function CartaoTarefa({
             ? "border-b-2 border-b-gaiamum-primary"
             : ""
       } ${
-        // Cronômetro de foco (migration 0052) — `!` força a prioridade sobre
-        // as classes de borda acima (responsável/drop), que usam a mesma
-        // propriedade CSS. "esgotado" sempre prevalece sobre "metade".
         hiperfoco === "esgotado"
-          ? "!border-gaiamum-danger"
+          ? "!border-gaiamum-danger ring-1 ring-gaiamum-danger/40"
           : hiperfoco === "metade"
-            ? "!border-gaiamum-warning bg-gaiamum-warning/10"
-            : ""
+            ? "!border-gaiamum-warning bg-gaiamum-warning/10 ring-1 ring-gaiamum-warning/30"
+            : hiperfoco === "ativo"
+              ? "!border-gaiamum-primary ring-1 ring-gaiamum-primary/50 shadow-lg shadow-gaiamum-primary/20"
+              : ""
       }`}
     >
-      <div className="overflow-hidden rounded-[10px]">
-        {/* Traço de urgência — só em P1, pedido do Fabio pra chamar mais
-            atenção nos cartões mais urgentes. bg-gaiamum-danger é fixo
-            (#ef4444) nos 3 temas, já com contraste ok em claro e escuro. */}
-        {tarefa.prioridade === "P1" && <div className="h-1.5 bg-gaiamum-danger" />}
+      <div className="overflow-hidden rounded-[7px]">
+        {/* Traço de urgência — só em P1 (barra superior vermelha discreta,
+            como no mockup aprovado). bg-gaiamum-danger é fixo nos 3 temas. */}
+        {tarefa.prioridade === "P1" && <div className="h-1 bg-gaiamum-danger" />}
 
-        {/* Andar 1 — título, só renomeia */}
-        <div className="flex items-center gap-1 border-b border-gaiamum-border-forte bg-gaiamum-titulo-cartao px-2 py-1.5">
+        {/* Linha do título — alça, título (clique renomeia, como sempre) e
+            menu ⋯ (Abrir, Renomear, Mover para..., Excluir). */}
+        <div className="flex items-center gap-1 px-1.5 pt-1.5">
           <button
             ref={alcaRef}
             type="button"
@@ -372,27 +454,16 @@ export function CartaoTarefa({
             // Alvo de toque de 44×44px em qualquer dispositivo de toque
             // (critério de acessibilidade padrão iOS/Android) — achado real
             // (2026-10-04, Fabio: "tenho muita dificuldade de... colocar o
-            // cartão, não tá fluido"): antes era só `px-1 py-1` com um ícone
-            // `text-sm`, bem menor que isso, fácil de errar o toque com o
-            // dedo (precisão de mouse ≠ precisão de dedo). Em mouse
-            // (`pointer:fine`) continua compacto — não precisa do mesmo
-            // tamanho generoso, e um alvo grande ali só ocuparia espaço à
-            // toa no cabeçalho do cartão.
-            className="flex shrink-0 cursor-grab touch-none items-center justify-center rounded text-gaiamum-text-muted active:cursor-grabbing sm:hover:text-gaiamum-text [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:text-lg [@media(pointer:fine)]:px-1 [@media(pointer:fine)]:py-1 [@media(pointer:fine)]:text-sm [@media(pointer:fine)]:leading-none"
+            // cartão, não tá fluido"). Em mouse (`pointer:fine`) continua
+            // compacto.
+            className="flex shrink-0 cursor-grab touch-none items-center justify-center rounded text-gaiamum-text-muted/70 active:cursor-grabbing sm:hover:text-gaiamum-text [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 [@media(pointer:fine)]:px-0.5 [@media(pointer:fine)]:py-1"
             style={{ touchAction: "none" }}
             onClick={(e) => e.stopPropagation()}
           >
-            ⠿
+            <IconeAlca className="h-4 w-4 [@media(pointer:coarse)]:h-5 [@media(pointer:coarse)]:w-5" />
           </button>
           {coluna.concluido && (
-            <Image
-              src="/brand/crab-mark.png"
-              alt=""
-              width={14}
-              height={14}
-              className="shrink-0"
-              title="Concluído!"
-            />
+            <Image src="/brand/crab-mark.png" alt="" width={14} height={14} className="shrink-0" title="Concluído!" />
           )}
           {editandoTitulo ? (
             <input
@@ -404,115 +475,128 @@ export function CartaoTarefa({
                 if (e.key === "Enter") e.currentTarget.blur();
                 if (e.key === "Escape") setEditandoTitulo(false);
               }}
-              className="w-full rounded border border-gaiamum-primary bg-gaiamum-surface-raised px-1.5 py-0.5 text-sm text-gaiamum-text outline-none"
+              className="w-full rounded border border-gaiamum-primary bg-gaiamum-surface px-1.5 py-0.5 text-sm text-gaiamum-text outline-none"
             />
           ) : (
             <button
               type="button"
               onClick={() => setEditandoTitulo(true)}
-              title="Clique para renomear"
-              className="flex-1 truncate text-left text-sm font-medium text-gaiamum-text hover:text-gaiamum-primary"
+              title={`${tarefa.titulo} — clique para renomear`}
+              className="min-w-0 flex-1 truncate text-left text-sm font-medium text-gaiamum-text hover:text-gaiamum-primary"
             >
               {tarefa.titulo}
             </button>
           )}
-          <button
-            type="button"
-            data-sem-arrasto
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuMoverAberto((atual) => !atual);
-            }}
-            title="Mover para..."
-            aria-label="Mover para outra coluna, turno ou posição"
-            className="shrink-0 rounded px-1 py-1 text-xs text-gaiamum-text-muted hover:text-gaiamum-primary"
-          >
-            ⇄
-          </button>
-          {podeExcluir && (
-            <button
-              type="button"
-              data-sem-arrasto
-              onClick={(e) => {
-                e.stopPropagation();
-                onExcluir();
-              }}
-              className="shrink-0 text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-            >
-              ✕
-            </button>
-          )}
+          <MenuSuspenso
+            rotulo="Ações do cartão"
+            icone={<IconePontos className="h-4 w-4" />}
+            classeBotao="h-7 w-7 [@media(pointer:coarse)]:h-9 [@media(pointer:coarse)]:w-9"
+            itens={(fechar) => (
+              <>
+                <ItemMenu
+                  onClick={() => {
+                    fechar();
+                    onAbrir();
+                  }}
+                >
+                  Abrir cartão
+                </ItemMenu>
+                <ItemMenu
+                  onClick={() => {
+                    fechar();
+                    setEditandoTitulo(true);
+                  }}
+                >
+                  Renomear
+                </ItemMenu>
+                <ItemMenu
+                  onClick={() => {
+                    fechar();
+                    setMenuMoverAberto(true);
+                  }}
+                >
+                  ⇄ Mover para...
+                </ItemMenu>
+                {podeExcluir && (
+                  <ItemMenu
+                    perigo
+                    onClick={() => {
+                      fechar();
+                      onExcluir();
+                    }}
+                  >
+                    Excluir cartão
+                  </ItemMenu>
+                )}
+              </>
+            )}
+          />
         </div>
 
-        {/* Andar 2 — corpo do cartão, abre o modal */}
-        <div onClick={aoClicarAbrir} className="cursor-pointer p-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
-              {tarefa.prioridade}
-            </span>
+        {/* Corpo — abre o modal de detalhe (como antes). Metadados compactos
+            (progressive disclosure): o resto continua dentro do cartão. */}
+        <div onClick={aoClicarAbrir} className="cursor-pointer px-2.5 pb-2 pt-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={CLASSE_CHIP_NEUTRO}>{tarefa.prioridade}</span>
             {tarefa.is_marco && (
-              <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
-                🚩 Marco
+              <span className={CLASSE_CHIP_NEUTRO}>
+                <IconeBandeira className="h-3 w-3 text-gaiamum-accent" />
+                Marco
               </span>
             )}
             {etiquetasDaTarefa.map((te) => {
               const etiqueta = etiquetasDoTenant.find((e) => e.id === te.etiqueta_id);
               if (!etiqueta) return null;
               return (
-                <span key={te.id} className={`rounded-full border px-2 py-0.5 ${CLASSE_COR_ETIQUETA[etiqueta.cor]}`}>
+                <span key={te.id} className={`${CLASSE_CHIP} max-w-[8rem] truncate ${CLASSE_COR_ETIQUETA[etiqueta.cor]}`}>
                   {etiqueta.nome}
                 </span>
               );
             })}
             {tarefa.data_limite && (
-              <span className={`rounded-full border px-2 py-0.5 ${CLASSE_PRAZO[urgencia]}`}>
-                {new Date(tarefa.data_limite).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
-              </span>
-            )}
-            {tarefa.hiperfoco_iniciado_em && tarefa.tempo_estimado_min && (
-              <span
-                className={`rounded-full border px-2 py-0.5 ${
-                  hiperfoco === "esgotado"
-                    ? "border-gaiamum-danger text-gaiamum-danger"
-                    : hiperfoco === "metade"
-                      ? "border-gaiamum-warning text-gaiamum-warning"
-                      : "border-gaiamum-border text-gaiamum-text-muted"
-                }`}
-                title="Cronômetro de foco"
-              >
-                ⏱{" "}
-                {hiperfoco === "esgotado"
-                  ? "esgotado"
-                  : `${minutosRestantesHiperfoco(tarefa.hiperfoco_iniciado_em, tarefa.tempo_estimado_min)} min restantes`}
+              <span className={`${CLASSE_CHIP} bg-gaiamum-surface ${CLASSE_PRAZO[urgencia]}`} title="Prazo">
+                {new Date(tarefa.data_limite).toLocaleString("pt-BR", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </span>
             )}
             {checklistDaTarefa.length > 0 && (
-              <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
-                ☑ {concluidos}/{checklistDaTarefa.length}
+              <span className={CLASSE_CHIP_NEUTRO} title="Checklist">
+                <IconeChecklist className="h-3 w-3" />
+                {concluidos}/{checklistDaTarefa.length}
               </span>
             )}
             {anexosDaTarefa.length > 0 && (
-              <span className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted">
-                📎 {anexosDaTarefa.length}
+              <span className={CLASSE_CHIP_NEUTRO} title="Anexos">
+                <IconeClipe className="h-3 w-3" />
+                {anexosDaTarefa.length}
               </span>
             )}
             {tarefa.aguardando_de && (
-              <span
-                title={tarefa.aguardando_de}
-                className="rounded-full border border-gaiamum-border px-2 py-0.5 text-gaiamum-text-muted"
-              >
-                🕓 Aguardando
+              <span title={`Aguardando ${tarefa.aguardando_de}`} className={`${CLASSE_CHIP_NEUTRO} max-w-[9rem]`}>
+                <IconeAmpulheta className="h-3 w-3 shrink-0" />
+                <span className="truncate">Aguardando {tarefa.aguardando_de}</span>
+              </span>
+            )}
+            {membrosDaTarefa.length > 0 && (
+              <span className="ml-auto flex -space-x-1.5">
+                {membrosDaTarefa.map((tm) => {
+                  const membro = membrosDoTenant.find((m) => m.user_id === tm.user_id);
+                  return <AvatarIniciais key={tm.id} email={membro?.email ?? null} nomeExibicao={membro?.nome_exibicao} />;
+                })}
               </span>
             )}
           </div>
 
-          {membrosDaTarefa.length > 0 && (
-            <div className="mt-2 flex -space-x-1.5">
-              {membrosDaTarefa.map((tm) => {
-                const membro = membrosDoTenant.find((m) => m.user_id === tm.user_id);
-                return <AvatarIniciais key={tm.id} email={membro?.email ?? null} nomeExibicao={membro?.nome_exibicao} />;
-              })}
-            </div>
+          {temCronometro && (
+            <AreaCronometroFoco
+              iniciadoEm={tarefa.hiperfoco_iniciado_em as string}
+              minutos={tarefa.tempo_estimado_min as number}
+              estado={hiperfoco}
+            />
           )}
         </div>
       </div>

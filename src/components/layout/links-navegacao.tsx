@@ -1,9 +1,11 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
+import { LinkNavegacao } from "@/components/layout/link-navegacao";
 
 /** Sem "use client" nem "use server": roda no servidor quando importado por
  * MenuLateral (aside desktop), e entra no bundle do cliente quando importado
- * por MenuMobile (drawer) — evita duplicar a lista de links em 2 arquivos. */
+ * por MenuMobile (drawer) — evita duplicar a lista de links em 2 arquivos.
+ * Cada link é um `LinkNavegacao` (cliente) só pra marcar a rota atual como
+ * selecionada — as condições de exibição continuam todas aqui. */
 export function LinksNavegacao({
   temMetasSmart,
   acessoCompleto = true,
@@ -33,75 +35,43 @@ export function LinksNavegacao({
   return (
     <nav className="flex flex-col gap-1">
       {acessoCompleto && (
-        <Link
-          href="/"
-          onClick={aoClicarLink}
-          className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-        >
+        <LinkNavegacao href="/" onClick={aoClicarLink}>
           Início
-        </Link>
+        </LinkNavegacao>
       )}
-      <Link
-        href="/projetos"
-        onClick={aoClicarLink}
-        className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-      >
+      <LinkNavegacao href="/projetos" onClick={aoClicarLink}>
         Projetos
-      </Link>
+      </LinkNavegacao>
       {acessoCompleto && (
         <>
-          <Link
-            href="/onboarding"
-            onClick={aoClicarLink}
-            className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-          >
+          <LinkNavegacao href="/onboarding" onClick={aoClicarLink} className="flex items-center justify-between">
             Metas SMART
             {!temMetasSmart && (
               <span className="rounded-full bg-gaiamum-primary px-2 py-0.5 text-xs font-semibold text-white">
                 Pendente
               </span>
             )}
-          </Link>
-          <Link
-            href="/equipe"
-            onClick={aoClicarLink}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-          >
+          </LinkNavegacao>
+          <LinkNavegacao href="/equipe" onClick={aoClicarLink}>
             Equipe
-          </Link>
-          <Link
-            href="/agenda"
-            onClick={aoClicarLink}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-          >
+          </LinkNavegacao>
+          <LinkNavegacao href="/agenda" onClick={aoClicarLink}>
             Agenda
-          </Link>
+          </LinkNavegacao>
           {linkLab}
-          <Link
-            href="/configuracoes"
-            onClick={aoClicarLink}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-          >
+          <LinkNavegacao href="/configuracoes" onClick={aoClicarLink}>
             ⚙️ Configurações
-          </Link>
+          </LinkNavegacao>
         </>
       )}
       {souOwner && (
         <>
-          <Link
-            href="/marketing"
-            onClick={aoClicarLink}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-          >
+          <LinkNavegacao href="/marketing" onClick={aoClicarLink}>
             Marketing
-          </Link>
-          <Link
-            href="/financeiro"
-            onClick={aoClicarLink}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised"
-          >
+          </LinkNavegacao>
+          <LinkNavegacao href="/financeiro" onClick={aoClicarLink}>
             Financeiro
-          </Link>
+          </LinkNavegacao>
         </>
       )}
       {extra}

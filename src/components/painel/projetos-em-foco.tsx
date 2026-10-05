@@ -3,12 +3,14 @@ import { CLASSE_FUNDO_QUADRO, TEXTO_SOBRE_FUNDO_QUADRO } from "@/lib/ecc/kanban"
 import type { SaudeProjeto } from "@/lib/ecc/painel-geral";
 import type { Projeto } from "@/lib/ecc/tipos";
 
-const ROTULO_SAUDE: Record<SaudeProjeto, string> = {
+// Exportados — o cabeçalho do Kanban (`/projetos/[id]/tarefas`) mostra o
+// mesmo selo de saúde, com a mesma aparência.
+export const ROTULO_SAUDE: Record<SaudeProjeto, string> = {
   no_caminho: "No caminho",
   atencao: "Atenção",
 };
 
-const CLASSE_SAUDE: Record<SaudeProjeto, string> = {
+export const CLASSE_SAUDE: Record<SaudeProjeto, string> = {
   no_caminho: "border-gaiamum-success/40 bg-gaiamum-success/10 text-gaiamum-success",
   atencao: "border-gaiamum-danger/40 bg-gaiamum-danger/10 text-gaiamum-danger",
 };
