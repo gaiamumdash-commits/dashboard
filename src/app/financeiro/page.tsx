@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import { contarMetasSmart } from "@/lib/ecc/metas";
 import { primeiroDiaDoMesAtual } from "@/lib/ecc/kanban";
-import type { ContaAPagar } from "@/lib/ecc/tipos";
+import type { ContaAPagar, Receita } from "@/lib/ecc/tipos";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 import { ConsolidacaoGlobal } from "@/components/financeiro/consolidacao-global";
 
@@ -24,13 +24,14 @@ export default async function PaginaFinanceiro() {
   const supabase = await createClient();
   const mesReferencia = primeiroDiaDoMesAtual();
 
-  const [{ data: contasDoMes }, totalMetasSmart] = await Promise.all([
+  const [{ data: contasDoMes }, { data: receitasDoMes }, totalMetasSmart] = await Promise.all([
     supabase
       .from("contas_a_pagar")
       .select("*")
       .eq("tenant_id", tenantId)
       .eq("mes_referencia", mesReferencia)
       .order("data_vencimento", { ascending: true }),
+    supabase.from("receitas").select("valor, recebida").eq("tenant_id", tenantId).eq("mes_referencia", mesReferencia),
     contarMetasSmart(tenantId),
   ]);
 
@@ -38,6 +39,8 @@ export default async function PaginaFinanceiro() {
   const contasFixas = lista.filter((c) => c.conta_fixa_id !== null);
   const contasAvulsas = lista.filter((c) => c.conta_fixa_id === null);
   const somaFixas = contasFixas.reduce((soma, c) => soma + c.valor, 0);
+  const listaReceitas = (receitasDoMes as Pick<Receita, "valor" | "recebida">[] | null) ?? [];
+  const somaReceitas = listaReceitas.reduce((soma, r) => soma + r.valor, 0);
 
   return (
     <div className="flex min-h-screen flex-col bg-gaiamum-bg sm:flex-row">
@@ -50,7 +53,17 @@ export default async function PaginaFinanceiro() {
           <ConsolidacaoGlobal contasDoMes={lista} />
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <Link
+            href="/financeiro/receitas"
+            className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5 transition hover:border-gaiamum-primary"
+          >
+            <p className="text-xs uppercase tracking-wide text-gaiamum-text-muted">Receitas do mês</p>
+            <p className="mt-1 text-2xl font-semibold text-gaiamum-success">{formatarMoeda(somaReceitas)}</p>
+            <p className="mt-1 text-sm text-gaiamum-text-muted">
+              {listaReceitas.length === 0 ? "Lançar receita →" : `${listaReceitas.length} receita(s) →`}
+            </p>
+          </Link>
           <Link
             href="/financeiro/fixas"
             className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-5 transition hover:border-gaiamum-primary"

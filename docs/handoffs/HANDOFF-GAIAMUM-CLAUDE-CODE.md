@@ -10,7 +10,16 @@
 
 ---
 
-## Estado confirmado (2026-10-05, sessão #71 — última atualização)
+## Estado confirmado (2026-10-05, sessão #72 — última atualização)
+
+**Resumo em uma linha**: **Frente 1 (Receitas) implementada, testada e commitada localmente — NÃO publicada.** Bloqueio: o Fabio aplicar `supabase/migrations/0054_receitas.sql` no SQL Editor de produção ANTES do deploy. Depois: push + `vercel deploy --prod` (com ok do Fabio) e validação visual dele. Em seguida, Frente 2 Fase 1 (prompt copiável).
+
+- **Decisões do Fabio (aceitou as recomendações)**: sem receita recorrente por ora; projeto só como campo opcional (relatório por projeto depois); caminho A (Gemini interno) fica como SECUNDÁRIO, desde que (a) o Fabio teste 1x em produção e (b) qualquer falha caia no prompt copiável; atalhos ChatGPT/Gemini/Claude só como links; Fase 1 da Frente 2 vai pra produção sozinha. Ordem: Receitas → Fase 1.
+- **Diagnóstico do Gemini**: `ia_consumo_log` só tem 2 chamadas (última 2026-09-11) e nenhuma de planejamento — o erro era o rate limit fail-closed com a 0046 ausente (corrigida na #70, 03:29 UTC de hoje). Chamada de teste hoje com a chave do `.env.local`: OK em 2s. Riscos ainda abertos: timeout da função na Vercel com 20 sugestões; `formulario-novo-projeto.tsx:111` chama a Server Action sem `try/catch` (exceção não mostra mensagem) — tratar na Frente 2.
+- **O que entrou na Frente 1**: migration `0054_receitas.sql` (descrição, valor > 0, categoria opcional servico/produto/outra, `mes_referencia`, data prevista/recebimento, `recebida`, projeto opcional; RLS owner-only com `with check` que impede `projeto_id` de outro workspace); `receitas-regras.ts` (validação pura) + `receitas.ts` (Server Actions: criar, editar valor/data — `mes_referencia` acompanha a data —, marcar/desmarcar recebida, excluir); `/financeiro/receitas` (formulário rápido + lista); card "Receitas do mês" no Financeiro; `calcularFinanceiroDoMes(contas, receitas)` com Entradas = receitas do mês (previstas + recebidas).
+- **Testes**: 250/250 (unitários + integração no Postgres de teste isolado, onde a 0054 já está aplicada), 9 testes novos de RLS em `tests/integration/rls-receitas.test.ts`, 5 novos de cálculo em `painel-geral.test.ts`, regras em `receitas-regras.test.ts`. `tsc` limpo, `eslint` 0 erros (3 avisos antigos do lab), `npm run build` ok. Tela não validada visualmente (local aponta pra produção, que ainda não tem a tabela).
+
+## Estado confirmado (2026-10-05, sessão #71)
 
 **Resumo em uma linha**: redesenho visual do Kanban (`/projetos/[id]/tarefas`) **implementado (`2b13db4`), publicado em `gaiamum.com.br` e APROVADO pelo Fabio** — frente encerrada. **Próximas 2 frentes, já combinadas** (sessão nova depois do `/clear`): (1) **Receitas** no Financeiro/Painel e (2) **"Planejar com IA" por prompt copiável** — proposta refinada e decisões em aberto em `docs/gaiamum/FRENTES-RECEITAS-E-PROMPT-IA-2026-10-05.md`. **1ª coisa na sessão nova: ler esse arquivo e fazer ao Fabio as perguntas das "Decisões em aberto" antes de codar.** O "Planejar hoje" do mockup não foi pedido de novo na aprovação — segue como "Definir Hoje" no menu ⋮.
 
@@ -1539,6 +1548,10 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-10-05 (sessão nova #72) — Frente 1 (Receitas) implementada e testada, aguardando migration 0054 em produção; diagnóstico da IA interna
+
+Resumo completo em "Estado confirmado" (sessão #72, no topo). Em uma linha: Fabio aprovou as recomendações das "Decisões em aberto" das 2 frentes; Receitas feita (tabela `receitas` + RLS owner-only que também barra projeto de outro workspace, tela `/financeiro/receitas`, card no Financeiro, Entradas real no Painel geral), 250/250 testes com integração, build ok, commit local sem push. Gemini interno: causa do "erro direto" já tinha sido a 0046 ausente (corrigida na #70); chamada de teste hoje funcionou.
 
 ### 2026-10-05 (sessão nova #70) — Redesenho do Painel geral CONCLUÍDO, aprovado e publicado em produção; próxima frente (Kanban) já combinada
 

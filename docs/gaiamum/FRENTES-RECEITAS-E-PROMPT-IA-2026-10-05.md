@@ -4,6 +4,12 @@
 depois do `/clear`. Proposta refinada abaixo; as **decisões em aberto** no fim
 de cada frente precisam da resposta do Fabio antes de codar.
 
+> **Respondidas na sessão #72 (2026-10-05)** — o Fabio seguiu todas as
+> sugestões: receita recorrente fica pra depois; projeto só como campo
+> opcional; caminho A (Gemini interno) fica como secundário com fallback pro
+> prompt copiável; atalhos ChatGPT/Gemini/Claude só como links; Fase 1 vai
+> pra produção sozinha. Ordem: Frente 1 (Receitas) → Frente 2 Fase 1.
+
 ---
 
 ## Frente 1 — Receitas no dashboard

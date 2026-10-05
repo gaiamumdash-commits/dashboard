@@ -1,5 +1,5 @@
 import { hojeISOBrasil, FUSO_BRASIL, urgenciaDoPrazo } from "@/lib/ecc/kanban";
-import type { ContaAPagar, MetaSmart, Tarefa } from "@/lib/ecc/tipos";
+import type { ContaAPagar, MetaSmart, Receita, Tarefa } from "@/lib/ecc/tipos";
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -43,18 +43,19 @@ export type FinanceiroDoMes = {
   comprometido: number | null;
 };
 
-/** Números do card "Financeiro do mês". `entradas` é sempre 0 por ora — não
- * é um placeholder "em breve": é o valor real, porque não existe
- * receita/entrada no schema ainda (achado confirmado com o Fabio,
- * 2026-10-05 — ele cadastra os primeiros recebimentos variáveis quando
- * fechar um trabalho/vender o produto). `saldoPrevisto` é a diferença de
- * verdade (entradas - saídas), por isso fica negativo enquanto não houver
- * receita cadastrada — reflete a realidade, não esconde ela. `comprometido`
- * é `saídas/entradas`; sem nenhuma entrada mas com saída, o comprometimento
- * é 100% (gastando sem nenhuma renda registrada); sem saída nem entrada,
- * `null` (nada pra medir). */
-export function calcularFinanceiroDoMes(contasDoMes: Pick<ContaAPagar, "valor">[]): FinanceiroDoMes {
-  const entradas = 0;
+/** Números do card "Financeiro do mês". `entradas` soma as receitas do mês
+ * (`receitas`, migration 0054) — previstas e já recebidas, do mesmo jeito que
+ * `saidas` soma as contas do mês pagas ou não: os dois lados são "o que o mês
+ * prevê". `saldoPrevisto` é a diferença de verdade (entradas - saídas), e
+ * fica negativo quando o mês gasta mais do que entra — reflete a realidade,
+ * não esconde ela. `comprometido` é `saídas/entradas`; sem nenhuma entrada
+ * mas com saída, o comprometimento é 100% (gastando sem nenhuma renda
+ * registrada); sem saída nem entrada, `null` (nada pra medir). */
+export function calcularFinanceiroDoMes(
+  contasDoMes: Pick<ContaAPagar, "valor">[],
+  receitasDoMes: Pick<Receita, "valor">[] = [],
+): FinanceiroDoMes {
+  const entradas = receitasDoMes.reduce((soma, r) => soma + r.valor, 0);
   const saidas = contasDoMes.reduce((soma, c) => soma + c.valor, 0);
   const saldoPrevisto = entradas - saidas;
   const comprometido = entradas > 0 ? Math.min(100, Math.round((100 * saidas) / entradas)) : saidas > 0 ? 100 : null;

@@ -181,6 +181,24 @@ export type ContaAPagar = {
   forma_pagamento: FormaPagamento | null;
 };
 
+export type CategoriaReceita = "servico" | "produto" | "outra";
+
+/** Entrada de dinheiro (migration 0054) — espelho de `ContaAPagar` do lado
+ * das entradas. Sem recorrência por enquanto (decisão do Fabio, 2026-10-05). */
+export type Receita = {
+  id: string;
+  tenant_id: string;
+  projeto_id: string | null;
+  descricao: string;
+  valor: number;
+  categoria: CategoriaReceita | null;
+  mes_referencia: string;
+  data_prevista: string;
+  data_recebimento: string | null;
+  recebida: boolean;
+  criado_em: string;
+};
+
 export type EntidadeAnexo = "conta_a_pagar" | "tarefa";
 
 export type Anexo = {

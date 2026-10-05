@@ -24,7 +24,7 @@ import { FinanceiroDoMes } from "@/components/painel/financeiro-do-mes";
 import { MetaPrincipal } from "@/components/painel/meta-principal";
 import { ProjetosEmFoco, type ProjetoEmFoco } from "@/components/painel/projetos-em-foco";
 import { ProximosPassos, type PassoUnificado } from "@/components/painel/proximos-passos";
-import type { ColunaKanban, ContaAPagar, MetaSmart, Projeto, Tarefa } from "@/lib/ecc/tipos";
+import type { ColunaKanban, ContaAPagar, MetaSmart, Projeto, Receita, Tarefa } from "@/lib/ecc/tipos";
 
 const DIAS_PROXIMOS_PASSOS = 7;
 const MAX_PROXIMOS_PASSOS = 8;
@@ -65,17 +65,27 @@ export default async function PaginaInicial() {
 
   const mesReferencia = primeiroDiaDoMesAtual();
 
-  const [{ data: projetos }, { data: colunas }, { data: tarefas }, { data: metas }, { data: contasDoMes }, compromissosHoje] =
-    await Promise.all([
-      supabase.from("projetos").select("*").eq("tenant_id", tenantId).eq("arquivado", false),
-      supabase.from("colunas_kanban").select("id, concluido, hoje").eq("tenant_id", tenantId),
-      supabase.from("tarefas").select("*").eq("tenant_id", tenantId),
-      supabase.from("metas_smart").select("*").eq("tenant_id", tenantId).order("criado_em", { ascending: true }),
-      souOwner
-        ? supabase.from("contas_a_pagar").select("*").eq("tenant_id", tenantId).eq("mes_referencia", mesReferencia)
-        : Promise.resolve({ data: [] as ContaAPagar[] }),
-      listarCompromissosDoDia(tenantId),
-    ]);
+  const [
+    { data: projetos },
+    { data: colunas },
+    { data: tarefas },
+    { data: metas },
+    { data: contasDoMes },
+    { data: receitasDoMes },
+    compromissosHoje,
+  ] = await Promise.all([
+    supabase.from("projetos").select("*").eq("tenant_id", tenantId).eq("arquivado", false),
+    supabase.from("colunas_kanban").select("id, concluido, hoje").eq("tenant_id", tenantId),
+    supabase.from("tarefas").select("*").eq("tenant_id", tenantId),
+    supabase.from("metas_smart").select("*").eq("tenant_id", tenantId).order("criado_em", { ascending: true }),
+    souOwner
+      ? supabase.from("contas_a_pagar").select("*").eq("tenant_id", tenantId).eq("mes_referencia", mesReferencia)
+      : Promise.resolve({ data: [] as ContaAPagar[] }),
+    souOwner
+      ? supabase.from("receitas").select("valor").eq("tenant_id", tenantId).eq("mes_referencia", mesReferencia)
+      : Promise.resolve({ data: [] as Pick<Receita, "valor">[] }),
+    listarCompromissosDoDia(tenantId),
+  ]);
 
   const listaProjetos = (projetos as Projeto[] | null) ?? [];
   const mapaProjetos = new Map(listaProjetos.map((p) => [p.id, p]));
@@ -88,6 +98,7 @@ export default async function PaginaInicial() {
   const tarefasAbertas = listaTarefas.filter((t) => !mapaColunaConcluida.get(t.coluna_id));
   const listaMetas = (metas as MetaSmart[] | null) ?? [];
   const listaContasDoMes = (contasDoMes as ContaAPagar[] | null) ?? [];
+  const listaReceitasDoMes = (receitasDoMes as Pick<Receita, "valor">[] | null) ?? [];
 
   // --- "Seu dia" ---
   const tarefasHojeCount = tarefasAbertas.filter((t) => colunasHojeIds.has(t.coluna_id)).length;
@@ -187,7 +198,7 @@ export default async function PaginaInicial() {
                   Ver financeiro →
                 </Link>
               </div>
-              <FinanceiroDoMes contasDoMes={listaContasDoMes} />
+              <FinanceiroDoMes contasDoMes={listaContasDoMes} receitasDoMes={listaReceitasDoMes} />
             </section>
           )}
 

@@ -1,6 +1,6 @@
 import { calcularFinanceiroDoMes, contasVencendoEmDias } from "@/lib/ecc/painel-geral";
 import { IconeCircular } from "@/components/painel/icone-circular";
-import type { ContaAPagar } from "@/lib/ecc/tipos";
+import type { ContaAPagar, Receita } from "@/lib/ecc/tipos";
 
 function formatarMoeda(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -32,16 +32,19 @@ function CardValor({
   );
 }
 
-/** Card "Financeiro do mês" do Painel geral — achado real da investigação
- * antes de codar (confirmado com o Fabio): `contas_a_pagar` só modela
- * SAÍDAS, não existe receita/entrada no schema ainda (fica pra quando ele
- * cadastrar os primeiros recebimentos variáveis). "Entradas" mostra 0 de
- * verdade (não é inventado — é o estado real), "Saldo previsto" é a
- * diferença real (fica negativo até haver receita) e "Comprometido" é
- * `saídas/entradas` (100% quando não há nenhuma entrada mas há saída — ver
+/** Card "Financeiro do mês" do Painel geral. "Entradas" vem das receitas do
+ * mês (`receitas`, migration 0054), "Saídas" das contas a pagar do mês,
+ * "Saldo previsto" é a diferença real (pode ficar negativo) e "Comprometido"
+ * é `saídas/entradas` (100% quando não há nenhuma entrada mas há saída — ver
  * `calcularFinanceiroDoMes`). */
-export function FinanceiroDoMes({ contasDoMes }: { contasDoMes: ContaAPagar[] }) {
-  const { entradas, saidas, saldoPrevisto, comprometido } = calcularFinanceiroDoMes(contasDoMes);
+export function FinanceiroDoMes({
+  contasDoMes,
+  receitasDoMes,
+}: {
+  contasDoMes: ContaAPagar[];
+  receitasDoMes: Pick<Receita, "valor">[];
+}) {
+  const { entradas, saidas, saldoPrevisto, comprometido } = calcularFinanceiroDoMes(contasDoMes, receitasDoMes);
   const { quantidade: quantidadeVencendoEm7Dias, valorTotal: valorVencendoEm7Dias } = contasVencendoEmDias(contasDoMes);
 
   return (

@@ -196,8 +196,28 @@ describe("prazoRelativo", () => {
 });
 
 describe("calcularFinanceiroDoMes", () => {
-  it("entradas sempre 0 — não existe receita no schema ainda", () => {
+  it("entradas é 0 sem nenhuma receita no mês", () => {
     expect(calcularFinanceiroDoMes([{ valor: 100 }]).entradas).toBe(0);
+  });
+
+  it("entradas é a soma das receitas do mês (previstas e recebidas)", () => {
+    expect(calcularFinanceiroDoMes([], [{ valor: 1000 }, { valor: 250.5 }]).entradas).toBe(1250.5);
+  });
+
+  it("saldo previsto é entradas menos saídas", () => {
+    expect(calcularFinanceiroDoMes([{ valor: 300 }], [{ valor: 1000 }]).saldoPrevisto).toBe(700);
+  });
+
+  it("comprometido é saídas/entradas arredondado quando há receita", () => {
+    expect(calcularFinanceiroDoMes([{ valor: 300 }], [{ valor: 1000 }]).comprometido).toBe(30);
+  });
+
+  it("comprometido trava em 100% quando a saída passa da entrada", () => {
+    expect(calcularFinanceiroDoMes([{ valor: 1500 }], [{ valor: 1000 }]).comprometido).toBe(100);
+  });
+
+  it("comprometido é 0% com receita e nenhuma saída", () => {
+    expect(calcularFinanceiroDoMes([], [{ valor: 1000 }]).comprometido).toBe(0);
   });
 
   it("saídas é a soma de todas as contas do mês", () => {
