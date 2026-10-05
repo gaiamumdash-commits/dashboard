@@ -6,6 +6,15 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { iniciarLoginGoogle } from "@/lib/ecc/auth-google";
 
+/** Depois de "Criar conta", a MESMA mensagem pros dois casos — e-mail novo
+ * (o Supabase manda o link de confirmação) e e-mail que já tinha conta (o
+ * Supabase não manda nada, de propósito) —, pra nunca revelar quem já é
+ * cadastrado. Antes ela só falava em "confira seu e-mail", e quem já tinha
+ * conta ficava esperando um e-mail que nunca chegava (caso real da
+ * Angeline, 2026-10-05); agora diz o que fazer nos dois casos. */
+const AVISO_DEPOIS_DO_CADASTRO =
+  "Se este e-mail ainda não tinha conta, enviamos um link de confirmação: confira sua caixa de entrada (e o spam), clique no link e depois entre aqui. Se você já se cadastrou antes, não vai chegar e-mail nenhum — é só entrar com sua senha ou usar “Esqueci a senha”.";
+
 /** O Supabase manda essas mensagens em inglês, sem contexto nenhum do
  * Gaiamum — quem recebeu um convite e nunca usou o app antes não entende
  * "Email not confirmed" nem sabe que precisa procurar um e-mail de
@@ -99,7 +108,7 @@ function FormularioAuth() {
         // Mesma resposta (visual e textual) de um cadastro novo bem-sucedido
         // — nunca revela por aqui se o e-mail já tinha conta.
         setAviso(
-          "Cadastro feito! Confira seu e-mail (inclusive a caixa de spam) e clique no link de confirmação antes de entrar. Depois volte aqui e faça login normalmente.",
+          AVISO_DEPOIS_DO_CADASTRO,
         );
         setModo("login");
         return;
@@ -115,7 +124,7 @@ function FormularioAuth() {
     // um convite e nunca usou o Gaiamum antes.
     if (!data.session) {
       setAviso(
-        "Cadastro feito! Confira seu e-mail (inclusive a caixa de spam) e clique no link de confirmação antes de entrar. Depois volte aqui e faça login normalmente.",
+        AVISO_DEPOIS_DO_CADASTRO,
       );
       setModo("login");
       return;
