@@ -133,8 +133,15 @@ export default async function PaginaTarefas({ params }: { params: Promise<{ id: 
           o quadro então tinha DOIS scrolls horizontais competindo (o da
           página e o do próprio `overflow-x-auto` do quadro). Provavelmente
           já acontecia antes desta rodada (as colunas de 256px fixas também
-          somavam mais que 390px), só menos perceptível. */}
-      <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-10">
+          somavam mais que 390px), só menos perceptível.
+          SEM `max-w-*` de propósito (pedido do Fabio, 2026-10-04): "quero
+          usar o cartão Kanban na tela inteira... fica uma parte da tela só
+          usada e a experiência é ruim" — diferente de outras páginas do
+          app (texto/formulário, onde um teto de largura ajuda a leitura), o
+          quadro é feito pra usar toda a largura disponível: mais colunas
+          visíveis ao mesmo tempo lado a lado em vez de sobrar espaço vazio
+          nas bordas numa tela grande. */}
+      <main className="mx-auto w-full min-w-0 flex-1 px-4 py-10">
         <div className={`-mx-4 -mt-10 mb-8 h-2 sm:-mx-4 ${CLASSE_FUNDO_QUADRO[(projeto as Projeto).cor_fundo]}`} />
 
         <Link href="/projetos" className="text-sm text-gaiamum-text-muted hover:text-gaiamum-text">

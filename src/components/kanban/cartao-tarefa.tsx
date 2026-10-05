@@ -369,7 +369,16 @@ export function CartaoTarefa({
             data-sem-arrasto
             title="Arrastar cartão"
             aria-label="Arrastar cartão"
-            className="shrink-0 cursor-grab touch-none rounded px-1 py-1 text-sm leading-none text-gaiamum-text-muted active:cursor-grabbing sm:hover:text-gaiamum-text"
+            // Alvo de toque de 44×44px em qualquer dispositivo de toque
+            // (critério de acessibilidade padrão iOS/Android) — achado real
+            // (2026-10-04, Fabio: "tenho muita dificuldade de... colocar o
+            // cartão, não tá fluido"): antes era só `px-1 py-1` com um ícone
+            // `text-sm`, bem menor que isso, fácil de errar o toque com o
+            // dedo (precisão de mouse ≠ precisão de dedo). Em mouse
+            // (`pointer:fine`) continua compacto — não precisa do mesmo
+            // tamanho generoso, e um alvo grande ali só ocuparia espaço à
+            // toa no cabeçalho do cartão.
+            className="flex shrink-0 cursor-grab touch-none items-center justify-center rounded text-gaiamum-text-muted active:cursor-grabbing sm:hover:text-gaiamum-text [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:text-lg [@media(pointer:fine)]:px-1 [@media(pointer:fine)]:py-1 [@media(pointer:fine)]:text-sm [@media(pointer:fine)]:leading-none"
             style={{ touchAction: "none" }}
             onClick={(e) => e.stopPropagation()}
           >

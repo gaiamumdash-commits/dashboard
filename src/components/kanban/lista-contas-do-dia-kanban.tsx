@@ -14,7 +14,7 @@ function formatarMoeda(valor: number): string {
  * conta certa, pra marcar como paga/anexar comprovante. O riscado é só
  * feedback de "vou lá resolver isso agora" — não marca como paga sozinho,
  * quem faz isso é o Financeiro (evita marcar pago sem querer com 1 clique). */
-function ContaDoDia({ conta }: { conta: ContaAPagar }) {
+function ContaDoDia({ conta, rotuloDia }: { conta: ContaAPagar; rotuloDia: string }) {
   const [indo, setIndo] = useState(false);
   const router = useRouter();
 
@@ -36,23 +36,23 @@ function ContaDoDia({ conta }: { conta: ContaAPagar }) {
       <p className={`text-sm font-medium text-gaiamum-warning transition-all ${indo ? "line-through" : ""}`}>
         {conta.nome}
       </p>
-      <p className="text-xs text-gaiamum-warning/80">{formatarMoeda(conta.valor)} · vence hoje</p>
+      <p className="text-xs text-gaiamum-warning/80">{formatarMoeda(conta.valor)} · vence {rotuloDia}</p>
     </button>
   );
 }
 
-export function ListaContasDoDiaKanban({ contas }: { contas: ContaAPagar[] }) {
+export function ListaContasDoDiaKanban({ contas, rotuloDia = "hoje" }: { contas: ContaAPagar[]; rotuloDia?: string }) {
   if (contas.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-2 border-t border-gaiamum-border pt-2.5">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-        💰 Contas de hoje <span className="text-gaiamum-text">({contas.length})</span>
+        💰 Contas de {rotuloDia} <span className="text-gaiamum-text">({contas.length})</span>
       </h3>
       <ul className="flex flex-col gap-2">
         {contas.map((conta) => (
           <li key={conta.id}>
-            <ContaDoDia conta={conta} />
+            <ContaDoDia conta={conta} rotuloDia={rotuloDia} />
           </li>
         ))}
       </ul>

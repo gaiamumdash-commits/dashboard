@@ -1,63 +1,37 @@
-import Link from "next/link";
-import { listarCompromissosDoDia, type ResultadoCompromissosDoDia } from "@/lib/ecc/agenda";
+import { listarCompromissosDoDia } from "@/lib/ecc/agenda";
 import { listarContasDoDia } from "@/lib/ecc/financeiro";
-import { ListaContasDoDiaKanban } from "@/components/kanban/lista-contas-do-dia-kanban";
-
-/** Extraída à parte pra o TS estreitar `resultado` (exclui "oculto") de
- * forma confiável — dentro de um `&&` JSX aninhado o narrowing de union
- * discriminada nem sempre se propaga pros galhos internos do ternário. */
-function BlocoCompromissos({ resultado, hoje }: { resultado: Exclude<ResultadoCompromissosDoDia, { status: "oculto" }>; hoje: string }) {
-  return (
-    <>
-      <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gaiamum-text-muted">
-          📅 Compromissos de hoje
-          {resultado.status === "conectado" && (
-            <span className="text-gaiamum-text"> ({resultado.compromissos.length})</span>
-          )}
-        </h2>
-        <p className="mt-0.5 text-xs capitalize text-gaiamum-text-muted">{hoje}</p>
-      </div>
-
-      {resultado.status === "problema" ? (
-        <p className="text-sm text-gaiamum-danger">
-          Não consegui ler seu Google Calendar.{" "}
-          <Link href="/agenda" className="underline">
-            Reconecte na Agenda
-          </Link>{" "}
-          pra ver os compromissos aqui.
-        </p>
-      ) : resultado.compromissos.length === 0 ? (
-        <p className="text-sm text-gaiamum-text-muted">Nada marcado pra hoje. Dia livre pros cartões.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {resultado.compromissos.map((c) => (
-            <li key={c.id} className="rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised px-3 py-2">
-              <p className="text-xs font-semibold text-gaiamum-primary">{c.horario}</p>
-              <p className="text-sm text-gaiamum-text">{c.titulo}</p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
-  );
-}
+import { ID_COLUNA_COMPROMISSOS } from "@/lib/ecc/kanban";
+import { chaveDiaAtual } from "@/lib/ecc/semana";
+import { ColunaCompromissosDoDiaCliente } from "@/components/kanban/coluna-compromissos-do-dia-cliente";
 
 /** Coluna fixa à esquerda do quadro Kanban com os compromissos de hoje de
  * quem está logado (Google Calendar) e as contas a pagar que vencem hoje —
  * pra planejar os cartões sabendo quanto do dia já está ocupado/pendente.
  * Server Component, montado dentro de `<Suspense>` na página: a chamada ao
  * Google não segura o resto do quadro. Sem Google conectado e sem conta
- * vencendo hoje, não renderiza nada. */
+ * vencendo hoje, não renderiza nada (o dia seguinte, acessível pela
+ * barrinha "Amanhã" no rodapé do wrapper cliente, pode ter algo mesmo
+ * assim — por isso o rodapé de navegação só é omitido quando não há como
+ * alcançar o Google de jeito nenhum, não quando hoje especificamente está
+ * vazio; ver `ColunaCompromissosDoDiaCliente`).
+ *
+ * Achado real (2026-10-04, Fabio não conseguia ver/alcançar esta coluna no
+ * celular): faltava `data-coluna-card` (usado pelo rastreamento de "qual
+ * coluna está em foco" durante a rolagem, em `quadro-kanban.tsx`) e
+ * `snap-center` (sem isso o scroll-snap do celular não "trava" nela —
+ * ela existe no DOM mas o toque desliza direto, não para de verdade) —
+ * ela é um ReactNode solto, nunca fez parte do array `colunas`, então
+ * nunca tinha esses dois detalhes que toda outra coluna já carrega. */
 export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }) {
+  const chaveHoje = chaveDiaAtual();
   const [resultado, contasDoDia] = await Promise.all([
-    listarCompromissosDoDia(tenantId),
-    listarContasDoDia(tenantId),
+    listarCompromissosDoDia(tenantId, chaveHoje),
+    listarContasDoDia(tenantId, chaveHoje),
   ]);
 
   if (resultado.status === "oculto" && contasDoDia.length === 0) return null;
 
-  const hoje = new Date().toLocaleDateString("pt-BR", {
+  const rotuloData = new Date(`${chaveHoje}T12:00:00Z`).toLocaleDateString("pt-BR", {
     timeZone: "America/Sao_Paulo",
     weekday: "long",
     day: "numeric",
@@ -69,17 +43,18 @@ export async function ColunaCompromissosDoDia({ tenantId }: { tenantId: string }
     // mesma lógica de nivelamento das demais colunas (quadro-kanban.tsx):
     // sem isso, esta coluna fixa não participava do nivelamento por
     // conteúdo real e carregava um "chão" artificial mesmo vazia.
+    // `snap-center` + `data-coluna-card` — ver achado no comentário acima.
     <div
-      className="flex w-[85vw] shrink-0 flex-col gap-2.5 overflow-y-auto rounded-xl border border-gaiamum-primary/40 bg-gaiamum-surface p-3 sm:w-64"
+      data-coluna-card={ID_COLUNA_COMPROMISSOS}
+      className="flex w-[85vw] max-w-sm shrink-0 snap-center flex-col gap-2.5 overflow-y-auto rounded-xl border border-gaiamum-primary/40 bg-gaiamum-surface p-3 sm:w-64 sm:snap-align-none"
       style={{ maxHeight: "var(--altura-maxima-coluna-kanban)" }}
     >
-      {resultado.status !== "oculto" && <BlocoCompromissos resultado={resultado} hoje={hoje} />}
-
-      <ListaContasDoDiaKanban contas={contasDoDia} />
-
-      <Link href="/agenda?visao=dia" className="mt-auto text-xs text-gaiamum-text-muted underline hover:text-gaiamum-text">
-        Abrir a Agenda
-      </Link>
+      <ColunaCompromissosDoDiaCliente
+        chaveInicial={chaveHoje}
+        rotuloDataInicial={rotuloData}
+        resultadoInicial={resultado}
+        contasInicial={contasDoDia}
+      />
     </div>
   );
 }

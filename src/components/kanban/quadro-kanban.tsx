@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { mensagemDeErro } from "@/lib/erro-cliente";
 import type { Anexo, ChecklistItem, ColunaKanban, Etiqueta, MembroTenant, Tarefa, TarefaEtiqueta, TarefaMembro, Turno } from "@/lib/ecc/tipos";
-import { calcularNovaOrdem, calcularVelocidadeAutoScroll, encontrarColunaEmFoco, gerarIdCliente, tocarSomConcluido } from "@/lib/ecc/kanban";
+import {
+  ID_COLUNA_COMPROMISSOS,
+  calcularNovaOrdem,
+  calcularVelocidadeAutoScroll,
+  encontrarColunaEmFoco,
+  gerarIdCliente,
+  tocarSomConcluido,
+} from "@/lib/ecc/kanban";
 import {
   alternarDivisaoEmTurnos,
   criarColuna,
@@ -741,9 +748,26 @@ export function QuadroKanban({
   const todasAsColunasNaOrdem = colunaFixa ? [...colunasAbertas, colunaFixa] : colunasAbertas;
   const tarefasConcluidas = colunaFixa ? tarefas.filter((t) => t.coluna_id === colunaFixa.id).length : 0;
   const percentualConcluido = tarefas.length > 0 ? Math.round((tarefasConcluidas / tarefas.length) * 100) : 0;
-  const indiceFoco = Math.max(0, todasAsColunasNaOrdem.findIndex((c) => c.id === colunaFocoId));
-  const colunaEmFoco = todasAsColunasNaOrdem[indiceFoco] ?? null;
-  const contagemColunaFoco = colunaEmFoco ? tarefas.filter((t) => t.coluna_id === colunaEmFoco.id).length : 0;
+  // Opções do seletor/setas de navegação móvel (cabeçalho abaixo) — achado
+  // real (2026-10-04): "Compromissos do dia" é um ReactNode solto (nunca
+  // fez parte de `colunas`/`todasAsColunasNaOrdem`, que só tem
+  // `ColunaKanban` de verdade), então o seletor nunca oferecia ir pra ela, e
+  // o contador "Coluna X de Y" nunca contava com ela. Lista derivada SÓ pra
+  // esta navegação — `colunasDoProjeto` (passada pro cartão, pro menu
+  // "Mover para...") continua sendo `todasAsColunasNaOrdem` puro, já que
+  // Compromissos nunca é um destino válido de cartão.
+  const opcoesNavegacao = [
+    ...(colunaCompromissos
+      ? [{ id: ID_COLUNA_COMPROMISSOS, nome: "📅 Compromissos do dia", contagem: null as number | null }]
+      : []),
+    ...todasAsColunasNaOrdem.map((c) => ({
+      id: c.id,
+      nome: c.nome,
+      contagem: tarefas.filter((t) => t.coluna_id === c.id).length,
+    })),
+  ];
+  const indiceFoco = Math.max(0, opcoesNavegacao.findIndex((o) => o.id === colunaFocoId));
+  const opcaoEmFoco = opcoesNavegacao[indiceFoco] ?? null;
 
   function renderColuna(coluna: ColunaKanban, ehFixa: boolean) {
     const tarefasDaColuna = tarefas.filter((t) => t.coluna_id === coluna.id).sort((a, b) => a.ordem - b.ordem);
@@ -1042,11 +1066,11 @@ export function QuadroKanban({
           em notebook/tablet touch: a barra aparece a mais ali, sem remover
           nada do comportamento desktop existente (colunas continuam w-64,
           lado a lado, arrasto nativo). */}
-      {todasAsColunasNaOrdem.length > 0 && (
+      {opcoesNavegacao.length > 0 && (
         <div className="mb-2 hidden items-center gap-2 max-[1023px]:flex [@media(pointer:coarse)]:flex">
           <button
             type="button"
-            onClick={() => irParaColuna(todasAsColunasNaOrdem[Math.max(0, indiceFoco - 1)].id)}
+            onClick={() => irParaColuna(opcoesNavegacao[Math.max(0, indiceFoco - 1)].id)}
             disabled={indiceFoco <= 0}
             aria-label="Coluna anterior"
             className="shrink-0 rounded-lg border border-gaiamum-border px-2.5 py-1.5 text-gaiamum-text-muted disabled:opacity-30"
@@ -1057,25 +1081,26 @@ export function QuadroKanban({
           <label className="flex min-w-0 flex-1 flex-col items-center">
             <span className="sr-only">Escolher coluna</span>
             <select
-              value={colunaEmFoco?.id ?? ""}
+              value={opcaoEmFoco?.id ?? ""}
               onChange={(e) => irParaColuna(e.target.value)}
               className="w-full truncate rounded-lg border border-transparent bg-transparent text-center text-sm font-semibold text-gaiamum-text outline-none"
             >
-              {todasAsColunasNaOrdem.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome} ({tarefas.filter((t) => t.coluna_id === c.id).length})
+              {opcoesNavegacao.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.nome} {o.contagem !== null ? `(${o.contagem})` : ""}
                 </option>
               ))}
             </select>
             <span className="text-[11px] text-gaiamum-text-muted">
-              Coluna {indiceFoco + 1} de {todasAsColunasNaOrdem.length} · {contagemColunaFoco} cartão(ões)
+              Coluna {indiceFoco + 1} de {opcoesNavegacao.length}
+              {opcaoEmFoco?.contagem !== null ? ` · ${opcaoEmFoco?.contagem} cartão(ões)` : ""}
             </span>
           </label>
 
           <button
             type="button"
-            onClick={() => irParaColuna(todasAsColunasNaOrdem[Math.min(todasAsColunasNaOrdem.length - 1, indiceFoco + 1)].id)}
-            disabled={indiceFoco >= todasAsColunasNaOrdem.length - 1}
+            onClick={() => irParaColuna(opcoesNavegacao[Math.min(opcoesNavegacao.length - 1, indiceFoco + 1)].id)}
+            disabled={indiceFoco >= opcoesNavegacao.length - 1}
             aria-label="Próxima coluna"
             className="shrink-0 rounded-lg border border-gaiamum-border px-2.5 py-1.5 text-gaiamum-text-muted disabled:opacity-30"
           >

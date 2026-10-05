@@ -193,13 +193,17 @@ function formatarHoraBrasil(iso: string): string {
   });
 }
 
-/** Compromissos de hoje da pessoa logada, pra coluna do Kanban: eventos do
+/** Compromissos de um dia da pessoa logada, pra coluna do Kanban: eventos do
  * Google Calendar dela + compromissos do Gaiamum (a cópia do Google de um
  * compromisso do Gaiamum é descartada pra não repetir). Só aparece com o
  * Google conectado — sem conexão devolve `oculto` e o quadro não mostra a
- * coluna; conexão expirada devolve `expirado` pra avisar em vez de sumir. */
-export async function listarCompromissosDoDia(tenantId: string): Promise<ResultadoCompromissosDoDia> {
-  const { inicio, fimExclusivo } = limitesDoDia();
+ * coluna; conexão expirada devolve `expirado` pra avisar em vez de sumir.
+ * `chaveDia` (opcional, "AAAA-MM-DD") — pedido do Fabio (2026-10-04): poder
+ * espiar o dia seguinte pra planejar os cartões de hoje com base no que vem
+ * depois. Sem o parâmetro, continua sendo hoje (mesmo comportamento de
+ * antes) — `limitesDoDia()` já tratava isso, só não era exposto aqui. */
+export async function listarCompromissosDoDia(tenantId: string, chaveDia?: string): Promise<ResultadoCompromissosDoDia> {
+  const { inicio, fimExclusivo } = limitesDoDia(chaveDia);
   const supabase = await createClient();
 
   const [google, { data: manuais }] = await Promise.all([

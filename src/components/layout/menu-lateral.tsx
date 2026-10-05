@@ -9,6 +9,7 @@ import { SinoNotificacoes } from "@/components/layout/sino-notificacoes";
 import { BotaoSair } from "@/components/layout/botao-sair";
 import { EmailDaConta } from "@/components/layout/email-da-conta";
 import { LinksNavegacao } from "@/components/layout/links-navegacao";
+import { MenuLateralRetratil } from "@/components/layout/menu-lateral-retratil";
 import { MenuMobile } from "@/components/layout/menu-mobile";
 import { EmblemaPatente } from "@/components/lab/emblema-patente";
 import { LAB_VISIVEL } from "@/lib/ecc/lab/flags";
@@ -94,18 +95,18 @@ export function MenuLateral({
 }) {
   return (
     <>
-      {/* `sticky` + `h-screen`: o menu fica preso à altura da tela mesmo em
-          página comprida, então o e-mail da conta e o "Sair" do rodapé estão
-          sempre à vista — sem isso o rodapé ia parar no fim da página.
-          Critério de visibilidade (achado real, 2026-10-01): NÃO é só a
+      {/* Critério de visibilidade (achado real, 2026-10-01): NÃO é só a
           largura (`sm:`, 640px) — um celular DEITADO facilmente ultrapassa
-          isso (ex.: 844px) e ativaria este menu de 240px fixos, roubando um
-          quarto da largura do quadro kanban exatamente na hora em que mais
-          sobra espaço útil. Por isso soma `pointer: fine` (mouse de verdade)
-          como critério independente de largura — só aparece em desktop/
-          notebook real; qualquer dispositivo de toque, não importa a
-          largura, usa o `MenuMobile` (cabeçalho + painel) abaixo. */}
-      <aside className="hidden h-screen w-60 shrink-0 flex-col self-start overflow-hidden border-r border-gaiamum-border bg-gaiamum-surface px-4 py-6 [@media(min-width:640px)_and_(pointer:fine)]:sticky [@media(min-width:640px)_and_(pointer:fine)]:top-0 [@media(min-width:640px)_and_(pointer:fine)]:flex">
+          isso (ex.: 844px) e ativaria este menu, roubando espaço do quadro
+          kanban exatamente na hora em que mais sobra espaço útil. Por isso
+          soma `pointer: fine` (mouse de verdade) como critério independente
+          de largura — só aparece em desktop/notebook real; qualquer
+          dispositivo de toque, não importa a largura, usa o `MenuMobile`
+          (cabeçalho + painel) abaixo. A largura/retração em si (sticky,
+          h-screen, recolher/expandir) vive em `MenuLateralRetratil` — pedido
+          do Fabio (2026-10-04): "quero usar o cartão Kanban na tela
+          inteira... deixa o menu retrátil". */}
+      <MenuLateralRetratil>
         <div className="mb-8 flex items-center justify-between px-2">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/brand/crab-mark.png" alt="" width={32} height={32} />
@@ -146,7 +147,7 @@ export function MenuLateral({
           </Suspense>
           <BotaoSair />
         </div>
-      </aside>
+      </MenuLateralRetratil>
 
       <MenuMobile
         temMetasSmart={temMetasSmart}

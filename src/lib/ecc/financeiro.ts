@@ -318,24 +318,33 @@ export async function desmarcarComoPaga(contaId: string) {
   revalidatePath("/financeiro/avulsas");
 }
 
-/** Contas a pagar (fixas ou avulsas) que vencem HOJE e ainda não foram
+const CHAVE_DIA_VALIDA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Contas a pagar (fixas ou avulsas) que vencem num dia e ainda não foram
  * pagas — usado pela coluna "Compromissos de hoje" do Kanban pra destacar,
  * ao lado dos compromissos do Google, o que precisa ser resolvido no dia
  * (pedido do Fabio, 2026-09-29). Financeiro é owner-only: quem não é owner
  * do workspace nunca vê nada aqui (a RLS de `contas_a_pagar` já garante
  * isso, mas checar o papel antes evita uma query owner-only inútil pra
- * quem não vai ver resultado nenhum). */
-export async function listarContasDoDia(tenantId: string): Promise<ContaAPagar[]> {
+ * quem não vai ver resultado nenhum).
+ * `chaveDia` (opcional, "AAAA-MM-DD") — pedido do Fabio (2026-10-04): poder
+ * espiar as contas do dia seguinte junto com os compromissos. Formato
+ * inválido/ausente cai no padrão de sempre (hoje) — nunca quebra, só
+ * ignora um valor malformado. */
+export async function listarContasDoDia(tenantId: string, chaveDia?: string): Promise<ContaAPagar[]> {
   if ((await obterPapelAtual(tenantId)) !== "owner") return [];
 
   const supabase = await createClient();
-  const hojeISO = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO_BRASIL }).format(new Date());
+  const dataAlvo =
+    chaveDia && CHAVE_DIA_VALIDA.test(chaveDia)
+      ? chaveDia
+      : new Intl.DateTimeFormat("en-CA", { timeZone: FUSO_BRASIL }).format(new Date());
 
   const { data, error } = await supabase
     .from("contas_a_pagar")
     .select("*")
     .eq("tenant_id", tenantId)
-    .eq("data_vencimento", hojeISO)
+    .eq("data_vencimento", dataAlvo)
     .eq("pago", false)
     .order("valor", { ascending: false });
 

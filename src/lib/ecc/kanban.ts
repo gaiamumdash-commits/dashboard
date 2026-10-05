@@ -1,5 +1,18 @@
 import type { CorEtiqueta, MembroTenant, Tarefa } from "@/lib/ecc/tipos";
 
+/** Id estável da coluna fixa "Compromissos do dia" (`ColunaCompromissosDoDia`,
+ * Server Component) — compartilhado entre ela e `QuadroKanban` (cliente) pra
+ * marcar o `data-coluna-card` da mesma forma nos dois lados. Achado real
+ * (2026-10-04, Fabio não conseguia ver essa coluna no celular): faltava o
+ * atributo `data-coluna-card` e a classe `snap-center` nela — ela é um
+ * ReactNode solto, não faz parte do array `colunas` (que só tem
+ * `ColunaKanban` de verdade), então o rastreamento de "qual coluna está em
+ * foco durante a rolagem" (usado pelo seletor de coluna/setas do celular)
+ * simplesmente não sabia que ela existia. Não é um UUID de verdade de
+ * propósito — nunca é enviado ao banco, só usado como chave de DOM/estado
+ * no cliente. */
+export const ID_COLUNA_COMPROMISSOS = "compromissos-do-dia";
+
 /** Id otimista pra uma tarefa/coluna ainda não confirmada pelo servidor —
  * gerado no cliente e enviado como a PK real da linha (`criarTarefa`
  * insere com esse `id` em vez de deixar o banco gerar um novo), pra manter
