@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { NotificacaoApp } from "@/lib/ecc/tipos";
@@ -29,6 +29,12 @@ export function SinoNotificacoes({
   const [naoLidas, setNaoLidas] = useState(naoLidasIniciais);
   const [aberto, setAberto] = useState(false);
   const [notificacoes, setNotificacoes] = useState<NotificacaoApp[] | null>(null);
+  // No menu lateral do desktop o popover não pode ser `absolute`: a sidebar
+  // tem `overflow-hidden` (exigido pela animação de recolher) e cortava a
+  // lista na largura do menu (achado do Fabio, print de 2026-10-05). Com
+  // `fixed` ancorado na posição do sino, ele fica por cima da página.
+  const [posicaoFixa, setPosicaoFixa] = useState<{ top: number; left: number } | null>(null);
+  const botaoRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -41,6 +47,10 @@ export function SinoNotificacoes({
   function alternarAberto() {
     const vaiAbrir = !aberto;
     setAberto(vaiAbrir);
+    if (vaiAbrir && alinhamento === "left" && botaoRef.current) {
+      const r = botaoRef.current.getBoundingClientRect();
+      setPosicaoFixa({ top: r.bottom + 8, left: r.left });
+    }
     if (vaiAbrir) {
       listarNotificacoesRecentes().then(setNotificacoes);
     }
@@ -65,6 +75,7 @@ export function SinoNotificacoes({
   return (
     <div className="relative">
       <button
+        ref={botaoRef}
         type="button"
         onClick={alternarAberto}
         aria-label="Notificações"
@@ -80,8 +91,9 @@ export function SinoNotificacoes({
 
       {aberto && (
         <div
-          className={`absolute top-full z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-gaiamum-border bg-gaiamum-surface p-2 shadow-lg ${
-            alinhamento === "right" ? "right-0" : "left-0"
+          style={alinhamento === "left" && posicaoFixa ? { top: posicaoFixa.top, left: posicaoFixa.left } : undefined}
+          className={`z-50 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-gaiamum-border bg-gaiamum-surface p-2 shadow-lg ${
+            alinhamento === "right" ? "absolute right-0 top-full mt-2" : posicaoFixa ? "fixed" : "absolute left-0 top-full mt-2"
           }`}
         >
           <div className="flex items-center justify-between px-2 py-1">
