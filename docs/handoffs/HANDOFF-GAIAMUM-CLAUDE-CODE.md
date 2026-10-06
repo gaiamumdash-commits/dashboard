@@ -10,9 +10,11 @@
 
 ---
 
-## Estado confirmado (2026-10-05, sessão #72 — última atualização)
+## Estado confirmado (2026-10-06, sessão #72 — última atualização)
 
-**Resumo em uma linha**: **Frente 1 (Receitas) PUBLICADA em produção** — migration 0054 aplicada pelo Fabio no SQL Editor (confirmada via service role: tabela e colunas existem; anônimo vê 0 linhas), commit `9a6b161` em `origin/main` (push via @devops, `AIOX_ACTIVE_AGENT=devops`), `vercel deploy --prod` READY, `/financeiro/receitas` responde 200. **Pendente**: validação visual do Fabio (lançar receita de teste → conferir Entradas/Saldo/Comprometido no Painel → marcar recebida → excluir) e o teste dele de "Gerar sugestões" (decide o caminho A). Em seguida, Frente 2 Fase 1 (prompt copiável).
+**Resumo em uma linha**: sessão longa, **tudo publicado em produção e nada pendente no git** (último código `1dd0c87`; migrations 0054 e 0055 aplicadas pelo Fabio e confirmadas). Entregue: Receitas (Financeiro + Entradas no Painel, com próximos meses/atrasadas), convite "Instalar o app" (PWA) em Projetos/Painel/menu, Lab escondido também no sino/selo/cron, IA opcional ao criar projeto, sino não mais cortado, **Frente 2 Fase 1 — "Planejar na sua IA" por prompt copiável** (criação e menu ⋯ do projeto), aviso pós-cadastro novo, **seletor de workspace**, convite pendente dentro do app, olhinho de senha. **Próximo passo**: (1) confirmar com o Fabio se a Angeline aceitou o convite pelo cartão e vê "lançar um ebook"; (2) validações dele ainda abertas (lista em "Pendências em aberto" abaixo); (3) Frente 2 Fase 2 (recomendações em Página, prazos→datas, alarmes, Agenda, colunas) ou mover o painel "Acesso fechado" pra Configurações — perguntar qual. **Fluxo de publicação**: `@devops` com `AIOX_ACTIVE_AGENT=devops git push origin main` + `vercel deploy --prod`, checar `/auth` (ver `.claude/agent-memory/aiox-devops/`). **Validação visual**: build local com as 3 env do Supabase apontando pro Postgres de teste do Docker (`npx supabase status -o env`) + `next start -p 3055` + Playwright (`playwright-core` no scratchpad, Chrome do sistema); depois rodar `npm run build` normal de novo.
+
+**Detalhes da sessão #72 (05–06/10)**, em ordem:
 
 - **Correção pós-publicação (`3000f17`)**: a tela de Receitas só listava o mês atual, então parcelas futuras (seguro-desemprego out→jan) eram gravadas mas "sumiam". Agora mostra Atrasadas / Este mês / próximos meses + toast dizendo em que mês salvou. Validado pelo Fabio ("deu certo").
 - **Convite "Instalar o app" (PWA), pedido do Fabio**: o Gaiamum já era instalável (manifest + sw.js); agora tem card no Painel geral (1ª tela após o cadastro) + item "📲 Instalar o app" nos menus desktop e celular. 1 clique onde há `beforeinstallprompt` (Chrome/Edge/Android, capturado por script inline no <head> — `SCRIPT_CAPTURA_INSTALACAO` em `src/lib/instalar-app.ts`), passo a passo no iPhone/Safari Mac, some quando já roda como app, "Agora não" esconde 7 dias (localStorage, por aparelho). Lógica pura + 12 testes em `src/lib/__tests__/instalar-app.test.ts`. Não validado visualmente antes da publicação (Painel exige login com banco de produção) — validar com o Fabio no desktop.
@@ -1560,9 +1562,9 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 
 ## Checkpoints
 
-### 2026-10-05 (sessão nova #72) — Frente 1 (Receitas) implementada e testada, aguardando migration 0054 em produção; diagnóstico da IA interna
+### 2026-10-05/06 (sessão nova #72) — Receitas, PWA, prompt copiável (Fase 1), seletor de workspace; tudo publicado
 
-Resumo completo em "Estado confirmado" (sessão #72, no topo). Em uma linha: Fabio aprovou as recomendações das "Decisões em aberto" das 2 frentes; Receitas feita (tabela `receitas` + RLS owner-only que também barra projeto de outro workspace, tela `/financeiro/receitas`, card no Financeiro, Entradas real no Painel geral), 250/250 testes com integração, build ok, commit local sem push. Gemini interno: causa do "erro direto" já tinha sido a 0046 ausente (corrigida na #70); chamada de teste hoje funcionou.
+Resumo completo em "Estado confirmado" (sessão #72, no topo). Em uma linha: Fabio aprovou as recomendações das 2 frentes; Receitas (0054) e Fase 1 do prompt copiável (0055) publicadas; de quebra, a partir do uso real dele e da esposa: convite de instalar o app, Lab fora do sino/menu, IA opcional, sino cortado, aviso pós-cadastro, seletor de workspace, convite pendente no app, olhinho de senha e conta própria da Angeline. 298/298 testes; validação visual por Playwright em build de teste a cada mudança de tela. Último commit de código `1dd0c87`; git sem pendências.
 
 ### 2026-10-05 (sessão nova #70) — Redesenho do Painel geral CONCLUÍDO, aprovado e publicado em produção; próxima frente (Kanban) já combinada
 
