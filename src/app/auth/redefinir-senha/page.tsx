@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CampoSenha } from "@/components/campo-senha";
 import { ehErroDeSenhaCurta, MENSAGEM_SENHA_CURTA, TAMANHO_MINIMO_SENHA_NOVA } from "@/lib/senha";
+
+/** Sem sessão aqui = o link do e-mail não foi validado (expirou, já foi
+ * usado, ou é um link antigo aberto noutro navegador — ver
+ * `src/app/auth/confirmar/route.ts`). Antes aparecia "Auth session missing!". */
+const MENSAGEM_SEM_SESSAO =
+  "Não conseguimos validar o link do e-mail (ele expira e só pode ser usado uma vez). Volte pra tela de entrada, clique em “Esqueci minha senha” e use o link do e-mail novo.";
 
 export default function PaginaRedefinirSenha() {
   const router = useRouter();
@@ -34,7 +41,13 @@ export default function PaginaRedefinirSenha() {
     setCarregando(false);
 
     if (error) {
-      setErro(ehErroDeSenhaCurta(error.message) ? MENSAGEM_SENHA_CURTA : error.message);
+      setErro(
+        ehErroDeSenhaCurta(error.message)
+          ? MENSAGEM_SENHA_CURTA
+          : /session missing/i.test(error.message)
+            ? MENSAGEM_SEM_SESSAO
+            : error.message,
+      );
       return;
     }
 
@@ -60,6 +73,11 @@ export default function PaginaRedefinirSenha() {
           </label>
 
           {erro && <p className="text-sm text-gaiamum-danger">{erro}</p>}
+          {erro === MENSAGEM_SEM_SESSAO && (
+            <Link href="/auth" className="text-sm text-gaiamum-primary underline">
+              Voltar pra tela de entrada
+            </Link>
+          )}
 
           <button
             type="submit"

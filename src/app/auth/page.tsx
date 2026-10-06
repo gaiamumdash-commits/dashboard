@@ -17,6 +17,9 @@ import { ehErroDeSenhaCurta, MENSAGEM_SENHA_CURTA, TAMANHO_MINIMO_SENHA_LOGIN, T
 const AVISO_DEPOIS_DO_CADASTRO =
   "Se este e-mail ainda não tinha conta, enviamos um link de confirmação: confira sua caixa de entrada (e o spam), clique no link e depois entre aqui. Se você já se cadastrou antes, não vai chegar e-mail nenhum — é só entrar com sua senha ou usar “Esqueci a senha”.";
 
+const AVISO_LINK_INVALIDO =
+  "Esse link expirou ou já foi usado. Peça um novo: clique em “Esqueci minha senha” (pra trocar a senha) ou entre com a sua senha, se já tiver confirmado o e-mail.";
+
 /** O Supabase manda essas mensagens em inglês, sem contexto nenhum do
  * Gaiamum — quem recebeu um convite e nunca usou o app antes não entende
  * "Email not confirmed" nem sabe que precisa procurar um e-mail de
@@ -64,7 +67,10 @@ function FormularioAuth() {
   const [modo, setModo] = useState<"login" | "cadastro" | "recuperacao">("login");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [erro, setErro] = useState<string | null>(null);
+  // Vindo de um link de e-mail expirado/já usado (`/auth/confirmar`).
+  const [erro, setErro] = useState<string | null>(() =>
+    searchParams.get("aviso") === "link-invalido" ? AVISO_LINK_INVALIDO : null,
+  );
   const [aviso, setAviso] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
