@@ -6,6 +6,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { iniciarLoginGoogle } from "@/lib/ecc/auth-google";
 import { CampoSenha } from "@/components/campo-senha";
+import { ehErroDeSenhaCurta, MENSAGEM_SENHA_CURTA, TAMANHO_MINIMO_SENHA_LOGIN, TAMANHO_MINIMO_SENHA_NOVA } from "@/lib/senha";
 
 /** Depois de "Criar conta", a MESMA mensagem pros dois casos — e-mail novo
  * (o Supabase manda o link de confirmação) e e-mail que já tinha conta (o
@@ -28,6 +29,9 @@ function mensagemDeErroAuth(mensagem: string): string {
   }
   if (mensagem === "Invalid login credentials") {
     return "E-mail ou senha incorretos.";
+  }
+  if (ehErroDeSenhaCurta(mensagem)) {
+    return MENSAGEM_SENHA_CURTA;
   }
   return mensagem;
 }
@@ -235,6 +239,7 @@ function FormularioAuth() {
               <CampoSenha
                 value={senha}
                 onChange={setSenha}
+                minLength={modo === "cadastro" ? TAMANHO_MINIMO_SENHA_NOVA : TAMANHO_MINIMO_SENHA_LOGIN}
                 autoComplete={modo === "cadastro" ? "new-password" : "current-password"}
               />
             </label>

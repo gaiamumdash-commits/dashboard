@@ -53,6 +53,8 @@ export function CampoSenha({
         >
           Mostrar senha
         </span>
+        {/* Só em senha NOVA (cadastro/redefinição), onde a regra é 8+. */}
+        {minLength >= 8 && <span className="ml-auto text-xs text-gaiamum-text-muted">Mínimo de {minLength} caracteres</span>}
       </span>
     </div>
   );

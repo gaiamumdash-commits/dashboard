@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CampoSenha } from "@/components/campo-senha";
+import { ehErroDeSenhaCurta, MENSAGEM_SENHA_CURTA, TAMANHO_MINIMO_SENHA_NOVA } from "@/lib/senha";
 
 export default function PaginaRedefinirSenha() {
   const router = useRouter();
@@ -18,6 +19,11 @@ export default function PaginaRedefinirSenha() {
     evento.preventDefault();
     setErro(null);
 
+    if (senha.length < TAMANHO_MINIMO_SENHA_NOVA) {
+      setErro(MENSAGEM_SENHA_CURTA);
+      return;
+    }
+
     if (senha !== confirmacao) {
       setErro("As senhas não coincidem.");
       return;
@@ -28,7 +34,7 @@ export default function PaginaRedefinirSenha() {
     setCarregando(false);
 
     if (error) {
-      setErro(error.message);
+      setErro(ehErroDeSenhaCurta(error.message) ? MENSAGEM_SENHA_CURTA : error.message);
       return;
     }
 
@@ -45,12 +51,12 @@ export default function PaginaRedefinirSenha() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
             Nova senha
-            <CampoSenha value={senha} onChange={setSenha} autoComplete="new-password" />
+            <CampoSenha value={senha} onChange={setSenha} autoComplete="new-password" minLength={TAMANHO_MINIMO_SENHA_NOVA} />
           </label>
 
           <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
             Confirmar senha
-            <CampoSenha value={confirmacao} onChange={setConfirmacao} autoComplete="new-password" />
+            <CampoSenha value={confirmacao} onChange={setConfirmacao} autoComplete="new-password" minLength={TAMANHO_MINIMO_SENHA_NOVA} />
           </label>
 
           {erro && <p className="text-sm text-gaiamum-danger">{erro}</p>}
