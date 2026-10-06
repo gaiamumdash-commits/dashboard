@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Anexo } from "@/lib/ecc/tipos";
 import { removerAnexo, urlAssinadaDoAnexo } from "@/lib/ecc/anexos";
+import { ACCEPT_ANEXOS } from "@/lib/ecc/anexos-regras";
 
 function formatarTamanho(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -82,6 +83,7 @@ export function AnexoArquivo({
         <input
           type="file"
           name="arquivo"
+          accept={ACCEPT_ANEXOS}
           required
           className="text-xs text-gaiamum-text-muted file:mr-2 file:rounded file:border-0 file:bg-gaiamum-surface-raised file:px-2 file:py-1 file:text-xs file:text-gaiamum-text"
         />

@@ -5,6 +5,9 @@ import { timingSafeEqual } from "node:crypto";
 // tese permite inferir o segredo por medição de tempo de resposta. Mesmo
 // padrão do projeto irmão `platform` (src/lib/cron-auth.ts).
 export function autorizacaoCronValida(header: string | null, segredo: string): boolean {
+  // Segredo vazio/ausente nunca autoriza (auditoria 2026-10-06): sem isso,
+  // `CRON_SECRET` não configurado faria o header "Bearer " passar.
+  if (!segredo || segredo.trim() === "") return false;
   const esperado = Buffer.from(`Bearer ${segredo}`);
   const recebido = Buffer.from(header ?? "");
   if (recebido.length !== esperado.length) return false;

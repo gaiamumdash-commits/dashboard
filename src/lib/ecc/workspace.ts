@@ -1,6 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
-import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
+import { obterUsuarioAtual } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { buscarConvitePendentePorEmail, vincularUsuarioAoConvite } from "@/lib/ecc/equipe";
 import { buscarMembershipAtual } from "@/lib/ecc/membership";
 import { emailAutorizadoNoBeta, modoCadastroFechado, registrarUsoDoAcessoBeta } from "@/lib/ecc/acesso-beta";
@@ -68,14 +69,17 @@ export async function garantirWorkspace(): Promise<string> {
     }
   }
 
-  // RPC (não insert direto via service client) de propósito: garantir_workspace_pessoal()
-  // usa um advisory lock por usuário pra serializar chamadas concorrentes — sem isso, 2
-  // requisições quase simultâneas do mesmo usuário sem membership ainda podiam criar 2
-  // workspaces distintos (achado real, ver comentário na migration 0040).
-  const supabase = await createClient();
+  // RPC com advisory lock por usuário (2 requisições simultâneas nunca
+  // criam 2 workspaces — migration 0040). Desde a auditoria de segurança
+  // (migration 0056) ela só é executável pelo service role: a checagem de
+  // convite/cadastro fechado acima é a ÚNICA porta de entrada — antes,
+  // qualquer conta logada criava workspace chamando a RPC direto pela API.
+  // `user.id` vem da sessão revalidada no servidor, nunca do navegador.
+  const service = createServiceClient();
   const nomeWorkspace = user.email ? `Workspace de ${user.email}` : "Meu workspace";
 
-  const { data: tenantId, error: erroRpc } = await supabase.rpc("garantir_workspace_pessoal", {
+  const { data: tenantId, error: erroRpc } = await service.rpc("garantir_workspace_pessoal_para", {
+    p_user_id: user.id,
     p_nome: nomeWorkspace,
   });
 

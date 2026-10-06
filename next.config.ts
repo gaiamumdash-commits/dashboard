@@ -17,6 +17,27 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "16mb",
     },
   },
+  // Cabeçalhos de segurança (auditoria de 2026-10-06 — produção só tinha o
+  // HSTS que a Vercel já põe). Sem CSP completa de propósito: o app tem
+  // scripts inline (tema, captura do convite de instalação) e fala com
+  // Supabase/Google — uma CSP restritiva mal calibrada quebra o login. Aqui
+  // só `frame-ancestors` (ninguém embute o Gaiamum num iframe pra enganar
+  // clique). Microfone liberado só pro próprio site (voz na Agenda e no
+  // planejamento); câmera e localização bloqueadas.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       {

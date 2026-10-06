@@ -22,6 +22,14 @@ import {
  * projetos — logo, só ele pode usar o assistente de IA pra planejar um.
  * Extraída aqui pra não duplicar a mensagem entre as duas Server Actions
  * deste arquivo. */
+/** Só repassa pro usuário as mensagens que NÓS escrevemos nas funções do
+ * banco (`raise exception ... using errcode = 'P0001'`, migrations 0051/0055);
+ * qualquer outro erro do Postgres (nome de constraint, detalhe interno) vira
+ * um texto genérico — achado da auditoria de segurança de 2026-10-06. */
+function motivoSeguro(error: { code?: string; message?: string } | null): string {
+  return error?.code === "P0001" && error.message ? error.message : "erro inesperado no servidor";
+}
+
 async function exigirOwner(tenantId: string): Promise<void> {
   if ((await obterPapelAtual(tenantId)) !== "owner") {
     throw new Error("Só o dono do workspace pode criar projetos novos.");
@@ -154,7 +162,7 @@ export async function criarProjetoComPlanejamentoIA(input: unknown): Promise<Res
   });
 
   if (error || !projetoId) {
-    return { status: "erro", mensagem: `Falha ao criar o projeto: ${error?.message ?? "erro desconhecido"}. Sua prévia não foi perdida — tente confirmar de novo.` };
+    return { status: "erro", mensagem: `Falha ao criar o projeto: ${motivoSeguro(error)}. Sua prévia não foi perdida — tente confirmar de novo.` };
   }
 
   revalidatePath("/projetos");
@@ -195,7 +203,7 @@ export async function adicionarTarefasPlanejadas(input: unknown): Promise<Result
   });
 
   if (error) {
-    return { status: "erro", mensagem: `Não deu pra adicionar as tarefas: ${error.message}. Sua prévia não foi perdida — tente de novo.` };
+    return { status: "erro", mensagem: `Não deu pra adicionar as tarefas: ${motivoSeguro(error)}. Sua prévia não foi perdida — tente de novo.` };
   }
 
   revalidatePath(`/projetos/${projetoId}/tarefas`);

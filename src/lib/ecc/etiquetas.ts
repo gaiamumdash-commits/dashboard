@@ -35,7 +35,10 @@ export async function adicionarEtiquetaNaTarefa(
     .from("etiquetas")
     .select("id")
     .eq("tenant_id", tenantId)
-    .ilike("nome", nomeLimpo)
+    // `ilike` só pra ignorar maiúsculas — `%`, `_` e `\` escapados pra o
+    // nome ser comparado literalmente (sem isso "%" casava com qualquer
+    // etiqueta do workspace; auditoria de 2026-10-06).
+    .ilike("nome", nomeLimpo.replace(/[\\%_]/g, (c) => `\\${c}`))
     .maybeSingle();
 
   let etiquetaId = existente?.id as string | undefined;

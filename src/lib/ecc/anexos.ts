@@ -5,6 +5,7 @@ import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterPapelAtual } from "@/lib/ecc/equipe";
 import type { Anexo, EntidadeAnexo } from "@/lib/ecc/tipos";
+import { contentTypeDoAnexo, MENSAGEM_TIPO_NAO_ACEITO } from "@/lib/ecc/anexos-regras";
 
 const TAMANHO_MAXIMO_BYTES = 15 * 1024 * 1024; // 15MB — arquivo maior, o Fabio linka com Google Drive.
 
@@ -39,6 +40,11 @@ export async function enviarAnexoContaAPagar(contaId: string, formData: FormData
     throw new Error("Arquivo maior que 15MB — linke com o Google Drive em vez de anexar aqui.");
   }
 
+  const contentType = contentTypeDoAnexo(arquivo.name);
+  if (!contentType) {
+    throw new Error(MENSAGEM_TIPO_NAO_ACEITO);
+  }
+
   const user = await obterUsuarioAtual();
   if (!user) {
     throw new Error("Usuário não autenticado.");
@@ -48,7 +54,7 @@ export async function enviarAnexoContaAPagar(contaId: string, formData: FormData
   const storagePath = `${tenantId}/conta_a_pagar/${contaId}/${Date.now()}-${nomeSanitizado}`;
 
   const { error: erroUpload } = await supabase.storage.from("anexos").upload(storagePath, arquivo, {
-    contentType: arquivo.type || "application/octet-stream",
+    contentType,
   });
 
   if (erroUpload) {
@@ -62,7 +68,7 @@ export async function enviarAnexoContaAPagar(contaId: string, formData: FormData
     storage_path: storagePath,
     nome_arquivo: arquivo.name,
     tamanho_bytes: arquivo.size,
-    tipo_mime: arquivo.type || "application/octet-stream",
+    tipo_mime: contentType,
     enviado_por: user.id,
   });
 
@@ -87,6 +93,11 @@ export async function enviarAnexoTarefa(tarefaId: string, projetoId: string, for
     throw new Error("Arquivo maior que 15MB — linke com o Google Drive em vez de anexar aqui.");
   }
 
+  const contentType = contentTypeDoAnexo(arquivo.name);
+  if (!contentType) {
+    throw new Error(MENSAGEM_TIPO_NAO_ACEITO);
+  }
+
   const user = await obterUsuarioAtual();
   if (!user) {
     throw new Error("Usuário não autenticado.");
@@ -96,7 +107,7 @@ export async function enviarAnexoTarefa(tarefaId: string, projetoId: string, for
   const storagePath = `${tenantId}/tarefa/${tarefaId}/${Date.now()}-${nomeSanitizado}`;
 
   const { error: erroUpload } = await supabase.storage.from("anexos").upload(storagePath, arquivo, {
-    contentType: arquivo.type || "application/octet-stream",
+    contentType,
   });
 
   if (erroUpload) {
@@ -110,7 +121,7 @@ export async function enviarAnexoTarefa(tarefaId: string, projetoId: string, for
     storage_path: storagePath,
     nome_arquivo: arquivo.name,
     tamanho_bytes: arquivo.size,
-    tipo_mime: arquivo.type || "application/octet-stream",
+    tipo_mime: contentType,
     enviado_por: user.id,
   });
 
