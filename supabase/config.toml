@@ -258,6 +258,17 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Templates com a marca do Gaiamum, em português (2026-10-06). Isto vale pro
+# Supabase LOCAL; em produção o mesmo HTML é colado à mão no painel
+# (Authentication → Emails → Templates), com o mesmo assunto.
+[auth.email.template.recovery]
+subject = "Gaiamum: crie uma nova senha"
+content_path = "./supabase/templates/redefinir-senha.html"
+
+[auth.email.template.confirmation]
+subject = "Gaiamum: confirme seu e-mail"
+content_path = "./supabase/templates/confirmar-cadastro.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
