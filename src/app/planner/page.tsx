@@ -13,6 +13,7 @@ import { CardHoje } from "@/components/planner/card-hoje";
 import { CardMeusHabitos } from "@/components/planner/card-meus-habitos";
 import { CardEstaSemana } from "@/components/planner/card-esta-semana";
 import { BoasVindasPlanner } from "@/components/planner/boas-vindas";
+import { OpcaoResumoEmail } from "@/components/planner/opcao-resumo-email";
 
 export const metadata: Metadata = { title: "Meu Planner · Gaiamum" };
 
@@ -103,6 +104,8 @@ export default async function PaginaMeuPlanner() {
           <CardEstaSemana dias={semana.dias} concluidos={semana.concluidos} total={semana.total} hoje={hoje} />
         </div>
       </div>
+
+      {!primeiroAcesso && <OpcaoResumoEmail ligado={dados.preferencias?.resumo_diario ?? true} />}
     </EstruturaPlanner>
   );
 }

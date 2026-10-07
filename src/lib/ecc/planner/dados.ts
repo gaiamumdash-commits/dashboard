@@ -123,7 +123,7 @@ export async function carregarVisaoGeral(
     agenda,
   ] = await Promise.all([
     habitosERegistros(tenantId, semana),
-    supabase.from("planner_preferencias").select("areas").eq("tenant_id", tenantId).maybeSingle(),
+    supabase.from("planner_preferencias").select("areas, resumo_diario").eq("tenant_id", tenantId).maybeSingle(),
     supabase
       .from("planner_compromissos")
       .select("id, titulo, area, tipo, inicio, local, notas, pet_id, concluido")

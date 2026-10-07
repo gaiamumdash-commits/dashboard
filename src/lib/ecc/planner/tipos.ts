@@ -134,6 +134,8 @@ export type CompromissoPlanner = {
 
 export type PreferenciasPlanner = {
   areas: AreaPlanner[];
+  /** Resumo do dia por e-mail, às 7h (migration 0058). */
+  resumo_diario: boolean;
 };
 
 /** Retorno das Server Actions do Planner. Diferente do padrão antigo de

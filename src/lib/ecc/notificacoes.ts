@@ -1,6 +1,7 @@
 import "server-only";
 import { Resend } from "resend";
 import { formatarDataHoraBrasil } from "@/lib/ecc/kanban";
+import { assuntoDoResumo, textoDoResumo, type ResumoDiario } from "@/lib/ecc/planner/resumo-diario";
 
 // Enquanto o domínio gaiamum.com.br não estiver verificado no Resend, o
 // remetente de teste (onboarding@resend.dev) só entrega pro e-mail dono
@@ -543,4 +544,137 @@ export async function enviarEmailAtividade({
         }),
     ),
   );
+}
+
+// --------------------------------------------------------------------------
+// Resumo do dia do Planner (migration 0058). Diferente dos e-mails acima,
+// aqui TODO texto vindo da pessoa (título de compromisso, nome de hábito,
+// local) passa por `escaparHtml` — é conteúdo livre digitado no Planner.
+// --------------------------------------------------------------------------
+
+function escaparHtml(texto: string): string {
+  return texto
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function secaoResumo(titulo: string, linhas: string[]): string {
+  if (linhas.length === 0) return "";
+  return `
+                <p style="margin:20px 0 8px;color:#011f51;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${titulo}</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  ${linhas
+                    .map(
+                      (linha) =>
+                        `<tr><td style="padding:8px 0;border-bottom:1px solid #eef0f4;color:#1f2937;font-size:15px;line-height:1.4;">${linha}</td></tr>`,
+                    )
+                    .join("")}
+                </table>`;
+}
+
+export function montarHtmlResumoPlanner(r: ResumoDiario, nome: string, dataPorExtenso: string): string {
+  const hora = (h: string | null) =>
+    h ? `<span style="display:inline-block;min-width:48px;color:#0069fd;font-weight:600;">${h}</span>` : "";
+  const compromissos = r.compromissos.map(
+    (c) =>
+      `${hora(c.horario)}${escaparHtml(c.titulo)}${c.local ? `<br><span style="color:#6b7280;font-size:13px;margin-left:48px;">${escaparHtml(c.local)}</span>` : ""}`,
+  );
+  const rotinas = r.rotinas.map((x) => `${hora(x.horario)}${escaparHtml(x.nome)}`);
+  const habitos = r.habitos.map((h) => `○ ${escaparHtml(h)}`);
+  const manutencoes = r.manutencoes.map(
+    (m) =>
+      `🔧 ${escaparHtml(m.nome)} <span style="color:${m.atrasada ? "#b91c1c" : "#a16207"};font-size:13px;">· ${m.atrasada ? "atrasada" : "vence hoje"}</span>`,
+  );
+  const ontem = r.ontem
+    ? `<p style="margin:20px 0 0;padding:12px 14px;background-color:#f0fdf4;border-radius:10px;color:#166534;font-size:14px;">Ontem: <strong>${r.ontem.feitos} de ${r.ontem.planejados}</strong> hábitos e rotinas feitos.</p>`
+    : "";
+
+  return `
+<!doctype html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:0;background-color:#f5e9dc;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5e9dc;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:#011f51;padding:20px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="${URL_LOGO}" width="28" height="28" alt="" style="display:block;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <span style="color:#f5e9dc;font-size:16px;font-weight:600;">Gaiamum · Planner</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <p style="margin:0 0 4px;color:#6b7280;font-size:13px;">${escaparHtml(dataPorExtenso)}</p>
+                <h1 style="margin:0;color:#011f51;font-size:20px;font-weight:600;">Bom dia, ${escaparHtml(nome)}! Este é o seu dia.</h1>
+                ${secaoResumo("Compromissos", compromissos)}
+                ${secaoResumo("Rotinas", rotinas)}
+                ${secaoResumo("Hábitos de hoje", habitos)}
+                ${secaoResumo("Manutenções", manutencoes)}
+                ${ontem}
+                <a
+                  href="${URL_SITE}/planner"
+                  style="display:inline-block;margin-top:24px;background-color:#0069fd;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;"
+                >
+                  Abrir meu Planner
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px;border-top:1px solid #e5e7eb;">
+                <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.5;">
+                  Só você recebe este resumo — ninguém do seu workspace vê o seu Planner.
+                  Pra não receber mais, <a href="${URL_SITE}/planner#resumo-email" style="color:#6b7280;">desligue em Meu Planner</a>.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`.trim();
+}
+
+export async function enviarEmailResumoPlanner({
+  destinatario,
+  nome,
+  resumo,
+  dataPorExtenso,
+}: {
+  destinatario: string;
+  nome: string;
+  resumo: ResumoDiario;
+  dataPorExtenso: string;
+}): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails
+    .send({
+      from: REMETENTE_PADRAO,
+      to: destinatario,
+      subject: assuntoDoResumo(resumo),
+      html: montarHtmlResumoPlanner(resumo, nome, dataPorExtenso),
+      text: textoDoResumo(resumo, nome, `${URL_SITE}/planner`),
+    })
+    .catch((erro) => ({ error: erro }));
+
+  if (error) {
+    console.error(`Falha ao enviar o resumo do Planner pra ${destinatario}:`, error);
+    return false;
+  }
+  return true;
 }

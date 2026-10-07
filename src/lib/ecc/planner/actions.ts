@@ -76,6 +76,16 @@ export async function salvarPreferenciasPlanner(areas: string[]): Promise<Result
   return resultado(error, "Não foi possível salvar suas preferências.");
 }
 
+/** Liga/desliga o "Resumo do dia" por e-mail (migration 0058). Cria a linha
+ * de preferências se ainda não existir, sem mexer nas áreas escolhidas. */
+export async function definirResumoDiario(ligado: boolean): Promise<ResultadoAcao> {
+  const { tenantId, supabase } = await contexto();
+  const { error } = await supabase
+    .from("planner_preferencias")
+    .upsert({ tenant_id: tenantId, resumo_diario: ligado === true, atualizado_em: new Date().toISOString() }, { onConflict: "user_id,tenant_id" });
+  return resultado(error, "Não foi possível salvar a preferência do e-mail.");
+}
+
 // --------------------------------------------------------------------------
 // Hábitos e rotinas
 // --------------------------------------------------------------------------

@@ -91,6 +91,15 @@ src/components/layout/grupo-navegacao-planner.tsx   grupo expansível do menu
 - Responsivo: ordem no celular saudação/foco → hoje → hábitos → áreas → semana → sugestão. Abas com rolagem horizontal, sem overflow (verificado em 25 rotas a 390px).
 - Acessibilidade: checkboxes com `role="checkbox"` e `aria-checked`; estado no rótulo (nunca só cor, com ✓ visível); tabelas com `caption`, `th scope` e `abbr` nos dias; foco visível; dá para marcar e desmarcar pelo teclado (testado).
 
+### Resumo do dia por e-mail (migration 0058)
+
+- **Quando:** todo dia às 7h de Brasília (`/api/cron/resumo-planner`, `0 10 * * *` UTC no `vercel.json`, protegido por `CRON_SECRET`).
+- **Conteúdo:** compromissos e consultas de hoje, rotinas com horário, hábitos de hoje, manutenções vencendo ou atrasadas e quantos hábitos e rotinas foram feitos ontem. Tem o botão "Abrir meu Planner". Dia sem nada não gera e-mail.
+- **Privacidade:** o cron usa service role (não tem sessão), mas monta cada e-mail só com as linhas do par (user_id, tenant_id) de quem recebe e só envia para quem ainda é membro do workspace. O texto digitado pela pessoa é escapado no HTML.
+- **Sem duplicar:** o cron grava `planner_preferencias.resumo_enviado_em = hoje` num UPDATE condicional antes de enviar. Se o envio falhar, a marcação volta para null.
+- **Desligar:** pelo botão "📬 Resumo do dia por e-mail" no Meu Planner (`/planner#resumo-email`, que é o link do rodapé do e-mail). O padrão é ligado.
+- Lógica pura em `src/lib/ecc/planner/resumo-diario.ts` (testada); HTML em `notificacoes.ts` (`montarHtmlResumoPlanner`).
+
 ## 9. Adiado de propósito
 
 - **IA** ("Planejar com IA" e "Reorganizar minha semana"): só o contrato (`proposta-ia.ts`) e os botões "Em breve".
