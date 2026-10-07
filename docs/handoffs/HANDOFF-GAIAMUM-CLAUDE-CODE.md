@@ -10,7 +10,20 @@
 
 ---
 
-## Estado confirmado (2026-10-06, sessão #72 — última atualização)
+## Estado confirmado (2026-10-07, sessão #73 — última atualização)
+
+**Resumo em uma linha**: **Planner V1 implementado e testado, NÃO publicado.** É um domínio novo com menu expansível (Meu Planner, Pessoal, Estudos, Casa, Saúde), com a tela "Meu Planner" seguindo o mockup aprovado (`docs/gaiamum/mockups/planner-mockup-aprovado-2026-10-07.jpg`). Documentação completa em `docs/planner/PLANNER_V1.md` e checklist manual em `docs/planner/PLANNER_V1_QA.md`. **Bloqueio para publicar**: o Fabio aplicar `supabase/migrations/0057_planner.sql` no SQL Editor de produção ANTES do deploy (sem ela, /planner quebra e a Agenda falha ao ler `planner_compromissos`/`planner_manutencoes`). **Próximo passo**: (1) Fabio validar no build de teste ou aprovar a publicação; (2) aplicar a 0057; (3) push + `vercel deploy --prod` via `@devops`; (4) rodar o QA manual com 2 contas (privacidade A×B).
+
+- **Decisões do Fabio (AskUserQuestion, 07/10)**: (1) dado do Planner é **privado de cada pessoa** (`user_id` + `tenant_id`, RLS `planner_eh_meu`, nem o owner vê o Planner do membro); (2) **objetivos pessoais numa tabela leve própria** (`planner_objetivos`), com as Metas SMART só como referência em leitura (não estendemos `metas_smart`, que é 1 por horizonte e da equipe); (3) **datas do Planner ficam no Planner e a Agenda as lê** como a fonte `planner` (consultas, compromissos de pet, manutenções), sem virar `eventos_agenda` nem ir para o Google.
+- **Migration 0057**: 12 tabelas `planner_*`, RLS `for all` em todas, `user_id default auth.uid()`, `with check` impedindo apontar para hábito ou pet de outra pessoa, `grant` explícito só para `authenticated` (prepara para o fim do `auto_expose_new_tables` do Supabase em 2026-10-30), reversão documentada no topo. Nenhuma tabela existente foi alterada.
+- **Código**: `src/lib/ecc/planner/{tipos,regras,painel,dados,actions,proposta-ia}.ts`, `src/app/planner/{page,loading}.tsx`, `src/app/planner/[area]/page.tsx` (sub-abas em `?aba=`), `src/components/planner/*`, `src/components/layout/grupo-navegacao-planner.tsx`. Toques em código existente: `agenda.ts` (parâmetro `incluirPlanner`, padrão `true`; o Lab passa `false`), `tipos.ts` (fonte `planner`), `agenda-apresentacao.ts` (rótulo/cor lime), `detalhe-item-agenda.tsx` (item Planner sem alarme), `link-navegacao.tsx` (prop `exato`), `links-navegacao.tsx` (grupo Planner).
+- **Actions do Planner devolvem `{ok, erro}`** (não lançam), para a mensagem em português chegar à tela em produção. A IA ficou só como contrato (`proposta-ia.ts`, zod estrito, sem chamada de modelo). Os botões "Planejar com IA" e "Reorganizar minha semana" aparecem desabilitados, com "Em breve". O card "Sugestão do Gaiamum" é calculado, não é IA.
+- **Testes**: 359/359 (47 novos: 13 de RLS USER_A×USER_B em `tests/integration/rls-planner.test.ts`, mais regras, painel e contrato da IA). `tsc` limpo, `eslint` com 0 erros (3 avisos antigos do Lab), `npm run build` ok (rodado de novo no modo normal no fim).
+- **Validação visual (Playwright, build de teste na 3055 contra o Postgres do Docker)**: 25 rotas em desktop e 390px, temas claro e navy, sem overflow nem erro de console. Circuito real na conta vazia: boas-vindas → criar hábito pela tela → marcar hoje → recarregar persiste → dia futuro bloqueado → desmarcar pelo teclado. Na Agenda, os itens do Planner aparecem em lime. Achados corrigidos no caminho: constante de classe exportada de módulo "use client" chegava vazia num Server Component (movida para `estilos.ts`); `sr-only` em tabela com rolagem esticava a página no celular (`relative` no contêiner); grid sem `grid-cols-1` esticava no celular.
+- **Limitação conhecida**: rota inválida (`/planner/financeiro`) mostra a página 404, mas com HTTP 200 (o Next com `loading.tsx` envia o status antes do `notFound`).
+- **Contas de teste (só no Postgres local do Docker)**: `fabio.planner@teste.gaiamum.invalid` (com dados) e `novo.planner@teste.gaiamum.invalid` (vazia), senha `Planner-teste-123`. O script de seed fica no scratchpad da sessão e não foi versionado.
+
+## Estado confirmado (2026-10-06, sessão #72)
 
 **Resumo em uma linha**: sessão longa, **tudo publicado em produção e nada pendente no git** (último código `1dd0c87`; migrations 0054 e 0055 aplicadas pelo Fabio e confirmadas). Entregue: Receitas (Financeiro + Entradas no Painel, com próximos meses/atrasadas), convite "Instalar o app" (PWA) em Projetos/Painel/menu, Lab escondido também no sino/selo/cron, IA opcional ao criar projeto, sino não mais cortado, **Frente 2 Fase 1 — "Planejar na sua IA" por prompt copiável** (criação e menu ⋯ do projeto), aviso pós-cadastro novo, **seletor de workspace**, convite pendente dentro do app, olhinho de senha. **Próximo passo**: (1) confirmar com o Fabio se a Angeline aceitou o convite pelo cartão e vê "lançar um ebook"; (2) validações dele ainda abertas (lista em "Pendências em aberto" abaixo); (3) Frente 2 Fase 2 (recomendações em Página, prazos→datas, alarmes, Agenda, colunas) ou mover o painel "Acesso fechado" pra Configurações — perguntar qual. **Fluxo de publicação**: `@devops` com `AIOX_ACTIVE_AGENT=devops git push origin main` + `vercel deploy --prod`, checar `/auth` (ver `.claude/agent-memory/aiox-devops/`). **Validação visual**: build local com as 3 env do Supabase apontando pro Postgres de teste do Docker (`npx supabase status -o env`) + `next start -p 3055` + Playwright (`playwright-core` no scratchpad, Chrome do sistema); depois rodar `npm run build` normal de novo.
 
@@ -1563,6 +1576,10 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-10-07 (sessão #73) — Planner V1 implementado, testado e validado visualmente; aguardando migration 0057 + ok para publicar
+
+Resumo completo em "Estado confirmado" (sessão #73, no topo). Em uma linha: auditoria (Fase A) → 3 decisões de schema do Fabio (privado por pessoa, objetivos próprios, Agenda lê as datas do Planner) → migration 0057 com RLS provada A×B → Meu Planner seguindo o mockup + 4 áreas com todas as sub-abas → integração com a Agenda → contrato da IA sem modelo → docs `docs/planner/`. 359/359 testes, build ok. Nada publicado.
 
 ### 2026-10-05/06 (sessão nova #72) — Receitas, PWA, prompt copiável (Fase 1), seletor de workspace; tudo publicado
 

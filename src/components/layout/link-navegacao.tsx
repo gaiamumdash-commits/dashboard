@@ -13,16 +13,21 @@ import type { ReactNode } from "react";
 export function LinkNavegacao({
   href,
   onClick,
+  exato = false,
   className = "",
   children,
 }: {
   href: string;
   onClick?: () => void;
+  /** Só a rota exata conta como ativa (ex.: "Meu Planner" não acende em
+   * /planner/pessoal, que tem subitem próprio). */
+  exato?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const ativo = href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+  const ativo =
+    href === "/" || exato ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <Link

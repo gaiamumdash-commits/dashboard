@@ -34,7 +34,8 @@ export async function listarAgendaUnificadaLab(
   inicioSemana: Date,
   fimSemanaExclusivo: Date,
 ): Promise<{ itens: ItemAgenda[] }> {
-  const { itens } = await listarAgendaUnificada(tenantIdLab, true, inicioSemana, fimSemanaExclusivo, false);
+  // O Planner é dado pessoal do workspace real — nunca entra na agenda fictícia do Lab.
+  const { itens } = await listarAgendaUnificada(tenantIdLab, true, inicioSemana, fimSemanaExclusivo, false, false);
 
   return {
     itens: itens.map((item) => ({

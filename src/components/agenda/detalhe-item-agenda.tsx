@@ -77,7 +77,8 @@ export function DetalheItemAgenda({ item, aoFechar }: { item: ItemAgenda; aoFech
   // Alarme só existe pra entidades cobertas por `EntidadeAlarme` — google é
   // gerenciado pelo próprio Google, decisão não tem alarme (fora de escopo
   // desta rodada; `alarmes.entidade_tipo` no banco não aceita "decisao").
-  const suportaAlarme = item.fonte !== "google" && item.fonte !== "decisao";
+  // Itens do Planner também não (V1): são geridos na própria tela do Planner.
+  const suportaAlarme = item.fonte !== "google" && item.fonte !== "decisao" && item.fonte !== "planner";
 
   // Compromisso do Gaiamum ou evento do Google com hora marcada podem ser
   // editados/excluídos aqui. Eventos de dia inteiro do Google seguem sendo

@@ -12,6 +12,7 @@ import type {
   ResultadoAgenda,
   Tarefa,
 } from "@/lib/ecc/tipos";
+import type { CompromissoPlanner, ManutencaoPlanner } from "@/lib/ecc/planner/tipos";
 
 /** Junta os eventos do Google Calendar com as contas a pagar em aberto, as
  * tarefas com prazo e as decisões (todas só existiam no Financeiro/Kanban/
@@ -26,13 +27,26 @@ export async function listarAgendaUnificada(
   inicioSemana: Date,
   fimSemanaExclusivo: Date,
   incluirGoogle: boolean = true,
+  /** Compromissos e manutenções do Planner (migration 0057). Dado pessoal:
+   * a RLS só devolve as linhas da própria pessoa, então ninguém vê o Planner
+   * de outro membro na Agenda. O próprio Planner passa `false` (já lê essas
+   * tabelas com o estado de "concluído" que a Agenda não precisa). */
+  incluirPlanner: boolean = true,
 ): Promise<{ google: ResultadoAgenda; itens: ItemAgenda[] }> {
   const supabase = await createClient();
   const inicioIso = inicioSemana.toISOString();
   const fimIso = fimSemanaExclusivo.toISOString();
 
-  const [google, resultadoContas, resultadoTarefas, resultadoColunas, resultadoEventos, resultadoDecisoes] =
-    await Promise.all([
+  const [
+    google,
+    resultadoContas,
+    resultadoTarefas,
+    resultadoColunas,
+    resultadoEventos,
+    resultadoDecisoes,
+    resultadoCompromissosPlanner,
+    resultadoManutencoesPlanner,
+  ] = await Promise.all([
       incluirGoogle
         ? listarEventosGoogleCalendar(inicioSemana, fimSemanaExclusivo)
         : Promise.resolve<ResultadoAgenda>({ status: "nao_conectado" }),
@@ -67,6 +81,24 @@ export async function listarAgendaUnificada(
             .gte("data", inicioIso)
             .lt("data", fimIso)
         : Promise.resolve({ data: [] as Pick<Decisao, "id" | "titulo" | "projeto_id" | "data">[] }),
+      incluirPlanner
+        ? supabase
+            .from("planner_compromissos")
+            .select("id, titulo, area, inicio, local")
+            .eq("tenant_id", tenantId)
+            .eq("concluido", false)
+            .gte("inicio", inicioIso)
+            .lt("inicio", fimIso)
+        : Promise.resolve({ data: [] as Pick<CompromissoPlanner, "id" | "titulo" | "area" | "inicio" | "local">[] }),
+      incluirPlanner
+        ? supabase
+            .from("planner_manutencoes")
+            .select("id, nome, proxima_data")
+            .eq("tenant_id", tenantId)
+            .eq("ativo", true)
+            .gte("proxima_data", paraDataISO(inicioSemana))
+            .lt("proxima_data", paraDataISO(fimSemanaExclusivo))
+        : Promise.resolve({ data: [] as Pick<ManutencaoPlanner, "id" | "nome" | "proxima_data">[] }),
     ]);
 
   const mapaColunaConcluida = new Map(
@@ -164,7 +196,33 @@ export async function listarAgendaUnificada(
     };
   });
 
-  const itens = [...itensGoogle, ...itensContas, ...itensTarefas, ...itensManuais, ...itensDecisoes].sort(
+  const itensPlanner: ItemAgenda[] = [
+    ...((resultadoCompromissosPlanner.data as Pick<CompromissoPlanner, "id" | "titulo" | "area" | "inicio" | "local">[] | null) ?? []).map(
+      (compromisso) => ({
+        id: compromisso.id,
+        fonte: "planner" as const,
+        titulo: compromisso.titulo,
+        quando: compromisso.inicio,
+        fim: null,
+        link: `/planner/${compromisso.area}`,
+        badge: compromisso.local,
+      }),
+    ),
+    ...((resultadoManutencoesPlanner.data as Pick<ManutencaoPlanner, "id" | "nome" | "proxima_data">[] | null) ?? []).map(
+      (manutencao) => ({
+        id: manutencao.id,
+        fonte: "planner" as const,
+        titulo: `🔧 ${manutencao.nome}`,
+        // Manutenção é de dia inteiro (coluna `date`), como conta a pagar.
+        quando: manutencao.proxima_data as string,
+        fim: null,
+        link: "/planner/casa?aba=manutencoes",
+        badge: null,
+      }),
+    ),
+  ];
+
+  const itens = [...itensGoogle, ...itensContas, ...itensTarefas, ...itensManuais, ...itensDecisoes, ...itensPlanner].sort(
     (a, b) => new Date(a.quando).getTime() - new Date(b.quando).getTime(),
   );
 

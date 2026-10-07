@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { LinkNavegacao } from "@/components/layout/link-navegacao";
+import { GrupoNavegacaoPlanner } from "@/components/layout/grupo-navegacao-planner";
 
 /** Sem "use client" nem "use server": roda no servidor quando importado por
  * MenuLateral (aside desktop), e entra no bundle do cliente quando importado
@@ -42,6 +43,10 @@ export function LinksNavegacao({
       <LinkNavegacao href="/projetos" onClick={aoClicarLink}>
         Projetos
       </LinkNavegacao>
+      {/* Planner é pessoal (cada um vê só o seu), então aparece pra todo
+          mundo — inclusive quem entrou convidado só pra um quadro. Pra quem
+          tem acesso completo, fica logo depois da Agenda (abaixo). */}
+      {!acessoCompleto && <GrupoNavegacaoPlanner aoClicarLink={aoClicarLink} />}
       {acessoCompleto && (
         <>
           <LinkNavegacao href="/onboarding" onClick={aoClicarLink} className="flex items-center justify-between">
@@ -58,6 +63,7 @@ export function LinksNavegacao({
           <LinkNavegacao href="/agenda" onClick={aoClicarLink}>
             Agenda
           </LinkNavegacao>
+          <GrupoNavegacaoPlanner aoClicarLink={aoClicarLink} />
           {linkLab}
           <LinkNavegacao href="/configuracoes" onClick={aoClicarLink}>
             ⚙️ Configurações

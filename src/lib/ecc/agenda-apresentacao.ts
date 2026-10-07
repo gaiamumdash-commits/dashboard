@@ -35,6 +35,7 @@ export const RÓTULO_FONTE: Record<FonteItemAgenda, string> = {
   tarefa: "Kanban",
   evento_agenda: "Agenda",
   decisao: "Decisões",
+  planner: "Planner",
 };
 
 /** Mapeia cada fonte a uma das 6 cores fixas já usadas no kanban
@@ -46,4 +47,5 @@ export const COR_FONTE_AGENDA: Record<FonteItemAgenda, CorEtiqueta> = {
   tarefa: "purple",
   evento_agenda: "teal",
   decisao: "yellow",
+  planner: "lime",
 };

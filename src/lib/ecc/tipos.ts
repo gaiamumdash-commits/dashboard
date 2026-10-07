@@ -532,7 +532,9 @@ export type ResultadoAgenda =
 
 /** Um item da Agenda unificada — pode vir do Google ou de dentro do
  * próprio Gaiamum (conta a pagar, tarefa com prazo, evento manual/voz). */
-export type FonteItemAgenda = "google" | "conta_a_pagar" | "tarefa" | "evento_agenda" | "decisao";
+/** `planner`: compromisso ou manutenção do Planner (migration 0057) — dado
+ * pessoal, a RLS só devolve as linhas da própria pessoa. */
+export type FonteItemAgenda = "google" | "conta_a_pagar" | "tarefa" | "evento_agenda" | "decisao" | "planner";
 
 export type OrigemEventoAgenda = "manual" | "voz";
 
