@@ -85,6 +85,7 @@ src/components/layout/grupo-navegacao-planner.tsx   grupo expansível do menu
 - Menu com o grupo Planner expansível e estado ativo por rota.
 - Meu Planner no layout do mockup: hero com saudação pelo usuário logado e "Foco de hoje", sugestão calculada, 4 cards de área com anel de consistência e indicadores reais, Hoje, Meus hábitos (grade S T Q Q S S D) e Esta semana (placar N/M).
 - Hábitos e rotinas: criar, editar, arquivar, reativar, excluir, marcar e desmarcar (sem dia futuro), com acompanhamento semanal.
+- **Tudo é editável depois de criado** ("Editar" abre o mesmo formulário já preenchido): hábitos e rotinas, compromissos e consultas (título, data/hora, local, notas, pet), leituras, cursos e idiomas, manutenções, objetivos, pets e notas. Criar e editar usam a mesma validação (`src/lib/ecc/planner/validacao.ts`), então as duas regras nunca divergem.
 - Pessoal, Estudos, Casa e Saúde com todas as sub-abas pedidas.
 - Estados de UX: skeleton (`loading.tsx`), vazio por seção, primeiro acesso (boas-vindas com escolha de áreas), erro por toast e no formulário, botão desabilitado durante a ação, atualização otimista com reversão.
 - Responsivo: ordem no celular saudação/foco → hoje → hábitos → áreas → semana → sugestão. Abas com rolagem horizontal, sem overflow (verificado em 25 rotas a 390px).
@@ -95,7 +96,6 @@ src/components/layout/grupo-navegacao-planner.tsx   grupo expansível do menu
 - **IA** ("Planejar com IA" e "Reorganizar minha semana"): só o contrato (`proposta-ia.ts`) e os botões "Em breve".
 - Alarmes para itens do Planner (o `alarmes.entidade_tipo` não aceita esses tipos; seria uma migration a mais).
 - Espelhar compromissos do Planner no Google Calendar (decisão 3).
-- Editar compromisso, leitura ou curso depois de criados (hoje: status, progresso, marcar e excluir); editar manutenção (hoje: "feita hoje" e excluir).
 - Navegar para semanas passadas ou futuras no Planner (hoje: só a semana atual).
 - Saúde clínica (prontuário, exames, medicação): fora do escopo por definição.
 
@@ -110,4 +110,3 @@ src/components/layout/grupo-navegacao-planner.tsx   grupo expansível do menu
 1. Fabio aplicar a migration 0057 em produção **antes** do deploy.
 2. Fase 2 da IA no Planner, reaproveitando o padrão do planejamento de projetos (prompt copiável → prévia → confirmação), já com o contrato pronto.
 3. Alarme para consulta e manutenção (estender `alarmes.entidade_tipo`).
-4. Edição completa de compromissos, leituras e cursos.

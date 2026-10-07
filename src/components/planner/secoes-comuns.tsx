@@ -9,6 +9,7 @@ import {
   criarObjetivo,
   excluirCompromisso,
   excluirNota,
+  editarObjetivo,
   excluirObjetivo,
 } from "@/lib/ecc/planner/actions";
 import { formatarDataCurta, ROTULO_AREA } from "@/lib/ecc/planner/regras";
@@ -30,7 +31,7 @@ import { CaixaMarcar } from "@/components/planner/caixa-marcar";
 import { FormularioCompromisso, FormularioHabito } from "@/components/planner/formularios";
 import { GradeHabitos } from "@/components/planner/grade-habitos";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
-import { CLASSE_BOTAO_PRIMARIO, CLASSE_BOTAO_SECUNDARIO, CLASSE_CAMPO, CLASSE_CARD } from "@/components/planner/estilos";
+import { CLASSE_BOTAO_PRIMARIO, CLASSE_BOTAO_SECUNDARIO, CLASSE_CAMPO, CLASSE_CARD, CLASSE_LINK_EDITAR } from "@/components/planner/estilos";
 
 /** Card de seção das telas de área: título, descrição curta e ação. */
 export function CardSecao({
@@ -194,6 +195,9 @@ function LinhaObjetivo({ objetivo, hoje }: { objetivo: ObjetivoPlanner; hoje: st
           </option>
         ))}
       </select>
+      <BotaoDialogo titulo="Editar objetivo" className={CLASSE_LINK_EDITAR} rotulo="Editar">
+        {(fechar) => <FormularioObjetivo area={objetivo.area} objetivo={objetivo} aoSalvar={fechar} />}
+      </BotaoDialogo>
       <BotaoExcluir
         rotulo={`Excluir ${objetivo.titulo}`}
         confirmar={`Excluir o objetivo "${objetivo.titulo}"?`}
@@ -203,28 +207,41 @@ function LinhaObjetivo({ objetivo, hoje }: { objetivo: ObjetivoPlanner; hoje: st
   );
 }
 
-function FormularioObjetivo({ area, aoSalvar }: { area: AreaPlanner; aoSalvar: () => void }) {
+function FormularioObjetivo({ area, objetivo, aoSalvar }: { area: AreaPlanner; objetivo?: ObjetivoPlanner; aoSalvar: () => void }) {
   const { pendente, executar } = useAcaoPlanner();
   return (
     <form
       className="flex flex-col gap-4"
-      action={(formData) => executar(() => criarObjetivo(formData), { sucesso: "Objetivo criado.", aoConcluir: aoSalvar })}
+      action={(formData) =>
+        executar(() => (objetivo ? editarObjetivo(objetivo.id, formData) : criarObjetivo(formData)), {
+          sucesso: objetivo ? "Objetivo salvo." : "Objetivo criado.",
+          aoConcluir: aoSalvar,
+        })
+      }
     >
       <input type="hidden" name="area" value={area} />
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Objetivo
-        <input name="titulo" required maxLength={200} autoFocus placeholder="Terminar 2 livros até dezembro..." className={CLASSE_CAMPO} />
+        <input
+          name="titulo"
+          required
+          maxLength={200}
+          autoFocus
+          defaultValue={objetivo?.titulo}
+          placeholder="Terminar 2 livros até dezembro..."
+          className={CLASSE_CAMPO}
+        />
       </label>
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Prazo (opcional)
-        <input type="date" name="prazo" className={CLASSE_CAMPO} />
+        <input type="date" name="prazo" defaultValue={objetivo?.prazo ?? ""} className={CLASSE_CAMPO} />
       </label>
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Notas (opcional)
-        <textarea name="notas" maxLength={2000} rows={3} className={CLASSE_CAMPO} />
+        <textarea name="notas" maxLength={2000} rows={3} defaultValue={objetivo?.notas ?? ""} className={CLASSE_CAMPO} />
       </label>
       <button type="submit" disabled={pendente} className={CLASSE_BOTAO_PRIMARIO}>
-        {pendente ? "Salvando..." : "Criar objetivo"}
+        {pendente ? "Salvando..." : objetivo ? "Salvar" : "Criar objetivo"}
       </button>
     </form>
   );
@@ -405,7 +422,16 @@ function formatarInicio(iso: string): string {
   });
 }
 
-function LinhaCompromisso({ compromisso, nomePet, hoje }: { compromisso: CompromissoPlanner; nomePet: string | null; hoje: string }) {
+function LinhaCompromisso({
+  compromisso,
+  pets,
+  hoje,
+}: {
+  compromisso: CompromissoPlanner;
+  pets: { id: string; nome: string }[];
+  hoje: string;
+}) {
+  const nomePet = compromisso.pet_id ? (pets.find((p) => p.id === compromisso.pet_id)?.nome ?? null) : null;
   return (
     <li className="flex items-center gap-3 py-3">
       <CaixaMarcar origem="compromisso" id={compromisso.id} data={hoje} feito={compromisso.concluido} rotulo={compromisso.titulo} />
@@ -419,6 +445,9 @@ function LinhaCompromisso({ compromisso, nomePet, hoje }: { compromisso: Comprom
           {nomePet && ` · 🐾 ${nomePet}`}
         </p>
       </div>
+      <BotaoDialogo titulo={compromisso.tipo === "consulta" ? "Editar consulta" : "Editar compromisso"} className={CLASSE_LINK_EDITAR} rotulo="Editar">
+        {(fechar) => <FormularioCompromisso area={compromisso.area} compromisso={compromisso} pets={pets} aoSalvar={fechar} />}
+      </BotaoDialogo>
       <BotaoExcluir
         rotulo={`Excluir ${compromisso.titulo}`}
         confirmar={`Excluir "${compromisso.titulo}"? Ele também sai da sua Agenda.`}
@@ -451,7 +480,6 @@ export function SecaoCompromissos({
   const doTipo = compromissos.filter((c) => c.tipo === tipo);
   const proximos = doTipo.filter((c) => c.inicio >= agora || !c.concluido);
   const anteriores = doTipo.filter((c) => c.inicio < agora && c.concluido).reverse();
-  const nomes = new Map(pets.map((p) => [p.id, p.nome]));
 
   return (
     <CardSecao
@@ -473,7 +501,7 @@ export function SecaoCompromissos({
           {proximos.length > 0 && (
             <ul className="divide-y divide-gaiamum-border">
               {proximos.map((c) => (
-                <LinhaCompromisso key={c.id} compromisso={c} nomePet={c.pet_id ? (nomes.get(c.pet_id) ?? null) : null} hoje={hoje} />
+                <LinhaCompromisso key={c.id} compromisso={c} pets={pets} hoje={hoje} />
               ))}
             </ul>
           )}
@@ -482,7 +510,7 @@ export function SecaoCompromissos({
               <summary className="cursor-pointer text-gaiamum-text-muted hover:text-gaiamum-text">Já feitos ({anteriores.length})</summary>
               <ul className="mt-2 divide-y divide-gaiamum-border">
                 {anteriores.map((c) => (
-                  <LinhaCompromisso key={c.id} compromisso={c} nomePet={c.pet_id ? (nomes.get(c.pet_id) ?? null) : null} hoje={hoje} />
+                  <LinhaCompromisso key={c.id} compromisso={c} pets={pets} hoje={hoje} />
                 ))}
               </ul>
             </details>

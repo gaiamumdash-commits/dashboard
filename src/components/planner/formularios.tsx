@@ -1,9 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { criarCompromisso, criarHabito, editarHabito } from "@/lib/ecc/planner/actions";
+import { criarCompromisso, criarHabito, editarCompromisso, editarHabito } from "@/lib/ecc/planner/actions";
 import { NOME_DIA, ROTULO_AREA } from "@/lib/ecc/planner/regras";
-import { AREAS_PLANNER, type AreaPlanner, type HabitoPlanner, type TipoCompromisso, type TipoHabito } from "@/lib/ecc/planner/tipos";
+import { dataEHoraParaFormulario } from "@/lib/ecc/planner/validacao";
+import {
+  AREAS_PLANNER,
+  type AreaPlanner,
+  type CompromissoPlanner,
+  type HabitoPlanner,
+  type TipoCompromisso,
+  type TipoHabito,
+} from "@/lib/ecc/planner/tipos";
 import { hojeISOBrasil } from "@/lib/ecc/kanban";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
 import { CLASSE_BOTAO_PRIMARIO, CLASSE_CAMPO } from "@/components/planner/estilos";
@@ -147,59 +155,71 @@ export function FormularioCompromisso({
   areaFixa = false,
   tipo = "outro",
   pets = [],
+  compromisso,
   aoSalvar,
 }: {
   area: AreaPlanner;
   areaFixa?: boolean;
   tipo?: TipoCompromisso;
   pets?: { id: string; nome: string }[];
+  /** Presente = edição (área e tipo ficam como estão). */
+  compromisso?: CompromissoPlanner;
   aoSalvar?: () => void;
 }) {
   const { pendente, executar } = useAcaoPlanner();
   const [erro, setErro] = useState<string | null>(null);
+  const tipoAtual = compromisso?.tipo ?? tipo;
+  const quando = compromisso ? dataEHoraParaFormulario(compromisso.inicio) : { data: hojeISOBrasil(), hora: "09:00" };
+  const idErro = `erro-compromisso-${compromisso?.id ?? "novo"}`;
 
   return (
     <form
-      aria-describedby={erro ? "erro-compromisso" : undefined}
+      aria-describedby={erro ? idErro : undefined}
       className="flex flex-col gap-4"
       action={(formData) => {
         setErro(null);
         executar(
           async () => {
-            const resultado = await criarCompromisso(formData);
+            const resultado = compromisso ? await editarCompromisso(compromisso.id, formData) : await criarCompromisso(formData);
             if (!resultado.ok) setErro(resultado.erro);
             return resultado;
           },
-          { sucesso: "Compromisso salvo. Ele também aparece na sua Agenda.", aoConcluir: aoSalvar },
+          { sucesso: compromisso ? "Compromisso salvo." : "Compromisso salvo. Ele também aparece na sua Agenda.", aoConcluir: aoSalvar },
         );
       }}
     >
-      <input type="hidden" name="tipo" value={tipo} />
-      <Rotulo texto={tipo === "consulta" ? "Consulta" : "Compromisso"}>
+      <input type="hidden" name="tipo" value={tipoAtual} />
+      <Rotulo texto={tipoAtual === "consulta" ? "Consulta" : "Compromisso"}>
         <input
           name="titulo"
           required
           maxLength={200}
           autoFocus
-          placeholder={tipo === "consulta" ? "Dentista, check-up..." : tipo === "pet" ? "Vacina, banho e tosa..." : "Comprar filtro de água..."}
+          defaultValue={compromisso?.titulo}
+          placeholder={tipoAtual === "consulta" ? "Dentista, check-up..." : tipoAtual === "pet" ? "Vacina, banho e tosa..." : "Comprar filtro de água..."}
           className={CLASSE_CAMPO}
         />
       </Rotulo>
-      <SeletorArea area={area} fixa={areaFixa} />
+      {!compromisso && <SeletorArea area={area} fixa={areaFixa} />}
       <div className="grid grid-cols-2 gap-3">
         <Rotulo texto="Data">
-          <input type="date" name="data" required defaultValue={hojeISOBrasil()} className={CLASSE_CAMPO} />
+          <input type="date" name="data" required defaultValue={quando.data} className={CLASSE_CAMPO} />
         </Rotulo>
         <Rotulo texto="Horário">
-          <input type="time" name="hora" required defaultValue="09:00" className={CLASSE_CAMPO} />
+          <input type="time" name="hora" required defaultValue={quando.hora} className={CLASSE_CAMPO} />
         </Rotulo>
       </div>
       <Rotulo texto="Local (opcional)">
-        <input name="local" maxLength={200} className={CLASSE_CAMPO} />
+        <input name="local" maxLength={200} defaultValue={compromisso?.local ?? ""} className={CLASSE_CAMPO} />
       </Rotulo>
+      {compromisso && (
+        <Rotulo texto="Notas (opcional)">
+          <textarea name="notas" maxLength={1000} rows={2} defaultValue={compromisso.notas ?? ""} className={CLASSE_CAMPO} />
+        </Rotulo>
+      )}
       {pets.length > 0 && (
         <Rotulo texto="Pet (opcional)">
-          <select name="pet_id" defaultValue="" className={CLASSE_CAMPO}>
+          <select name="pet_id" defaultValue={compromisso?.pet_id ?? ""} className={CLASSE_CAMPO}>
             <option value="">Nenhum</option>
             {pets.map((p) => (
               <option key={p.id} value={p.id}>
@@ -209,7 +229,7 @@ export function FormularioCompromisso({
           </select>
         </Rotulo>
       )}
-      <ErroFormulario id="erro-compromisso" erro={erro} />
+      <ErroFormulario id={idErro} erro={erro} />
       <button type="submit" disabled={pendente} className={CLASSE_BOTAO_PRIMARIO}>
         {pendente ? "Salvando..." : "Salvar compromisso"}
       </button>

@@ -33,6 +33,10 @@ Pré-requisito: migration `0057_planner.sql` aplicada no ambiente testado. Use *
 - [ ] **Casa:** compras (adicionar com categoria, marcar, remover, "Limpar comprados"); cardápio (escrever numa célula e sair do campo salva; apagar o texto limpa); pet + compromisso do pet; manutenção ("Feita hoje" recalcula a próxima pela recorrência; status Atrasada / Em breve / Em dia).
 - [ ] **Saúde:** consulta aparece na Agenda (cor lime, rótulo "Planner"); hábitos de bem-estar; objetivos e anotações de bem-estar. Nenhum campo clínico.
 
+## Edição
+- [ ] Em cada item (hábito, rotina, compromisso/consulta, leitura, curso, idioma, manutenção, objetivo, pet, nota), "Editar" abre o formulário já preenchido. Salvar atualiza a tela e, ao recarregar, o valor novo continua.
+- [ ] Editar data e hora de uma consulta move o item na Agenda.
+
 ## Privacidade (obrigatório)
 - [ ] B não vê nada do Planner de A: cards, hábitos, compromissos.
 - [ ] Na **Agenda** de B, a consulta de A **não** aparece (e vice-versa).

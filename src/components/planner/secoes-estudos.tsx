@@ -1,13 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { atualizarCurso, atualizarLeitura, criarCurso, criarLeitura, excluirCurso, excluirLeitura } from "@/lib/ecc/planner/actions";
+import {
+  atualizarCurso,
+  atualizarLeitura,
+  criarCurso,
+  criarLeitura,
+  editarCurso,
+  editarLeitura,
+  excluirCurso,
+  excluirLeitura,
+} from "@/lib/ecc/planner/actions";
 import { formatarDataCurta } from "@/lib/ecc/planner/regras";
 import type { CursoPlanner, LeituraPlanner, ResultadoAcao, StatusCurso, StatusLeitura, TipoCurso } from "@/lib/ecc/planner/tipos";
 import { BotaoDialogo } from "@/components/planner/botao-dialogo";
 import { CardSecao, EstadoVazio } from "@/components/planner/secoes-comuns";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
-import { CLASSE_BOTAO_PRIMARIO, CLASSE_CAMPO } from "@/components/planner/estilos";
+import { CLASSE_BOTAO_PRIMARIO, CLASSE_CAMPO, CLASSE_LINK_EDITAR } from "@/components/planner/estilos";
 
 const ROTULO_STATUS_LEITURA: Record<StatusLeitura, string> = { quero_ler: "Quero ler", lendo: "Lendo", concluido: "Concluído" };
 const ROTULO_STATUS_CURSO: Record<StatusCurso, string> = { planejado: "Planejado", em_andamento: "Em andamento", concluido: "Concluído" };
@@ -97,43 +106,63 @@ function CartaoLeitura({ leitura }: { leitura: LeituraPlanner }) {
           aoSalvar={(v) => executar(() => atualizarLeitura(leitura.id, { progresso: v }))}
         />
       )}
-      <div className="flex justify-end">
+      {leitura.notas && <p className="whitespace-pre-wrap text-sm text-gaiamum-text-muted">{leitura.notas}</p>}
+      <div className="flex justify-end gap-3">
+        <BotaoDialogo titulo="Editar leitura" className={CLASSE_LINK_EDITAR} rotulo="Editar">
+          {(fechar) => <FormularioLeitura leitura={leitura} aoSalvar={fechar} />}
+        </BotaoDialogo>
         <ExcluirLink confirmar={`Excluir "${leitura.titulo}"?`} acao={() => excluirLeitura(leitura.id)} />
       </div>
     </li>
   );
 }
 
-function FormularioLeitura({ aoSalvar }: { aoSalvar: () => void }) {
+/** Criar (com status inicial) ou editar (título, autor, prazo, notas —
+ * status e progresso mudam direto no cartão). */
+function FormularioLeitura({ leitura, aoSalvar }: { leitura?: LeituraPlanner; aoSalvar: () => void }) {
   const { pendente, executar } = useAcaoPlanner();
   return (
-    <form className="flex flex-col gap-4" action={(fd) => executar(() => criarLeitura(fd), { sucesso: "Leitura adicionada.", aoConcluir: aoSalvar })}>
+    <form
+      className="flex flex-col gap-4"
+      action={(fd) =>
+        executar(() => (leitura ? editarLeitura(leitura.id, fd) : criarLeitura(fd)), {
+          sucesso: leitura ? "Leitura salva." : "Leitura adicionada.",
+          aoConcluir: aoSalvar,
+        })
+      }
+    >
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Título
-        <input name="titulo" required maxLength={200} autoFocus className={CLASSE_CAMPO} />
+        <input name="titulo" required maxLength={200} autoFocus defaultValue={leitura?.titulo} className={CLASSE_CAMPO} />
       </label>
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Autor (opcional)
-        <input name="autor" maxLength={120} className={CLASSE_CAMPO} />
+        <input name="autor" maxLength={120} defaultValue={leitura?.autor ?? ""} className={CLASSE_CAMPO} />
       </label>
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
-          Status
-          <select name="status" defaultValue="lendo" className={CLASSE_CAMPO}>
-            {Object.entries(ROTULO_STATUS_LEITURA).map(([v, r]) => (
-              <option key={v} value={v}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!leitura && (
+          <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
+            Status
+            <select name="status" defaultValue="lendo" className={CLASSE_CAMPO}>
+              {Object.entries(ROTULO_STATUS_LEITURA).map(([v, r]) => (
+                <option key={v} value={v}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
           Terminar até (opcional)
-          <input type="date" name="data_alvo" className={CLASSE_CAMPO} />
+          <input type="date" name="data_alvo" defaultValue={leitura?.data_alvo ?? ""} className={CLASSE_CAMPO} />
         </label>
       </div>
+      <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
+        Notas (opcional)
+        <textarea name="notas" maxLength={2000} rows={3} defaultValue={leitura?.notas ?? ""} className={CLASSE_CAMPO} />
+      </label>
       <button type="submit" disabled={pendente} className={CLASSE_BOTAO_PRIMARIO}>
-        {pendente ? "Salvando..." : "Adicionar leitura"}
+        {pendente ? "Salvando..." : leitura ? "Salvar" : "Adicionar leitura"}
       </button>
     </form>
   );
@@ -216,6 +245,7 @@ function CartaoCurso({ curso }: { curso: CursoPlanner }) {
         desabilitado={pendente}
         aoSalvar={(v) => executar(() => atualizarCurso(curso.id, { progresso: v }))}
       />
+      {curso.notas && <p className="whitespace-pre-wrap text-sm text-gaiamum-text-muted">{curso.notas}</p>}
       <div className="flex items-center justify-between">
         {curso.link ? (
           <a href={curso.link} target="_blank" rel="noreferrer noopener" className="text-xs text-gaiamum-primary hover:underline">
@@ -224,51 +254,84 @@ function CartaoCurso({ curso }: { curso: CursoPlanner }) {
         ) : (
           <span />
         )}
-        <ExcluirLink confirmar={`Excluir "${curso.nome}"?`} acao={() => excluirCurso(curso.id)} />
+        <div className="flex gap-3">
+          <BotaoDialogo titulo={curso.tipo === "idioma" ? "Editar idioma" : "Editar curso"} className={CLASSE_LINK_EDITAR} rotulo="Editar">
+            {(fechar) => <FormularioCurso tipo={curso.tipo} curso={curso} aoSalvar={fechar} />}
+          </BotaoDialogo>
+          <ExcluirLink confirmar={`Excluir "${curso.nome}"?`} acao={() => excluirCurso(curso.id)} />
+        </div>
       </div>
     </li>
   );
 }
 
-function FormularioCurso({ tipo, aoSalvar }: { tipo: TipoCurso; aoSalvar: () => void }) {
+/** Criar ou editar curso/idioma. Os 2 tipos mostram TODOS os campos na
+ * edição (nenhum dado some ao salvar); na criação, cada tipo mostra só o
+ * que costuma usar. Status e progresso mudam direto no cartão. */
+function FormularioCurso({ tipo, curso, aoSalvar }: { tipo: TipoCurso; curso?: CursoPlanner; aoSalvar: () => void }) {
   const { pendente, executar } = useAcaoPlanner();
   const idioma = tipo === "idioma";
+  const mostrarIdioma = idioma || Boolean(curso);
+  const mostrarCurso = !idioma || Boolean(curso);
   return (
-    <form className="flex flex-col gap-4" action={(fd) => executar(() => criarCurso(fd), { sucesso: "Adicionado.", aoConcluir: aoSalvar })}>
+    <form
+      className="flex flex-col gap-4"
+      action={(fd) =>
+        executar(() => (curso ? editarCurso(curso.id, fd) : criarCurso(fd)), {
+          sucesso: curso ? "Salvo." : "Adicionado.",
+          aoConcluir: aoSalvar,
+        })
+      }
+    >
       <input type="hidden" name="tipo" value={tipo} />
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         {idioma ? "Idioma" : "Curso"}
-        <input name="nome" required maxLength={200} autoFocus placeholder={idioma ? "Inglês, Espanhol..." : "Gestão de projetos..."} className={CLASSE_CAMPO} />
+        <input
+          name="nome"
+          required
+          maxLength={200}
+          autoFocus
+          defaultValue={curso?.nome}
+          placeholder={idioma ? "Inglês, Espanhol..." : "Gestão de projetos..."}
+          className={CLASSE_CAMPO}
+        />
       </label>
-      {idioma ? (
+      {mostrarIdioma && (
         <>
           <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
             Objetivo (opcional)
-            <input name="objetivo" maxLength={300} placeholder="Conversar em reuniões até junho..." className={CLASSE_CAMPO} />
+            <input name="objetivo" maxLength={300} defaultValue={curso?.objetivo ?? ""} placeholder="Conversar em reuniões até junho..." className={CLASSE_CAMPO} />
           </label>
           <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
             Frequência (opcional)
-            <input name="frequencia" maxLength={120} placeholder="3x por semana, 30 min" className={CLASSE_CAMPO} />
+            <input name="frequencia" maxLength={120} defaultValue={curso?.frequencia ?? ""} placeholder="3x por semana, 30 min" className={CLASSE_CAMPO} />
           </label>
         </>
-      ) : (
+      )}
+      {mostrarCurso && (
         <>
           <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
             Instituição (opcional)
-            <input name="instituicao" maxLength={120} className={CLASSE_CAMPO} />
+            <input name="instituicao" maxLength={120} defaultValue={curso?.instituicao ?? ""} className={CLASSE_CAMPO} />
           </label>
           <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
             Link (opcional)
-            <input type="url" name="link" maxLength={500} placeholder="https://" className={CLASSE_CAMPO} />
+            <input type="url" name="link" maxLength={500} defaultValue={curso?.link ?? ""} placeholder="https://" className={CLASSE_CAMPO} />
           </label>
         </>
       )}
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Concluir até (opcional)
-        <input type="date" name="data_alvo" className={CLASSE_CAMPO} />
+        <input type="date" name="data_alvo" defaultValue={curso?.data_alvo ?? ""} className={CLASSE_CAMPO} />
       </label>
+      {curso && (
+        <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
+          Notas (opcional)
+          <textarea name="notas" maxLength={2000} rows={3} defaultValue={curso.notas ?? ""} className={CLASSE_CAMPO} />
+        </label>
+      )}
       <button type="submit" disabled={pendente} className={CLASSE_BOTAO_PRIMARIO}>
-        {pendente ? "Salvando..." : idioma ? "Adicionar idioma" : "Adicionar curso"}
+        {pendente ? "Salvando..." : curso ? "Salvar" : idioma ? "Adicionar idioma" : "Adicionar curso"}
       </button>
     </form>
   );

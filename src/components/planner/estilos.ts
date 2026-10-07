@@ -14,5 +14,9 @@ export const CLASSE_BOTAO_PRIMARIO =
 export const CLASSE_BOTAO_SECUNDARIO =
   "rounded-lg border border-gaiamum-border px-4 py-2 text-sm font-medium text-gaiamum-text transition hover:bg-gaiamum-surface-raised disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gaiamum-primary";
 
+/** "Editar" discreto ao lado de "Excluir" nas listas. */
+export const CLASSE_LINK_EDITAR =
+  "text-xs text-gaiamum-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-gaiamum-primary";
+
 export const CLASSE_BOTAO_RODAPE_CARD =
   "mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-gaiamum-primary/10 px-4 py-2.5 text-sm font-medium text-gaiamum-primary transition hover:bg-gaiamum-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gaiamum-primary";

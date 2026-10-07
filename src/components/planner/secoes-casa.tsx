@@ -5,6 +5,8 @@ import {
   adicionarCompra,
   criarManutencao,
   criarPet,
+  editarManutencao,
+  editarPet,
   excluirCompra,
   excluirManutencao,
   excluirPet,
@@ -26,7 +28,7 @@ import { REFEICOES, type CelulaCardapio, type ItemCompra, type ManutencaoPlanner
 import { BotaoDialogo } from "@/components/planner/botao-dialogo";
 import { CardSecao, EstadoVazio } from "@/components/planner/secoes-comuns";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
-import { CLASSE_BOTAO_PRIMARIO, CLASSE_BOTAO_SECUNDARIO, CLASSE_CAMPO } from "@/components/planner/estilos";
+import { CLASSE_BOTAO_PRIMARIO, CLASSE_BOTAO_SECUNDARIO, CLASSE_CAMPO, CLASSE_LINK_EDITAR } from "@/components/planner/estilos";
 
 function dataLonga(chave: string): string {
   return `${formatarDataCurta(chave)}/${chave.slice(0, 4)}`;
@@ -241,24 +243,29 @@ export function SecaoCardapio({ semana, cardapio, hoje }: { semana: string; card
 // Pets — cadastro leve; compromissos do pet ficam em "Compromissos" (tipo pet)
 // --------------------------------------------------------------------------
 
-function FormularioPet({ aoSalvar }: { aoSalvar: () => void }) {
+function FormularioPet({ pet, aoSalvar }: { pet?: PetPlanner; aoSalvar: () => void }) {
   const { pendente, executar } = useAcaoPlanner();
   return (
-    <form className="flex flex-col gap-4" action={(fd) => executar(() => criarPet(fd), { sucesso: "Pet adicionado.", aoConcluir: aoSalvar })}>
+    <form
+      className="flex flex-col gap-4"
+      action={(fd) =>
+        executar(() => (pet ? editarPet(pet.id, fd) : criarPet(fd)), { sucesso: pet ? "Pet salvo." : "Pet adicionado.", aoConcluir: aoSalvar })
+      }
+    >
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Nome
-        <input name="nome" required maxLength={80} autoFocus className={CLASSE_CAMPO} />
+        <input name="nome" required maxLength={80} autoFocus defaultValue={pet?.nome} className={CLASSE_CAMPO} />
       </label>
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Tipo (opcional)
-        <input name="tipo" maxLength={60} placeholder="Cachorro, gato..." className={CLASSE_CAMPO} />
+        <input name="tipo" maxLength={60} defaultValue={pet?.tipo ?? ""} placeholder="Cachorro, gato..." className={CLASSE_CAMPO} />
       </label>
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Notas (opcional)
-        <textarea name="notas" maxLength={2000} rows={3} placeholder="Ração, veterinário, cuidados..." className={CLASSE_CAMPO} />
+        <textarea name="notas" maxLength={2000} rows={3} defaultValue={pet?.notas ?? ""} placeholder="Ração, veterinário, cuidados..." className={CLASSE_CAMPO} />
       </label>
       <button type="submit" disabled={pendente} className={CLASSE_BOTAO_PRIMARIO}>
-        {pendente ? "Salvando..." : "Adicionar pet"}
+        {pendente ? "Salvando..." : pet ? "Salvar" : "Adicionar pet"}
       </button>
     </form>
   );
@@ -285,14 +292,19 @@ export function SecaoPets({ pets }: { pets: PetPlanner[] }) {
               <p className="font-medium text-gaiamum-text">🐾 {p.nome}</p>
               {p.tipo && <p className="text-xs text-gaiamum-text-muted">{p.tipo}</p>}
               {p.notas && <p className="whitespace-pre-wrap text-sm text-gaiamum-text-muted">{p.notas}</p>}
-              <button
-                type="button"
-                disabled={pendente}
-                onClick={() => window.confirm(`Excluir ${p.nome}? Os compromissos dele continuam, sem o vínculo.`) && executar(() => excluirPet(p.id))}
-                className="mt-2 self-end text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
-              >
-                Excluir
-              </button>
+              <div className="mt-2 flex justify-end gap-3">
+                <BotaoDialogo titulo={`Editar ${p.nome}`} className={CLASSE_LINK_EDITAR} rotulo="Editar">
+                  {(fechar) => <FormularioPet pet={p} aoSalvar={fechar} />}
+                </BotaoDialogo>
+                <button
+                  type="button"
+                  disabled={pendente}
+                  onClick={() => window.confirm(`Excluir ${p.nome}? Os compromissos dele continuam, sem o vínculo.`) && executar(() => excluirPet(p.id))}
+                  className="text-xs text-gaiamum-text-muted hover:text-gaiamum-danger"
+                >
+                  Excluir
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -312,34 +324,59 @@ const CLASSE_STATUS: Record<StatusManutencao, string> = {
   sem_data: "bg-gaiamum-surface text-gaiamum-text-muted",
 };
 
-function FormularioManutencao({ aoSalvar }: { aoSalvar: () => void }) {
+function FormularioManutencao({ manutencao, aoSalvar }: { manutencao?: ManutencaoPlanner; aoSalvar: () => void }) {
   const { pendente, executar } = useAcaoPlanner();
   return (
-    <form className="flex flex-col gap-4" action={(fd) => executar(() => criarManutencao(fd), { sucesso: "Manutenção criada.", aoConcluir: aoSalvar })}>
+    <form
+      className="flex flex-col gap-4"
+      action={(fd) =>
+        executar(() => (manutencao ? editarManutencao(manutencao.id, fd) : criarManutencao(fd)), {
+          sucesso: manutencao ? "Manutenção salva." : "Manutenção criada.",
+          aoConcluir: aoSalvar,
+        })
+      }
+    >
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Manutenção
-        <input name="nome" required maxLength={120} autoFocus placeholder="Trocar filtro de água, limpar ar-condicionado..." className={CLASSE_CAMPO} />
+        <input
+          name="nome"
+          required
+          maxLength={120}
+          autoFocus
+          defaultValue={manutencao?.nome}
+          placeholder="Trocar filtro de água, limpar ar-condicionado..."
+          className={CLASSE_CAMPO}
+        />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
           Última vez (opcional)
-          <input type="date" name="ultima_realizacao" className={CLASSE_CAMPO} />
+          <input type="date" name="ultima_realizacao" defaultValue={manutencao?.ultima_realizacao ?? ""} className={CLASSE_CAMPO} />
         </label>
         <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
           Próxima data
-          <input type="date" name="proxima_data" className={CLASSE_CAMPO} />
+          <input type="date" name="proxima_data" defaultValue={manutencao?.proxima_data ?? ""} className={CLASSE_CAMPO} />
         </label>
       </div>
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Repetir a cada (meses, opcional)
-        <input type="number" name="recorrencia_meses" min={1} max={120} inputMode="numeric" placeholder="6" className={CLASSE_CAMPO} />
+        <input
+          type="number"
+          name="recorrencia_meses"
+          min={1}
+          max={120}
+          inputMode="numeric"
+          defaultValue={manutencao?.recorrencia_meses ?? ""}
+          placeholder="6"
+          className={CLASSE_CAMPO}
+        />
       </label>
       <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
         Observação (opcional)
-        <textarea name="observacao" maxLength={1000} rows={2} className={CLASSE_CAMPO} />
+        <textarea name="observacao" maxLength={1000} rows={2} defaultValue={manutencao?.observacao ?? ""} className={CLASSE_CAMPO} />
       </label>
       <button type="submit" disabled={pendente} className={CLASSE_BOTAO_PRIMARIO}>
-        {pendente ? "Salvando..." : "Criar manutenção"}
+        {pendente ? "Salvando..." : manutencao ? "Salvar" : "Criar manutenção"}
       </button>
     </form>
   );
@@ -368,6 +405,9 @@ function LinhaManutencao({ manutencao, hoje }: { manutencao: ManutencaoPlanner; 
       >
         ✓ Feita hoje
       </button>
+      <BotaoDialogo titulo="Editar manutenção" className={CLASSE_LINK_EDITAR} rotulo="Editar">
+        {(fechar) => <FormularioManutencao manutencao={manutencao} aoSalvar={fechar} />}
+      </BotaoDialogo>
       <button
         type="button"
         disabled={pendente}

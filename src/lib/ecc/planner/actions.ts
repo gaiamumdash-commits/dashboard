@@ -3,10 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
-import { FUSO_BRASIL, hojeISOBrasil, paraUtcDoFuso } from "@/lib/ecc/kanban";
+import { hojeISOBrasil } from "@/lib/ecc/kanban";
 import {
   concluirManutencao,
-  dataOpcional,
   ehAreaPlanner,
   ehChaveData,
   ehRefeicao,
@@ -16,6 +15,7 @@ import {
   textoOpcional,
   validarHabito,
 } from "@/lib/ecc/planner/regras";
+import { lerCompromisso, lerCurso, lerLeitura, lerManutencao, lerObjetivo, lerPet } from "@/lib/ecc/planner/validacao";
 import { AREAS_PLANNER, type ResultadoAcao } from "@/lib/ecc/planner/tipos";
 
 /**
@@ -162,20 +162,20 @@ export async function marcarHabitoNoDia(habitoId: string, data: string, feito: b
 // --------------------------------------------------------------------------
 
 export async function criarObjetivo(formData: FormData): Promise<ResultadoAcao> {
-  const titulo = textoObrigatorio(formData.get("titulo"), 200, "Objetivo");
-  if (!titulo.ok) return falha(titulo.erro);
   const area = formData.get("area");
   if (!ehAreaPlanner(area)) return falha("Área inválida.");
-  const prazo = dataOpcional(formData.get("prazo"), "Data");
-  if (!prazo.ok) return falha(prazo.erro);
-  const notas = textoOpcional(formData.get("notas"), 2000, "Notas");
-  if (!notas.ok) return falha(notas.erro);
+  const objetivo = lerObjetivo(formData);
+  if (!objetivo.ok) return falha(objetivo.erro);
 
   const { tenantId, supabase } = await contexto();
-  const { error } = await supabase
-    .from("planner_objetivos")
-    .insert({ tenant_id: tenantId, titulo: titulo.valor, area, prazo: prazo.valor, notas: notas.valor });
+  const { error } = await supabase.from("planner_objetivos").insert({ tenant_id: tenantId, area, ...objetivo.valor });
   return resultado(error, "Não foi possível criar o objetivo.");
+}
+
+export async function editarObjetivo(objetivoId: string, formData: FormData): Promise<ResultadoAcao> {
+  const objetivo = lerObjetivo(formData);
+  if (!objetivo.ok) return falha(objetivo.erro);
+  return atualizarPorId("planner_objetivos", objetivoId, objetivo.valor, "Não foi possível salvar o objetivo.");
 }
 
 export async function atualizarStatusObjetivo(objetivoId: string, status: string): Promise<ResultadoAcao> {
@@ -235,26 +235,28 @@ export async function excluirNota(notaId: string): Promise<ResultadoAcao> {
 // --------------------------------------------------------------------------
 
 export async function criarLeitura(formData: FormData): Promise<ResultadoAcao> {
-  const titulo = textoObrigatorio(formData.get("titulo"), 200, "Título");
-  if (!titulo.ok) return falha(titulo.erro);
-  const autor = textoOpcional(formData.get("autor"), 120, "Autor");
-  if (!autor.ok) return falha(autor.erro);
+  const leitura = lerLeitura(formData);
+  if (!leitura.ok) return falha(leitura.erro);
   const status = formData.get("status");
   if (!["quero_ler", "lendo", "concluido"].includes(String(status))) return falha("Status inválido.");
-  const dataAlvo = dataOpcional(formData.get("data_alvo"), "Data alvo");
-  if (!dataAlvo.ok) return falha(dataAlvo.erro);
 
   const { tenantId, supabase } = await contexto();
   const { error } = await supabase.from("planner_leituras").insert({
     tenant_id: tenantId,
-    titulo: titulo.valor,
-    autor: autor.valor,
+    ...leitura.valor,
     status,
     progresso: status === "concluido" ? 100 : 0,
     data_inicio: status === "lendo" ? hojeISOBrasil() : null,
-    data_alvo: dataAlvo.valor,
   });
   return resultado(error, "Não foi possível adicionar a leitura.");
+}
+
+/** Edita os dados da leitura (título, autor, data alvo, notas). Status e
+ * progresso continuam no próprio cartão (`atualizarLeitura`). */
+export async function editarLeitura(leituraId: string, formData: FormData): Promise<ResultadoAcao> {
+  const leitura = lerLeitura(formData);
+  if (!leitura.ok) return falha(leitura.erro);
+  return atualizarPorId("planner_leituras", leituraId, leitura.valor, "Não foi possível salvar a leitura.");
 }
 
 /** Status e progresso andam juntos: concluir = 100%; começar a ler grava a
@@ -302,32 +304,20 @@ export async function excluirLeitura(leituraId: string): Promise<ResultadoAcao> 
 
 export async function criarCurso(formData: FormData): Promise<ResultadoAcao> {
   const tipo = formData.get("tipo") === "idioma" ? "idioma" : "curso";
-  const nome = textoObrigatorio(formData.get("nome"), 200, tipo === "idioma" ? "Idioma" : "Nome do curso");
-  if (!nome.ok) return falha(nome.erro);
-  const instituicao = textoOpcional(formData.get("instituicao"), 120, "Instituição");
-  if (!instituicao.ok) return falha(instituicao.erro);
-  const objetivo = textoOpcional(formData.get("objetivo"), 300, "Objetivo");
-  if (!objetivo.ok) return falha(objetivo.erro);
-  const frequencia = textoOpcional(formData.get("frequencia"), 120, "Frequência");
-  if (!frequencia.ok) return falha(frequencia.erro);
-  const dataAlvo = dataOpcional(formData.get("data_alvo"), "Data alvo");
-  if (!dataAlvo.ok) return falha(dataAlvo.erro);
-  const link = textoOpcional(formData.get("link"), 500, "Link");
-  if (!link.ok) return falha(link.erro);
-  if (link.valor && !/^https?:\/\//i.test(link.valor)) return falha("O link precisa começar com http:// ou https://.");
+  const curso = lerCurso(formData, tipo);
+  if (!curso.ok) return falha(curso.erro);
 
   const { tenantId, supabase } = await contexto();
-  const { error } = await supabase.from("planner_cursos").insert({
-    tenant_id: tenantId,
-    tipo,
-    nome: nome.valor,
-    instituicao: instituicao.valor,
-    objetivo: objetivo.valor,
-    frequencia: frequencia.valor,
-    data_alvo: dataAlvo.valor,
-    link: link.valor,
-  });
+  const { error } = await supabase.from("planner_cursos").insert({ tenant_id: tenantId, tipo, ...curso.valor });
   return resultado(error, tipo === "idioma" ? "Não foi possível adicionar o idioma." : "Não foi possível adicionar o curso.");
+}
+
+/** Edita os dados do curso/idioma; o tipo não muda (curso continua curso). */
+export async function editarCurso(cursoId: string, formData: FormData): Promise<ResultadoAcao> {
+  const tipo = formData.get("tipo") === "idioma" ? "idioma" : "curso";
+  const curso = lerCurso(formData, tipo);
+  if (!curso.ok) return falha(curso.erro);
+  return atualizarPorId("planner_cursos", cursoId, curso.valor, "Não foi possível salvar.");
 }
 
 export async function atualizarCurso(
@@ -440,17 +430,17 @@ export async function salvarRefeicao(
 }
 
 export async function criarPet(formData: FormData): Promise<ResultadoAcao> {
-  const nome = textoObrigatorio(formData.get("nome"), 80, "Nome");
-  if (!nome.ok) return falha(nome.erro);
-  const tipo = textoOpcional(formData.get("tipo"), 60, "Tipo");
-  if (!tipo.ok) return falha(tipo.erro);
-  const notas = textoOpcional(formData.get("notas"), 2000, "Notas");
-  if (!notas.ok) return falha(notas.erro);
+  const pet = lerPet(formData);
+  if (!pet.ok) return falha(pet.erro);
   const { tenantId, supabase } = await contexto();
-  const { error } = await supabase
-    .from("planner_pets")
-    .insert({ tenant_id: tenantId, nome: nome.valor, tipo: tipo.valor, notas: notas.valor });
+  const { error } = await supabase.from("planner_pets").insert({ tenant_id: tenantId, ...pet.valor });
   return resultado(error, "Não foi possível adicionar o pet.");
+}
+
+export async function editarPet(petId: string, formData: FormData): Promise<ResultadoAcao> {
+  const pet = lerPet(formData);
+  if (!pet.ok) return falha(pet.erro);
+  return atualizarPorId("planner_pets", petId, pet.valor, "Não foi possível salvar o pet.", false, false);
 }
 
 export async function excluirPet(petId: string): Promise<ResultadoAcao> {
@@ -458,32 +448,17 @@ export async function excluirPet(petId: string): Promise<ResultadoAcao> {
 }
 
 export async function criarManutencao(formData: FormData): Promise<ResultadoAcao> {
-  const nome = textoObrigatorio(formData.get("nome"), 120, "Manutenção");
-  if (!nome.ok) return falha(nome.erro);
-  const ultima = dataOpcional(formData.get("ultima_realizacao"), "Última realização");
-  if (!ultima.ok) return falha(ultima.erro);
-  const proxima = dataOpcional(formData.get("proxima_data"), "Próxima data");
-  if (!proxima.ok) return falha(proxima.erro);
-  let recorrencia: number | null = null;
-  const recorrenciaBruta = formData.get("recorrencia_meses");
-  if (recorrenciaBruta && String(recorrenciaBruta).trim()) {
-    const r = inteiroEntre(recorrenciaBruta, 1, 120, "Recorrência (meses)");
-    if (!r.ok) return falha(r.erro);
-    recorrencia = r.valor;
-  }
-  const observacao = textoOpcional(formData.get("observacao"), 1000, "Observação");
-  if (!observacao.ok) return falha(observacao.erro);
-
+  const manutencao = lerManutencao(formData);
+  if (!manutencao.ok) return falha(manutencao.erro);
   const { tenantId, supabase } = await contexto();
-  const { error } = await supabase.from("planner_manutencoes").insert({
-    tenant_id: tenantId,
-    nome: nome.valor,
-    ultima_realizacao: ultima.valor,
-    proxima_data: proxima.valor,
-    recorrencia_meses: recorrencia,
-    observacao: observacao.valor,
-  });
+  const { error } = await supabase.from("planner_manutencoes").insert({ tenant_id: tenantId, ...manutencao.valor });
   return resultado(error, "Não foi possível criar a manutenção.", true);
+}
+
+export async function editarManutencao(manutencaoId: string, formData: FormData): Promise<ResultadoAcao> {
+  const manutencao = lerManutencao(formData);
+  if (!manutencao.ok) return falha(manutencao.erro);
+  return atualizarPorId("planner_manutencoes", manutencaoId, manutencao.valor, "Não foi possível salvar a manutenção.", true);
 }
 
 /** "Feito hoje": a próxima data é recalculada pela recorrência. */
@@ -516,36 +491,25 @@ export async function excluirManutencao(manutencaoId: string): Promise<Resultado
 // --------------------------------------------------------------------------
 
 export async function criarCompromisso(formData: FormData): Promise<ResultadoAcao> {
-  const titulo = textoObrigatorio(formData.get("titulo"), 200, "Título");
-  if (!titulo.ok) return falha(titulo.erro);
   const area = formData.get("area");
   if (!ehAreaPlanner(area)) return falha("Área inválida.");
   const tipoBruto = String(formData.get("tipo") ?? "outro");
   const tipo = ["consulta", "pet", "outro"].includes(tipoBruto) ? tipoBruto : "outro";
-  const data = formData.get("data");
-  if (!ehChaveData(data)) return falha("Escolha a data.");
-  const horaBruta = String(formData.get("hora") ?? "").trim() || "09:00";
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(horaBruta)) return falha("Horário inválido.");
-  const local = textoOpcional(formData.get("local"), 200, "Local");
-  if (!local.ok) return falha(local.erro);
-  const notas = textoOpcional(formData.get("notas"), 1000, "Notas");
-  if (!notas.ok) return falha(notas.erro);
-  const petBruto = formData.get("pet_id");
-  const petId = petBruto ? lerId(petBruto) : null;
-  if (petBruto && !petId) return falha("Pet inválido.");
+  const compromisso = lerCompromisso(formData);
+  if (!compromisso.ok) return falha(compromisso.erro);
 
   const { tenantId, supabase } = await contexto();
-  const { error } = await supabase.from("planner_compromissos").insert({
-    tenant_id: tenantId,
-    titulo: titulo.valor,
-    area,
-    tipo,
-    inicio: paraUtcDoFuso(`${data}T${horaBruta}`, FUSO_BRASIL).toISOString(),
-    local: local.valor,
-    notas: notas.valor,
-    pet_id: petId,
-  });
+  const { error } = await supabase.from("planner_compromissos").insert({ tenant_id: tenantId, area, tipo, ...compromisso.valor });
   return resultado(error, "Não foi possível criar o compromisso.", true);
+}
+
+/** Edita título, data/hora, local, notas e pet. Área e tipo ficam como
+ * estão (uma consulta continua sendo consulta de Saúde). Pet de outra
+ * pessoa é barrado pela RLS (`with check` da migration 0057). */
+export async function editarCompromisso(compromissoId: string, formData: FormData): Promise<ResultadoAcao> {
+  const compromisso = lerCompromisso(formData);
+  if (!compromisso.ok) return falha(compromisso.erro);
+  return atualizarPorId("planner_compromissos", compromissoId, compromisso.valor, "Não foi possível salvar o compromisso.", true);
 }
 
 export async function marcarCompromisso(compromissoId: string, concluido: boolean): Promise<ResultadoAcao> {
@@ -575,6 +539,30 @@ type TabelaComId =
   | "planner_pets"
   | "planner_manutencoes"
   | "planner_compromissos";
+
+/** Update genérico por id (só as linhas da própria pessoa passam pela RLS;
+ * nenhuma linha alterada = item não existe ou não é seu). `comCarimbo`:
+ * tabelas sem `atualizado_em` (pets) passam `false`. */
+async function atualizarPorId(
+  tabela: TabelaComId,
+  valorId: string,
+  campos: Record<string, unknown>,
+  mensagem: string,
+  tambemAgenda = false,
+  comCarimbo = true,
+): Promise<ResultadoAcao> {
+  const id = lerId(valorId);
+  if (!id) return falha("Item inválido.");
+  const { tenantId, supabase } = await contexto();
+  const { data, error } = await supabase
+    .from(tabela)
+    .update(comCarimbo ? { ...campos, atualizado_em: new Date().toISOString() } : campos)
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .select("id");
+  if (!error && (data ?? []).length === 0) return falha("Item não encontrado. Recarregue a página.");
+  return resultado(error, mensagem, tambemAgenda);
+}
 
 async function excluirPorId(tabela: TabelaComId, valorId: string, mensagem: string, tambemAgenda = false): Promise<ResultadoAcao> {
   const id = lerId(valorId);
