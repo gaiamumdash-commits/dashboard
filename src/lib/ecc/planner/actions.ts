@@ -15,7 +15,7 @@ import {
   textoOpcional,
   validarHabito,
 } from "@/lib/ecc/planner/regras";
-import { lerCompromisso, lerCurso, lerLeitura, lerManutencao, lerObjetivo, lerPet } from "@/lib/ecc/planner/validacao";
+import { lerCompra, lerCompromisso, lerCurso, lerLeitura, lerManutencao, lerObjetivo, lerPet } from "@/lib/ecc/planner/validacao";
 import { AREAS_PLANNER, type ResultadoAcao } from "@/lib/ecc/planner/tipos";
 
 /**
@@ -366,21 +366,18 @@ export async function excluirCurso(cursoId: string): Promise<ResultadoAcao> {
 // --------------------------------------------------------------------------
 
 export async function adicionarCompra(formData: FormData): Promise<ResultadoAcao> {
-  const nome = textoObrigatorio(formData.get("nome"), 120, "Item");
-  if (!nome.ok) return falha(nome.erro);
-  const categoria = textoOpcional(formData.get("categoria"), 60, "Categoria");
-  if (!categoria.ok) return falha(categoria.erro);
-  const quantidade = textoOpcional(formData.get("quantidade"), 40, "Quantidade");
-  if (!quantidade.ok) return falha(quantidade.erro);
-
+  const compra = lerCompra(formData);
+  if (!compra.ok) return falha(compra.erro);
   const { tenantId, supabase } = await contexto();
-  const { error } = await supabase.from("planner_compras").insert({
-    tenant_id: tenantId,
-    nome: nome.valor,
-    categoria: categoria.valor ?? "Geral",
-    quantidade: quantidade.valor,
-  });
+  const { error } = await supabase.from("planner_compras").insert({ tenant_id: tenantId, ...compra.valor });
   return resultado(error, "Não foi possível adicionar o item.");
+}
+
+/** Corrige nome, categoria e quantidade (tabela sem `atualizado_em`). */
+export async function editarCompra(itemId: string, formData: FormData): Promise<ResultadoAcao> {
+  const compra = lerCompra(formData);
+  if (!compra.ok) return falha(compra.erro);
+  return atualizarPorId("planner_compras", itemId, compra.valor, "Não foi possível salvar o item.", false, false);
 }
 
 export async function marcarCompra(itemId: string, comprado: boolean): Promise<ResultadoAcao> {

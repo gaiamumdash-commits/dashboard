@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   dataEHoraParaFormulario,
+  lerCompra,
   lerCompromisso,
   lerCurso,
   lerLeitura,
@@ -57,5 +58,17 @@ describe("validação compartilhada criar/editar do Planner", () => {
     });
     expect(lerPet(form({ nome: "Thor", tipo: "Cachorro" }))).toEqual({ ok: true, valor: { nome: "Thor", tipo: "Cachorro", notas: null } });
     expect(lerPet(form({ nome: "" })).ok).toBe(false);
+  });
+
+  it("compra: categoria vazia vira Geral; nome é obrigatório", () => {
+    expect(lerCompra(form({ nome: " Arroz ", categoria: "", quantidade: "2 kg" }))).toEqual({
+      ok: true,
+      valor: { nome: "Arroz", categoria: "Geral", quantidade: "2 kg" },
+    });
+    expect(lerCompra(form({ nome: "Detergente", categoria: "Limpeza" }))).toEqual({
+      ok: true,
+      valor: { nome: "Detergente", categoria: "Limpeza", quantidade: null },
+    });
+    expect(lerCompra(form({ nome: "  " })).ok).toBe(false);
   });
 });

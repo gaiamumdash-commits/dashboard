@@ -99,6 +99,16 @@ export function lerPet(f: CamposFormulario) {
   });
 }
 
+/** Item da lista de compras; categoria vazia vira "Geral". */
+export function lerCompra(f: CamposFormulario) {
+  const categoria = textoOpcional(f.get("categoria"), 60, "Categoria");
+  return juntar<{ nome: string; categoria: string; quantidade: string | null }>({
+    nome: textoObrigatorio(f.get("nome"), 120, "Item"),
+    categoria: categoria.ok ? { ok: true, valor: categoria.valor ?? "Geral" } : categoria,
+    quantidade: textoOpcional(f.get("quantidade"), 40, "Quantidade"),
+  });
+}
+
 function inicioCompromisso(data: unknown, hora: unknown): Validado<string> {
   if (!ehChaveData(data)) return { ok: false, erro: "Escolha a data." };
   const horario = String(hora ?? "").trim() || "09:00";

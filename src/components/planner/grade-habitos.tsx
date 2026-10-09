@@ -60,17 +60,28 @@ function BolinhaDia({ habito, dia }: { habito: Pick<HabitoPlanner, "id" | "nome"
   );
 }
 
-function AcoesHabito({ habito }: { habito: HabitoPlanner }) {
+/** "Editar" sempre visível (corrigir dias, horário, nome); com `completo`,
+ * também o menu ⋯ (arquivar, excluir). */
+function AcoesHabito({ habito, completo }: { habito: HabitoPlanner; completo: boolean }) {
   const { executar } = useAcaoPlanner();
   const [editando, setEditando] = useState(false);
   return (
-    <>
-      <MenuSuspenso
+    <div className="flex items-center justify-end gap-1">
+      <button
+        type="button"
+        onClick={() => setEditando(true)}
+        aria-label={`Editar ${habito.nome}`}
+        title="Editar"
+        className="rounded px-1.5 py-0.5 text-xs text-gaiamum-primary hover:bg-gaiamum-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gaiamum-primary"
+      >
+        <span aria-hidden>✎</span>
+        {completo && <span className="ml-1 hidden sm:inline">Editar</span>}
+      </button>
+      {completo && <MenuSuspenso
         rotulo={`Ações de ${habito.nome}`}
         icone={<span className="px-1.5 text-base leading-none">⋯</span>}
         itens={(fechar) => (
           <>
-            <ItemMenu onClick={() => { fechar(); setEditando(true); }}>Editar</ItemMenu>
             <ItemMenu
               onClick={() => {
                 fechar();
@@ -92,7 +103,7 @@ function AcoesHabito({ habito }: { habito: HabitoPlanner }) {
             </ItemMenu>
           </>
         )}
-      />
+      />}
       {editando && (
         <Dialog titulo={habito.tipo === "rotina" ? "Editar rotina" : "Editar hábito"} aoFechar={() => setEditando(false)} largura="md">
           <div className="mt-4">
@@ -100,13 +111,13 @@ function AcoesHabito({ habito }: { habito: HabitoPlanner }) {
           </div>
         </Dialog>
       )}
-    </>
+    </div>
   );
 }
 
-/** Grade semanal S T Q Q S S D do mockup ("Meus hábitos"). Com
- * `gerenciar`, cada linha ganha o menu ⋯ (editar, arquivar, excluir) e o
- * resumo dos dias/horário — é a mesma grade nas telas das áreas. */
+/** Grade semanal S T Q Q S S D do mockup ("Meus hábitos"). Toda linha tem
+ * "Editar" (✎) visível; com `gerenciar`, ganha também o menu ⋯ (arquivar,
+ * excluir) e o resumo dos dias/horário — é a mesma grade nas telas das áreas. */
 export function GradeHabitos({
   habitos,
   registros,
@@ -138,11 +149,9 @@ export function GradeHabitos({
                 </abbr>
               </th>
             ))}
-            {gerenciar && (
-              <th scope="col">
-                <span className="sr-only">Ações</span>
-              </th>
-            )}
+            <th scope="col">
+              <span className="sr-only">Ações</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -175,11 +184,9 @@ export function GradeHabitos({
                   <BolinhaDia habito={habito} dia={dia} />
                 </td>
               ))}
-              {gerenciar && (
-                <td className="w-8 text-right">
-                  <AcoesHabito habito={habito} />
-                </td>
-              )}
+              <td className={`${gerenciar ? "w-8 sm:w-24" : "w-7"} text-right`}>
+                <AcoesHabito habito={habito} completo={gerenciar} />
+              </td>
             </tr>
           ))}
         </tbody>

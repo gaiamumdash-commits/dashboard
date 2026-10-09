@@ -5,6 +5,7 @@ import {
   adicionarCompra,
   criarManutencao,
   criarPet,
+  editarCompra,
   editarManutencao,
   editarPet,
   excluirCompra,
@@ -38,6 +39,31 @@ function dataLonga(chave: string): string {
 // Compras — lista simples por categoria
 // --------------------------------------------------------------------------
 
+function FormularioCompra({ item, aoSalvar }: { item: ItemCompra; aoSalvar: () => void }) {
+  const { pendente, executar } = useAcaoPlanner();
+  return (
+    <form className="flex flex-col gap-4" action={(fd) => executar(() => editarCompra(item.id, fd), { sucesso: "Item salvo.", aoConcluir: aoSalvar })}>
+      <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
+        Item
+        <input name="nome" required maxLength={120} autoFocus defaultValue={item.nome} className={CLASSE_CAMPO} />
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
+          Categoria
+          <input name="categoria" maxLength={60} defaultValue={item.categoria} list="categorias-compra" className={CLASSE_CAMPO} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-gaiamum-text-muted">
+          Quantidade (opcional)
+          <input name="quantidade" maxLength={40} defaultValue={item.quantidade ?? ""} className={CLASSE_CAMPO} />
+        </label>
+      </div>
+      <button type="submit" disabled={pendente} className={CLASSE_BOTAO_PRIMARIO}>
+        {pendente ? "Salvando..." : "Salvar"}
+      </button>
+    </form>
+  );
+}
+
 function LinhaCompra({ item }: { item: ItemCompra }) {
   const { pendente, executar } = useAcaoPlanner();
   const [otimista, setOtimista] = useState(item.comprado);
@@ -64,6 +90,9 @@ function LinhaCompra({ item }: { item: ItemCompra }) {
         {item.nome}
         {item.quantidade && <span className="text-gaiamum-text-muted"> · {item.quantidade}</span>}
       </label>
+      <BotaoDialogo titulo="Editar item" className={CLASSE_LINK_EDITAR} rotulo="Editar">
+        {(fechar) => <FormularioCompra item={item} aoSalvar={fechar} />}
+      </BotaoDialogo>
       <button
         type="button"
         aria-label={`Remover ${item.nome}`}
