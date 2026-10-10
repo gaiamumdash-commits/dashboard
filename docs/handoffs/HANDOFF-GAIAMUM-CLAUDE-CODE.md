@@ -43,13 +43,12 @@
   - **Conferir se uma tabela ou coluna existe** com a anon key do `.env.local` via `/rest/v1/<tabela>?select=<coluna>&limit=1`: 404/`PGRST205` = tabela não existe; 400/`42703` = coluna não existe; 401/`42501` = existe e está protegida.
   - **Publicar antes da migration**: o código do Mapa mental tolera a migration ausente (mostra "em instalação", desliga o arraste ou mostra aviso no e-mail), então dá para publicar antes do SQL sem quebrar nada.
 - **Sessão #76 (2026-10-10, mesma data)**:
-  - **Compartilhar mapa**: o dono escolhe na hora entre 🔒 Só eu, 👥 Equipe (só acesso completo) e 👥 Equipe e convidados (inclui escopo `projeto`), sempre só leitura. Migration **0063** (`inclui_convidados` + RLS com `tem_acesso_completo`), entregue ao Fabio para colar. Sem a 0063 o botão fica desligado. Detalhes na fase 2b do `MAPAS_V1.md`. Testes: 329/329, mais o caso do convidado no `rls-mapas.test.ts` (ainda não executado).
+  - **Compartilhar mapa**: o dono escolhe na hora entre 🔒 Só eu, 👥 Equipe (só acesso completo) e 👥 Equipe e convidados (inclui escopo `projeto`), sempre só leitura. Migration **0063** (`inclui_convidados` + RLS com `tem_acesso_completo`). Detalhes na fase 2b do `MAPAS_V1.md`. Testes: 329/329, mais o caso do convidado no `rls-mapas.test.ts` (ainda não executado).
   - **Resend**: o domínio `gaiamum.com.br` está **Verified** (print do Fabio). O Fabio criou `RESEND_FROM_EMAIL = Gaiamum <notificacoes@gaiamum.com.br>` na Vercel. Falta confirmar com outro usuário que o e-mail chega.
+  - **Fechamento**: 0063 **aplicada pelo Fabio** e conferida em produção (`inclui_convidados` → 401/`42501`). Código `2e59b23` publicado. O Fabio respondeu "feito" aos testes na tela (compartilhar com convidado e e-mail para outro usuário).
 - **Pendências em aberto**:
-  1. Fabio: colar a migration 0063 (se ainda não colou) e testar o compartilhamento com um convidado de quadro.
-  2. Rodar os testes de RLS (Planner e Mapas) num banco de teste (Docker ou projeto de homologação).
-  3. Confirmar que um e-mail (resumo do mapa ou notificação) chega para um usuário que não é o Fabio.
-  4. Fora da V1, sem pedido: exportar PDF/PNG, modelos prontos (SWOT/projeto/semana), coedição em tempo real e IA generativa no mapa.
+  1. Rodar os testes de RLS (Planner e Mapas) num banco de teste (Docker ou projeto de homologação).
+  2. Fora da V1, sem pedido: exportar PDF/PNG, modelos prontos (SWOT/projeto/semana), coedição em tempo real e IA generativa no mapa.
 - **Idioma**: o Fabio quer **sempre pt-BR**, mesmo quando o prompt de sistema disser inglês; isso está na memória. O ditado por voz dele às vezes chega em outro idioma ("fuzzy trace" = "fase três"); interpretar e confirmar.
 
 ## Estado confirmado (2026-10-09, sessão #74)
