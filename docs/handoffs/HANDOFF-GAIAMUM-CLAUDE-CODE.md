@@ -46,9 +46,9 @@
   - **Compartilhar mapa**: o dono escolhe na hora entre 🔒 Só eu, 👥 Equipe (só acesso completo) e 👥 Equipe e convidados (inclui escopo `projeto`), sempre só leitura. Migration **0063** (`inclui_convidados` + RLS com `tem_acesso_completo`). Detalhes na fase 2b do `MAPAS_V1.md`. Testes: 329/329, mais o caso do convidado no `rls-mapas.test.ts` (ainda não executado).
   - **Resend**: o domínio `gaiamum.com.br` está **Verified** (print do Fabio). O Fabio criou `RESEND_FROM_EMAIL = Gaiamum <notificacoes@gaiamum.com.br>` na Vercel. Falta confirmar com outro usuário que o e-mail chega.
   - **Fechamento**: 0063 **aplicada pelo Fabio** e conferida em produção (`inclui_convidados` → 401/`42501`). Código `2e59b23` publicado. O Fabio respondeu "feito" aos testes na tela (compartilhar com convidado e e-mail para outro usuário).
+  - **Testes de integração/RLS EXECUTADOS pela primeira vez de ponta a ponta**: Supabase local no Docker (`npx supabase start`, API em `127.0.0.1:57321`). O banco local estava na 0058; apliquei 0059–0063 com `migration up --local`, só no local. Resultado: **99/99 em 16 arquivos**, incluindo `rls-planner` (13), `rls-mapas` (8, com o caso do convidado da 0063) e `rls-limites-entre-projetos` (15). Passo a passo em `tests/integration/README.md`.
 - **Pendências em aberto**:
-  1. Rodar os testes de RLS (Planner e Mapas) num banco de teste (Docker ou projeto de homologação).
-  2. Fora da V1, sem pedido: exportar PDF/PNG, modelos prontos (SWOT/projeto/semana), coedição em tempo real e IA generativa no mapa.
+  1. Fora da V1, sem pedido: exportar PDF/PNG, modelos prontos (SWOT/projeto/semana), coedição em tempo real e IA generativa no mapa.
 - **Idioma**: o Fabio quer **sempre pt-BR**, mesmo quando o prompt de sistema disser inglês; isso está na memória. O ditado por voz dele às vezes chega em outro idioma ("fuzzy trace" = "fase três"); interpretar e confirmar.
 
 ## Estado confirmado (2026-10-09, sessão #74)

@@ -21,11 +21,19 @@ prontos e revisáveis, só não foram *executados*.
 ```sh
 # 1. Docker Desktop precisa estar rodando.
 npx supabase start
-# 2. Copie a Service Role Key e a URL que o comando acima imprime.
-SUPABASE_TEST_URL="http://127.0.0.1:54321" \
-SUPABASE_TEST_SERVICE_ROLE_KEY="<a que o supabase start imprimiu>" \
+# 2. Se o banco local já existia, aplique as migrations novas SÓ nele
+#    (nunca `db push`, que mira produção):
+npx supabase migration up --local
+# 3. Copie as chaves que `npx supabase status -o json` imprime. Nesta
+#    máquina a API local fica na porta 57321 (config.toml).
+SUPABASE_TEST_URL="http://127.0.0.1:57321" \
+SUPABASE_TEST_SERVICE_ROLE_KEY="<SERVICE_ROLE_KEY>" \
+SUPABASE_TEST_ANON_KEY="<ANON_KEY>" \
 npm run test:integration
 ```
+
+Última execução completa: **2026-10-10, 99/99 em 16 arquivos**, com o
+banco local nas migrations 0001–0063.
 
 **Opção B — projeto de homologação isolado no Supabase Cloud** (nunca o de
 produção): definir as mesmas duas variáveis apontando pra ele.
