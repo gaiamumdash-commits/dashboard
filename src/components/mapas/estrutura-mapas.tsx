@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { MenuLateral } from "@/components/layout/menu-lateral";
 
-/** Casca das telas de Mapas: menu lateral + caminho (Mapas › título). */
+/** Casca das telas de Mapas: menu lateral + caminho (Mapa mental › título). */
 export function EstruturaMapas({
   ctx,
   titulo,
@@ -22,11 +22,11 @@ export function EstruturaMapas({
             <li>
               {titulo ? (
                 <Link href="/mapas" className="hover:text-gaiamum-text">
-                  Mapas
+                  Mapa mental
                 </Link>
               ) : (
                 <span aria-current="page" className="font-medium text-gaiamum-text">
-                  Mapas
+                  Mapa mental
                 </span>
               )}
             </li>

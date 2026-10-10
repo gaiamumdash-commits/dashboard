@@ -26,6 +26,9 @@ export async function listarMapas(tenantId: string, userId: string) {
   if (error) console.error("Mapas: listar", error);
   const todos = (data ?? []) as Mapa[];
   return {
+    // Tabela ainda não criada em produção (migration 0059 pendente) ou
+    // banco fora do ar: a tela avisa em vez de oferecer criar e falhar.
+    indisponivel: Boolean(error),
     meus: todos.filter((m) => m.user_id === userId),
     compartilhados: todos.filter((m) => m.user_id !== userId),
   };

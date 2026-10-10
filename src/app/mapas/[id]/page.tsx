@@ -4,7 +4,7 @@ import { carregarMapa, contextoMapas } from "@/lib/ecc/mapas/dados";
 import { EstruturaMapas } from "@/components/mapas/estrutura-mapas";
 import { EditorLista } from "@/components/mapas/editor-lista";
 
-export const metadata: Metadata = { title: "Mapa · Gaiamum" };
+export const metadata: Metadata = { title: "Mapa mental · Gaiamum" };
 
 /** Um mapa. `?foco=<id>` abre focado num ramo (caminho de volta no topo).
  * Mapa de outra pessoa (compartilhado) abre só pra leitura. */

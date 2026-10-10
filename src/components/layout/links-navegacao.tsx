@@ -43,14 +43,14 @@ export function LinksNavegacao({
       <LinkNavegacao href="/projetos" onClick={aoClicarLink}>
         Projetos
       </LinkNavegacao>
-      {/* Planner e Mapas são pessoais (cada um vê só o seu), então aparecem pra todo
+      {/* Planner e Mapa mental são pessoais (cada um vê só o seu), então aparecem pra todo
           mundo — inclusive quem entrou convidado só pra um quadro. Pra quem
           tem acesso completo, fica logo depois da Agenda (abaixo). */}
       {!acessoCompleto && (
         <>
           <GrupoNavegacaoPlanner aoClicarLink={aoClicarLink} />
           <LinkNavegacao href="/mapas" onClick={aoClicarLink}>
-            Mapas
+            Mapa mental
           </LinkNavegacao>
         </>
       )}
@@ -72,7 +72,7 @@ export function LinksNavegacao({
           </LinkNavegacao>
           <GrupoNavegacaoPlanner aoClicarLink={aoClicarLink} />
           <LinkNavegacao href="/mapas" onClick={aoClicarLink}>
-            Mapas
+            Mapa mental
           </LinkNavegacao>
           {linkLab}
           <LinkNavegacao href="/configuracoes" onClick={aoClicarLink}>
