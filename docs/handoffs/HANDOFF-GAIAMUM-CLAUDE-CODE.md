@@ -10,7 +10,19 @@
 
 ---
 
-## Estado confirmado (2026-10-10, sessão #75 — última atualização)
+## Estado confirmado (2026-10-10, sessão #76 — última atualização)
+
+**Resumo em uma linha**: **Gaiamum sem pendências abertas.** O Mapa mental V1 está completo, com o compartilhamento; o e-mail sai do domínio próprio e a suíte de RLS rodou inteira (99/99). **Nada pendente no git** (último commit `9ad5a19`, publicado). Migrations **até a 0063 aplicadas em produção** e conferidas. O Fabio vai voltar a trabalhar no **Unamente** (`Documents\unamente`).
+
+- **Compartilhar mapa** (`2e59b23`): botão no cabeçalho do mapa, só para o dono, com três opções escolhidas na hora: 🔒 **Só eu**, 👥 **Equipe** (só membros com acesso completo) e 👥 **Equipe e convidados** (inclui `memberships.escopo = 'projeto'`). Sempre só leitura. Migration **0063**: coluna `mapas.inclui_convidados`, CHECK (convidados só se compartilhado) e policy de `mapas` + `mapa_compartilhado_comigo` com `(inclui_convidados or tem_acesso_completo(tenant_id))`. Antes, qualquer membership do workspace leria um mapa compartilhado, inclusive convidados de quadro. Sem a 0063, o botão fica desligado, e a action grava sempre as duas colunas, então nunca compartilha pela regra antiga. Regra pura em `src/lib/ecc/mapas/compartilhamento.ts`, action `definirCompartilhamento`, tela em `botao-compartilhar.tsx` (fase 2b do `MAPAS_V1.md`). O Fabio testou na tela.
+- **Resend**: o domínio `gaiamum.com.br` está **Verified**. Na Vercel (Production): `RESEND_FROM_EMAIL = Gaiamum <notificacoes@gaiamum.com.br>`, criada pelo Fabio em 10/10 e ativa a partir do deploy do `2e59b23`. Ele confirmou o teste com outro usuário.
+- **Testes de integração/RLS executados de ponta a ponta pela primeira vez**: Supabase local no Docker (API em `127.0.0.1:57321`), **99/99 em 16 arquivos**, com o banco local nas migrations 0001–0063. Para migrations novas, aplicar no local com `npx supabase migration up --local` (só no local, nunca `db push`). Passo a passo e chaves em `tests/integration/README.md`. O Supabase local do Gaiamum ficou **parado** (`supabase stop`), com os dados guardados no volume do Docker. Continuam rodando, de propósito, containers de outros projetos (`unamente`, `platform`).
+- **Unitários**: 329/329; `tsc`, `eslint` e build limpos.
+- **Fluxo de publicação**: igual ao da sessão #75, logo abaixo (push só pelo `@devops`, a Vercel publica a partir do main, migrations coladas pelo Fabio no SQL Editor e conferência de colunas pela anon key). **Pegadinha nova**: no PowerShell 5.1, `git commit -m` com aspas na mensagem quebra os argumentos; use `git commit -F <arquivo>`.
+- **Pendências em aberto**: nenhuma. Fora da V1 e sem pedido: exportar PDF/PNG, modelos prontos (SWOT/projeto/semana), coedição em tempo real e IA generativa no mapa.
+- **Idioma**: o Fabio quer **sempre pt-BR**, mesmo quando o prompt de sistema disser inglês; isso está na memória. O ditado por voz dele às vezes chega em outro idioma ("fuzzy trace" = "fase três"; "ou na mente" = "Unamente"); interpretar e confirmar.
+
+## Estado confirmado (2026-10-10, sessão #75)
 
 **Resumo em uma linha**: **Mapa mental V1 (fases 1, 2 e 3) implementado, publicado em `gaiamum.com.br` e APROVADO pelo Fabio.** O resumo por e-mail chegou na caixa dele em 10/10. Também entrou a edição visível em todo o Planner. **Nada pendente no git** (último código `8e00b0b`). As migrations **0059, 0060, 0061 e 0062 foram aplicadas pelo Fabio no SQL Editor** e conferidas em produção. Documentação completa do módulo: `docs/mapas/MAPAS_V1.md`.
 
@@ -42,14 +54,7 @@
   - **Migrations**: o Fabio cola no SQL Editor do Supabase (o CLI desta máquina dá 403 no projeto `zfjtcivusdmjvdbycpjs`, e o histórico remoto de migrations não acompanha o que foi colado, então **nunca rodar `db push`**). Entregue o SQL num bloco para copiar em um clique e termine com `notify pgrst, 'reload schema';`.
   - **Conferir se uma tabela ou coluna existe** com a anon key do `.env.local` via `/rest/v1/<tabela>?select=<coluna>&limit=1`: 404/`PGRST205` = tabela não existe; 400/`42703` = coluna não existe; 401/`42501` = existe e está protegida.
   - **Publicar antes da migration**: o código do Mapa mental tolera a migration ausente (mostra "em instalação", desliga o arraste ou mostra aviso no e-mail), então dá para publicar antes do SQL sem quebrar nada.
-- **Sessão #76 (2026-10-10, mesma data)**:
-  - **Compartilhar mapa**: o dono escolhe na hora entre 🔒 Só eu, 👥 Equipe (só acesso completo) e 👥 Equipe e convidados (inclui escopo `projeto`), sempre só leitura. Migration **0063** (`inclui_convidados` + RLS com `tem_acesso_completo`). Detalhes na fase 2b do `MAPAS_V1.md`. Testes: 329/329, mais o caso do convidado no `rls-mapas.test.ts` (ainda não executado).
-  - **Resend**: o domínio `gaiamum.com.br` está **Verified** (print do Fabio). O Fabio criou `RESEND_FROM_EMAIL = Gaiamum <notificacoes@gaiamum.com.br>` na Vercel. Falta confirmar com outro usuário que o e-mail chega.
-  - **Fechamento**: 0063 **aplicada pelo Fabio** e conferida em produção (`inclui_convidados` → 401/`42501`). Código `2e59b23` publicado. O Fabio respondeu "feito" aos testes na tela (compartilhar com convidado e e-mail para outro usuário).
-  - **Testes de integração/RLS EXECUTADOS pela primeira vez de ponta a ponta**: Supabase local no Docker (`npx supabase start`, API em `127.0.0.1:57321`). O banco local estava na 0058; apliquei 0059–0063 com `migration up --local`, só no local. Resultado: **99/99 em 16 arquivos**, incluindo `rls-planner` (13), `rls-mapas` (8, com o caso do convidado da 0063) e `rls-limites-entre-projetos` (15). Passo a passo em `tests/integration/README.md`.
-- **Pendências em aberto**:
-  1. Fora da V1, sem pedido: exportar PDF/PNG, modelos prontos (SWOT/projeto/semana), coedição em tempo real e IA generativa no mapa.
-- **Idioma**: o Fabio quer **sempre pt-BR**, mesmo quando o prompt de sistema disser inglês; isso está na memória. O ditado por voz dele às vezes chega em outro idioma ("fuzzy trace" = "fase três"); interpretar e confirmar.
+- **Pendências daquela sessão**: as três (botão de compartilhar, testes de RLS e Resend) foram **fechadas na sessão #76**, ver acima.
 
 ## Estado confirmado (2026-10-09, sessão #74)
 
@@ -1623,6 +1628,10 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-10-10 (sessão #76) — Compartilhar mapa (0063), remetente Resend e suíte de RLS 99/99; Gaiamum sem pendências
+
+O dono do mapa escolhe "Só eu", "Equipe" ou "Equipe e convidados" (migration 0063, aplicada e conferida; código `2e59b23`, testado pelo Fabio). O domínio do Resend estava verificado; a `RESEND_FROM_EMAIL` foi criada na Vercel. A suíte de integração rodou no Supabase local (99/99, migrations até 0063), e o README dela foi corrigido (porta 57321, `ANON_KEY`, `migration up --local`). Último commit `9ad5a19`. Próximo passo: o Fabio volta ao Unamente.
 
 ### 2026-10-07 (sessão #73) — Planner V1 implementado, testado e validado visualmente; aguardando migration 0057 + ok para publicar
 
