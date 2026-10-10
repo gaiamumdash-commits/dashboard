@@ -40,3 +40,13 @@ Decisão de 2026-10-10: o mapa **não ganha timer, prazo ou alarme próprios**. 
 - **Celular:** os botões "+" ficam ao lado do ramo selecionado e a barra de ações embaixo, ao alcance do polegar. O mapa abre na ideia central em tamanho legível, e o ⤢ mostra o mapa inteiro. O zoom fica guardado na aba (`sessionStorage`).
 - **Limites conhecidos:** o tamanho do ramo é estimado, não medido, então um texto muito largo pode passar um pouco da caixa. Ramos arrastados podem encostar em outros por escolha da pessoa. Testes de interface (clique e gesto) não são automatizados, porque o repositório não tem biblioteca de teste de componente; foram conferidos por prints. O teste de RLS continua escrito e não executado.
 - **Aparência** (pedido do Fabio, 2026-10-10): o botão **Caixas | Linhas** no topo define o padrão do mapa (Caixas = todo ramo com borda; fica guardado por mapa neste navegador). No ramo selecionado, **🎨 Estilo** escolhe a **cor** (8 da paleta ou Automática; os ramos de dentro herdam) e a **borda** (com, sem/linha ou Automática). Fica salvo em `mapa_nos.cor`/`forma` (migration 0060) e entra no desfazer.
+
+## Auditoria de segurança (2026-10-10)
+
+- **Acesso:** a página e todas as ações passam por `garantirWorkspace()`. O `tenant_id` vem da sessão e o `user_id` vem do banco (`auth.uid()`), nunca do navegador. Toda escrita filtra pelo tenant e passa pela RLS: só o dono escreve, e a equipe só lê mapas compartilhados. Na tela, o modo "só leitura" é só visual; quem garante a regra é o banco.
+- **Entradas:** ids são validados como UUID; textos têm limite (200 por ramo, 2000 por nota, 50 mil por lista colada); coordenadas aceitam só números finitos dentro de ±100000; cor e borda aceitam só valores da paleta (com CHECK no banco); o limite de 500 ramos é garantido por trigger. `restaurarRamos` exige o pai antes do filho, o pai no mesmo mapa (FK composta) e não aceita ligação com tarefa nem compromisso.
+- **Tela:** não há `dangerouslySetInnerHTML`, `innerHTML` nem `eval`; todo texto é escapado pelo React. Nenhuma chave privilegiada (service role) é usada no módulo.
+- **Teste anônimo em produção:** leitura devolve vazio, o insert é recusado pela RLS e as funções `security definer` são negadas.
+- **Reforço opcional:** a migration 0061 tira o privilégio de tabela do papel `anon` (defesa em profundidade).
+- **Pendente:** `tests/integration/rls-mapas.test.ts`, que cobre dono × equipe × outro workspace, está escrito mas não foi executado, porque falta banco de teste (Docker ou projeto de homologação).
+- **Liberação:** o módulo não tem trava própria. Quem entra no Gaiamum, ou seja, os e-mails autorizados em `acesso-beta`, já vê o Mapa mental, sempre com os próprios mapas privados.
