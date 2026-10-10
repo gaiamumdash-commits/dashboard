@@ -1,1 +1,1 @@
-- [Fluxo de publicação](project_publish-flow.md) — push com AIOX_ACTIVE_AGENT=devops, vercel deploy --prod, checar /auth (não /login)
+- [Fluxo de publicação](project_publish-flow.md) — push com AIOX_ACTIVE_AGENT=devops, deploy automático via Vercel Git, migrations o Fabio aplica no SQL Editor (CLI 403), checar /auth
