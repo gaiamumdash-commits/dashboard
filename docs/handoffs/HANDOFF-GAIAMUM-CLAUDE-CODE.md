@@ -10,7 +10,46 @@
 
 ---
 
-## Estado confirmado (2026-10-09, sessão #74 — última atualização)
+## Estado confirmado (2026-10-10, sessão #75 — última atualização)
+
+**Resumo em uma linha**: **Mapa mental V1 (fases 1, 2 e 3) implementado, publicado em `gaiamum.com.br` e APROVADO pelo Fabio.** O resumo por e-mail chegou na caixa dele em 10/10. Também entrou a edição visível em todo o Planner. **Nada pendente no git** (último código `8e00b0b`). As migrations **0059, 0060, 0061 e 0062 foram aplicadas pelo Fabio no SQL Editor** e conferidas em produção. Documentação completa do módulo: `docs/mapas/MAPAS_V1.md`.
+
+- **Planner: tudo editável de forma visível** (`c1f4576`). Hábitos e rotinas ganharam "✎ Editar" em toda grade, inclusive no card "Meus hábitos" e na visão geral da área (antes ficava escondido no menu ⋯). Itens da lista de compras agora também podem ser editados (`editarCompra` + `lerCompra`, com teste). Ficam fixos de propósito: área/tipo do compromisso, tipo do curso e as áreas escolhidas no primeiro acesso (que só definem a ordem dos cards).
+- **Mapa mental: decisões do Fabio** (benchmark do MindMeister, 09/10):
+  - privado por padrão, com opção de compartilhar com o workspace só para leitura (o banco e a RLS já suportam; **falta o botão na tela**);
+  - item próprio "Mapa mental" no menu, logo abaixo do Planner, visível para todos, inclusive convidados de um quadro só;
+  - nada de IA paga: datas e palavras-chave por regra;
+  - nenhuma biblioteca gráfica nova;
+  - resumo por e-mail só para quem pede;
+  - **o mapa não tem timer, prazo nem alarme próprios**: o ramo é ligado a uma tarefa do Kanban ou a um compromisso do Planner e mostra o estado de lá, para não haver duas verdades;
+  - o compromisso do Planner não tem alarme próprio (conferido), por isso alarme e foco ficam na tarefa.
+- **Fase 1** (`84f5696`, `7142533`, `2904157`): migration 0059 (`mapas`, `mapa_nos`). A árvore usa FK composta `(pai_id, mapa_id)`, tem uma ideia central por mapa, limite de 500 ramos (trigger) e `ordem` double. A RLS usa `planner_eh_meu`, mais as funções security definer `mapa_e_meu(m_id, t_id)` e `mapa_compartilhado_comigo`. O modo **Lista** traz: editar tudo, recolher/expandir com "+N", focar num ramo (`?foco=`), atalhos Enter/Tab/Shift+Tab/Esc/Backspace, menu ⋯ com os mesmos movimentos para o celular, colar lista com recuo que vira ramos, e nota por ramo.
+- **Fase 2** (`e1b485a`, `05cb1dc`): visão **Mapa** (padrão; `?modo=mapa|lista`). O desenho é HTML + SVG próprio, com layout em dois lados sem sobreposição (testado com 500 ramos) e câmera com zoom, pinça, roda/trackpad e enquadrar.
+  - Arrastar grava `pos_x`/`pos_y` **relativos ao pai** (0060). Arrastar nunca muda a hierarquia, e reorganizar zera as posições.
+  - Desfazer/refazer cobre texto, posição, recolher, criar, excluir (restaura a sub-árvore com os mesmos ids) e reorganizar.
+  - Estilo "Caixas | Linhas" por mapa (localStorage) e, por ramo, **🎨 cor** (8 da paleta, herdada pelos ramos de dentro) e **borda**, nas colunas `cor`/`forma` da 0060.
+  - Os ramos selecionados mostram "+ dentro" e "+ abaixo", com a barra de ações embaixo, no estilo dos prints do MindMeister que o Fabio mandou.
+- **Segurança** (`aef29a2`): auditoria sem achados (detalhe na seção "Auditoria" do `MAPAS_V1.md`). Reforço na 0061 (`revoke all on mapas, mapa_nos from anon`). Liberação: o módulo não tem trava própria, então todos os e-mails liberados no cadastro fechado já o veem.
+- **Fase 3** (`8e00b0b`):
+  - **📅 datas citadas nos ramos**, com leitor próprio (`datas.ts`) que devolve `null` quando não há data; o `parser-fala-agenda` sempre devolve uma;
+  - **🔑 palavras-chave e #tags** (`palavras.ts`), com destaque no mapa (`?palavra=`);
+  - **▶ Executar este ramo**: vira tarefa do Kanban pelas actions do Kanban (`criarTarefa` com id do cliente, `atualizarDatasTarefa` em UTC a partir de Brasília, `iniciarHiperfoco` opcional) ou compromisso do Planner (`lerCompromisso`), ligado ao ramo por `tarefa_id`/`compromisso_id`. O selo mostra ✓/⏰/⚠/🎯 pelas regras do Kanban (`urgenciaDoPrazo`, `estadoHiperfoco`), e "Desligar" desfaz só o vínculo;
+  - **📬 resumo por e-mail** (`resumo-email.ts`, HTML escapado) só para o e-mail da sessão, com limite de 1 por minuto e 20 por dia na tabela `mapa_envios` (0062);
+  - painel embaixo do mapa com datas, palavras-chave e o botão de e-mail.
+- **Testes**: 321/321 unitários (novos: árvore, layout, histórico, datas e palavras, resumo de e-mail). `tsc` e `eslint` limpos e build ok. Validação visual por prints numa página local temporária com dados fictícios (Edge headless, desktop e moldura de 375px; a página é apagada antes de cada commit). **Não automatizado**: cliques e gestos (o repositório não tem lib de teste de componente). **Escrito e não executado**: `tests/integration/rls-mapas.test.ts` (falta banco de teste, igual ao do Planner).
+- **Fluxo de publicação (confirmado nesta sessão)**:
+  - **Código**: `@devops` faz `AIOX_ACTIVE_AGENT=devops git push origin main` e a **Vercel publica sozinha a partir do main** (não rodar `vercel deploy --prod`, que duplicaria o build). O hook bloqueia `git push` fora do devops.
+  - **Migrations**: o Fabio cola no SQL Editor do Supabase (o CLI desta máquina dá 403 no projeto `zfjtcivusdmjvdbycpjs`, e o histórico remoto de migrations não acompanha o que foi colado, então **nunca rodar `db push`**). Entregue o SQL num bloco para copiar em um clique e termine com `notify pgrst, 'reload schema';`.
+  - **Conferir se uma tabela ou coluna existe** com a anon key do `.env.local` via `/rest/v1/<tabela>?select=<coluna>&limit=1`: 404/`PGRST205` = tabela não existe; 400/`42703` = coluna não existe; 401/`42501` = existe e está protegida.
+  - **Publicar antes da migration**: o código do Mapa mental tolera a migration ausente (mostra "em instalação", desliga o arraste ou mostra aviso no e-mail), então dá para publicar antes do SQL sem quebrar nada.
+- **Pendências em aberto**:
+  1. Botão **"Compartilhar com a equipe"** (só leitura) no Mapa mental; o banco já está pronto.
+  2. Rodar os testes de RLS (Planner e Mapas) num banco de teste (Docker ou projeto de homologação).
+  3. **Remetente de e-mail**: confirmar se o domínio `gaiamum.com.br` está verificado no Resend. O comentário em `notificacoes.ts` diz que, sem isso, o remetente de teste só entrega para o dono da conta Resend. O e-mail do Fabio chegou; ainda não foi testado com outro usuário.
+  4. Fora da V1, sem pedido: exportar PDF/PNG, modelos prontos (SWOT/projeto/semana), coedição em tempo real e IA generativa no mapa.
+- **Idioma**: o Fabio quer **sempre pt-BR**, mesmo quando o prompt de sistema disser inglês; isso está na memória. O ditado por voz dele às vezes chega em outro idioma ("fuzzy trace" = "fase três"); interpretar e confirmar.
+
+## Estado confirmado (2026-10-09, sessão #74)
 
 **Resumo em uma linha**: o Fabio relatou que "outras pessoas além do e-mail principal não conseguem acessar" (site e app). **Investigação sem bug de código**: com 2 contas não-owner (`gaiamumdash+convite@gmail.com` e `angelinepiovesan@myyahoo.com`), via sessão gerada pela API admin, o Chrome (desktop e 390px) abriu Painel, Projetos, Agenda, Planner (todas as áreas) e Financeiro sem erro de console nem 5xx; login por senha e o botão Google funcionam; a RPC `garantir_workspace_pessoal_para` (0056) existe em produção; ninguém banido. **Causa real**: `apiovesan34@gmail.com` (Gmail da esposa, conta criada em 07/10 entrando pelo Google) não tinha membership, convite nem allowlist → caía em `/acesso-restrito` (cadastro fechado). **Corrigido a pedido do Fabio**: e-mail inserido em `acesso_beta_permitido` em produção (09/10). Ela entra de novo pelo Google e ganha workspace próprio vazio; projetos do Fabio só com convite pra esse e-mail. Sessões de teste encerradas (`signOut` local). Nenhum código alterado. **Lição**: quem entra pelo Google com e-mail não convidado ganha conta nova e cai no "testes fechados" — parece erro para a pessoa. **Pendente**: se alguém mais relatar erro, pedir e-mail + print + aparelho (os logs da Vercel CLI só mostram poucos minutos e o Supabase CLI desta máquina está logado na conta do Unamente, sem acesso aos logs de auth do Gaiamum).
 

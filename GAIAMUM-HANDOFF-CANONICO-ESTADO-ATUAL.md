@@ -7,6 +7,10 @@
 
 Este documento é uma fotografia técnica, não uma proposta de roadmap. Nenhuma melhoria foi implementada nesta sessão.
 
+> **Atualizações depois desta auditoria:** o estado atual vive em `docs/handoffs/HANDOFF-GAIAMUM-CLAUDE-CODE.md`; leia a seção "Estado confirmado" mais recente. Módulos novos desde 30/09 com documentação própria:
+> - **Planner V1** (07/10, migrations 0057/0058): `docs/planner/PLANNER_V1.md`.
+> - **Mapa mental V1** (09–10/10, migrations 0059–0062; lista + mapa visual, datas e palavras por regra, ramo → tarefa/compromisso, resumo por e-mail): `docs/mapas/MAPAS_V1.md`.
+
 ---
 
 ## 1. Resumo executivo
