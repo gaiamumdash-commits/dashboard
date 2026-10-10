@@ -43,6 +43,12 @@ create table mapa_nos (
   texto text not null check (char_length(btrim(texto)) between 1 and 200),
   nota text check (char_length(nota) <= 2000),
   recolhido boolean not null default false,
+  -- "Executar este ramo" (fase 3): o ramo vira tarefa do Kanban ou
+  -- compromisso do Planner e fica LIGADO a ela — prazo, alarme, hiperfoco
+  -- e cor de urgência continuam sendo os de lá (fonte única); o mapa só
+  -- mostra o estado. Excluir a tarefa/compromisso só desfaz a ligação.
+  tarefa_id uuid references tarefas (id) on delete set null,
+  compromisso_id uuid references planner_compromissos (id) on delete set null,
   criado_em timestamptz not null default now(),
   atualizado_em timestamptz not null default now(),
   unique (id, mapa_id),
@@ -55,6 +61,9 @@ create unique index mapa_nos_uma_raiz_idx on mapa_nos (mapa_id) where pai_id is 
 create index mapa_nos_mapa_idx on mapa_nos (mapa_id, pai_id, ordem);
 create index mapas_dono_idx on mapas (user_id, tenant_id, atualizado_em desc);
 create index mapas_compartilhados_idx on mapas (tenant_id) where compartilhado;
+-- Excluir tarefa/compromisso procura os ramos ligados (on delete set null).
+create index mapa_nos_tarefa_idx on mapa_nos (tarefa_id) where tarefa_id is not null;
+create index mapa_nos_compromisso_idx on mapa_nos (compromisso_id) where compromisso_id is not null;
 
 -- ==========================================================================
 -- Limite de ramos por mapa.

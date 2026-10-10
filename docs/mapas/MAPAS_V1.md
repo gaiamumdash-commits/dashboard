@@ -17,7 +17,9 @@ Aprovado pelo Fabio em 2026-10-09, depois do benchmark do MindMeister.
 |---|---|---|
 | 1 | Migration 0059 (`mapas`, `mapa_nos`, RLS), menu, lista de mapas, **modo lista**: editar tudo, recolher/expandir, focar no ramo (`?foco=`), atalhos Enter/Tab/Shift+Tab/Esc/Backspace, colar lista → ramos, nota por ramo | Feita |
 | 2 | **Visão de mapa** (desktop e celular: zoom, arrastar, pinça), alternar lista/mapa, botão de compartilhar com a equipe | Pendente |
-| 3 | Datas e palavras detectadas, ramo → compromisso do Planner / tarefa do Kanban (com confirmação), botão de **resumo por e-mail** | Pendente |
+| 3 | Datas e palavras detectadas, **"▶ Executar este ramo"** (vira tarefa do Kanban ou compromisso do Planner, com confirmação, e fica ligado a ela: o ramo mostra a cor de urgência/✓ de lá, e dá pra já iniciar o hiperfoco), botão de **resumo por e-mail** | Pendente |
+
+Decisão de 2026-10-10: o mapa **não ganha timer, prazo ou alarme próprios**. Ele usa os do Kanban/Planner por ligação (`mapa_nos.tarefa_id` / `compromisso_id`, já criados na 0059), para não haver duas verdades. Antes de construir, conferir se o compromisso do Planner tem alarme próprio ou depende do da Agenda.
 
 ## Onde está
 
