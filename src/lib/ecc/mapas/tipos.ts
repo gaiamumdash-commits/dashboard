@@ -19,6 +19,10 @@ export type NoMapa = {
   texto: string;
   nota: string | null;
   recolhido: boolean;
+  /** Posição arrastada na visão de mapa, RELATIVA ao pai (migration 0060).
+   * null/ausente = layout automático. Nunca muda a hierarquia. */
+  pos_x?: number | null;
+  pos_y?: number | null;
 };
 
 /** Mover um ramo: subir/descer entre os irmãos, entrar no irmão de cima

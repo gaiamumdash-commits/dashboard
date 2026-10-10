@@ -296,3 +296,115 @@ export async function definirTudoRecolhido(mapaId: string, recolhido: boolean): 
     .not("pai_id", "is", null);
   return resultado(error, "Não foi possível atualizar o mapa.");
 }
+
+// --------------------------------------------------------------------------
+// Visão de mapa (fase 2): posições e desfazer
+// --------------------------------------------------------------------------
+
+const AVISO_POSICAO_PENDENTE =
+  "Ainda não dá pra salvar a posição dos ramos: falta uma atualização do banco (migration 0060). O mapa continua funcionando no layout automático.";
+
+function lerCoordenada(valor: unknown): number | null {
+  return typeof valor === "number" && Number.isFinite(valor) && Math.abs(valor) <= 100000 ? Math.round(valor * 10) / 10 : null;
+}
+
+function erroDePosicao(error: { code?: string; message: string } | null, mensagem: string): ResultadoMapa {
+  if (error?.code === "42703" || error?.code === "PGRST204") return falha(AVISO_POSICAO_PENDENTE);
+  return resultado(error, mensagem);
+}
+
+/** Posição arrastada (relativa ao pai), ou null pra voltar ao automático.
+ * Só desenho: nunca toca em `pai_id`/`ordem`. Gravada ao SOLTAR o ramo. */
+export async function salvarPosicao(noId: string, posicao: { x: number; y: number } | null): Promise<ResultadoMapa> {
+  const id = lerId(noId);
+  if (!id) return falha("Ramo inválido.");
+  const x = posicao ? lerCoordenada(posicao.x) : null;
+  const y = posicao ? lerCoordenada(posicao.y) : null;
+  if (posicao && (x === null || y === null)) return falha("Posição inválida.");
+
+  const { tenantId, supabase } = await contexto();
+  const { data, error } = await supabase
+    .from("mapa_nos")
+    .update({ pos_x: x, pos_y: y })
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .not("pai_id", "is", null)
+    .select("id");
+  if (!error && (data ?? []).length === 0) return falha("Ramo não encontrado. Recarregue a página.");
+  return erroDePosicao(error, "Não foi possível salvar a posição.");
+}
+
+/** "Reorganizar": todos os ramos voltam ao layout automático. */
+export async function limparPosicoes(mapaId: string): Promise<ResultadoMapa> {
+  const id = lerId(mapaId);
+  if (!id) return falha("Mapa inválido.");
+  const { tenantId, supabase } = await contexto();
+  const { error } = await supabase
+    .from("mapa_nos")
+    .update({ pos_x: null, pos_y: null })
+    .eq("mapa_id", id)
+    .eq("tenant_id", tenantId)
+    .not("pos_x", "is", null);
+  return erroDePosicao(error, "Não foi possível reorganizar o mapa.");
+}
+
+/** Desfazer "Reorganizar": devolve as posições que existiam antes. */
+export async function definirPosicoes(mapaId: string, itens: { id: string; x: number; y: number }[]): Promise<ResultadoMapa> {
+  const mapa = lerId(mapaId);
+  if (!mapa || !Array.isArray(itens) || itens.length > MAX_NOS_POR_MAPA) return falha("Posições inválidas.");
+  const validos = itens.map((i) => ({ id: lerId(i?.id), x: lerCoordenada(i?.x), y: lerCoordenada(i?.y) }));
+  if (validos.some((i) => !i.id || i.x === null || i.y === null)) return falha("Posições inválidas.");
+
+  const { tenantId, supabase } = await contexto();
+  const respostas = await Promise.all(
+    validos.map((i) =>
+      supabase.from("mapa_nos").update({ pos_x: i.x, pos_y: i.y }).eq("id", i.id!).eq("mapa_id", mapa).eq("tenant_id", tenantId),
+    ),
+  );
+  return erroDePosicao(respostas.find((r) => r.error)?.error ?? null, "Não foi possível restaurar as posições.");
+}
+
+/** Desfazer uma exclusão: reinsere o ramo e tudo o que estava dentro, com
+ * os mesmos ids, num insert só (pai antes dos filhos). O pai do primeiro
+ * ramo precisa continuar existindo no mapa. */
+export async function restaurarRamos(mapaId: string, nos: unknown[]): Promise<ResultadoMapa> {
+  const mapa = lerId(mapaId);
+  if (!mapa || !Array.isArray(nos) || nos.length === 0 || nos.length > MAX_NOS_POR_MAPA) return falha("Nada pra restaurar.");
+
+  const linhas: Record<string, unknown>[] = [];
+  const ids = new Set<string>();
+  for (const bruto of nos) {
+    const n = (bruto ?? {}) as Record<string, unknown>;
+    const id = lerId(n.id);
+    const pai = lerId(n.pai_id);
+    const texto = textoObrigatorio(n.texto, MAX_TEXTO_NO, "Texto do ramo");
+    const nota = textoOpcional(n.nota ?? "", MAX_NOTA_NO, "Nota");
+    const ordem = typeof n.ordem === "number" && Number.isFinite(n.ordem) ? n.ordem : null;
+    if (!id || !pai || !texto.ok || !nota.ok || ordem === null) return falha("Não foi possível restaurar: dados inválidos.");
+    // Dentro do lote, o pai tem que vir antes (só o 1º aponta pra fora).
+    if (linhas.length > 0 && !ids.has(pai)) return falha("Não foi possível restaurar: ordem inválida.");
+    ids.add(id);
+    const x = lerCoordenada(n.pos_x);
+    const y = lerCoordenada(n.pos_y);
+    linhas.push({
+      id,
+      mapa_id: mapa,
+      pai_id: pai,
+      ordem,
+      texto: texto.valor,
+      nota: nota.valor,
+      recolhido: n.recolhido === true,
+      ...(x !== null && y !== null ? { pos_x: x, pos_y: y } : {}),
+    });
+  }
+
+  const { tenantId, supabase } = await contexto();
+  const { nos: atuais, error: erroLeitura } = await estruturaDoMapa(supabase, tenantId, mapa);
+  if (erroLeitura) return resultado(erroLeitura, "Não foi possível restaurar.");
+  if (!atuais.some((n) => n.id === linhas[0].pai_id)) return falha("O ramo de cima não existe mais — não dá pra desfazer.");
+  if (atuais.length + linhas.length > MAX_NOS_POR_MAPA) return falha(`Restaurar passaria de ${MAX_NOS_POR_MAPA} ramos.`);
+
+  const { error } = await supabase.from("mapa_nos").insert(linhas.map((l) => ({ ...l, tenant_id: tenantId })));
+  if (!error) await tocarMapa(supabase, tenantId, mapa);
+  return resultado(error, "Não foi possível restaurar o ramo.");
+}

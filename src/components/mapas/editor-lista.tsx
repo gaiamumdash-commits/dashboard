@@ -124,7 +124,7 @@ export function EditorLista({
     setEditando,
     setRascunho,
     setDialogo,
-    hrefFoco: (id) => (id && id !== raiz?.id ? `/mapas/${mapaId}?foco=${id}` : `/mapas/${mapaId}`),
+    hrefFoco: (id) => (id && id !== raiz?.id ? `/mapas/${mapaId}?modo=lista&foco=${id}` : `/mapas/${mapaId}?modo=lista`),
     expandir: (id) => setRecolhidos((rec) => ({ ...rec, [id]: false })),
 
     salvarTexto(no, texto) {

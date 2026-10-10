@@ -127,3 +127,19 @@ export function lerListaIndentada(texto: string, maximo = MAX_NOS_POR_MAPA - 1):
   }
   return { itens, cortados };
 }
+
+/** O ramo `id` e tudo o que está dentro dele, pai sempre antes dos filhos
+ * — a ordem que o banco aceita ao reinserir (desfazer uma exclusão). */
+export function subarvore<T extends NoOrdenavel>(nos: T[], id: string): T[] {
+  const filhos = filhosPorPai(nos);
+  const inicio = nos.find((n) => n.id === id);
+  if (!inicio) return [];
+  const resultado: T[] = [];
+  const fila: T[] = [inicio];
+  while (fila.length > 0) {
+    const no = fila.shift()!;
+    resultado.push(no);
+    fila.push(...(filhos.get(no.id) ?? []));
+  }
+  return resultado;
+}

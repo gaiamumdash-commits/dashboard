@@ -103,6 +103,16 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — Mapas: privado, compartilhado só 
     expect(depois!.texto).toBe("Copy");
   });
 
+  it("posição do ramo (migration 0060): B não arrasta o ramo do mapa compartilhado de A", async () => {
+    const { data: alterado } = await userB.cliente.from("mapa_nos").update({ pos_x: 999, pos_y: 999 }).eq("id", ramoA).select("id");
+    expect(alterado ?? []).toEqual([]);
+    const { error } = await userA.cliente.from("mapa_nos").update({ pos_x: 120, pos_y: -40 }).eq("id", ramoA);
+    expect(error).toBeNull();
+    // Meia posição é recusada (x sem y).
+    const { error: meia } = await userA.cliente.from("mapa_nos").update({ pos_x: 1, pos_y: null }).eq("id", ramoA);
+    expect(meia).not.toBeNull();
+  });
+
   it("pessoa de outro workspace não vê nem o mapa compartilhado", async () => {
     const { data } = await estranho.cliente.from("mapa_nos").select("id").eq("mapa_id", mapaA);
     expect(data).toEqual([]);
