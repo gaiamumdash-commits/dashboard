@@ -6,6 +6,9 @@ export type Mapa = {
   user_id: string;
   titulo: string;
   compartilhado: boolean;
+  /** Convidados de quadro (escopo 'projeto') também leem (migration 0063).
+   * Ausente enquanto a 0063 não roda em produção. */
+  inclui_convidados?: boolean;
   criado_em: string;
   atualizado_em: string;
 };

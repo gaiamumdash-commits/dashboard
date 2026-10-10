@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { criarMapa, excluirMapa } from "@/lib/ecc/mapas/actions";
 import { FUSO_BRASIL } from "@/lib/ecc/kanban";
 import { MAX_TEXTO_NO, type Mapa } from "@/lib/ecc/mapas/tipos";
+import { compartilhamentoDoMapa, seloCompartilhamento } from "@/lib/ecc/mapas/compartilhamento";
 import { BotaoDialogo } from "@/components/planner/botao-dialogo";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
 import {
@@ -76,6 +77,7 @@ function FormularioNovoMapa({ aoSalvar }: { aoSalvar: () => void }) {
 
 function CartaoMapa({ mapa, meu }: { mapa: Mapa; meu: boolean }) {
   const { pendente, executar } = useAcaoPlanner();
+  const selo = seloCompartilhamento(compartilhamentoDoMapa(mapa), meu);
   return (
     <li className="flex flex-col gap-2 rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-4 transition hover:border-gaiamum-primary/60">
       <Link href={`/mapas/${mapa.id}`} className="flex items-start gap-3">
@@ -91,8 +93,7 @@ function CartaoMapa({ mapa, meu }: { mapa: Mapa; meu: boolean }) {
           </span>
           <span className="block text-xs text-gaiamum-text-muted">
             Atualizado em {quando(mapa.atualizado_em)}
-            {mapa.compartilhado &&
-              (meu ? " · compartilhado com a equipe" : " · só leitura")}
+            {selo && ` · ${selo}`}
           </span>
         </span>
       </Link>

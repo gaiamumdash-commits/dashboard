@@ -8,6 +8,21 @@ import type { EstadoVinculo, Mapa, NoMapa, OpcoesExecucao, VinculoRamo } from "@
 // os compartilhados com o workspace; aqui separamos os dois.
 
 const COLUNAS_MAPA = "id, tenant_id, user_id, titulo, compartilhado, criado_em, atualizado_em";
+const COLUNA_CONVIDADOS = ", inclui_convidados";
+
+type Consulta = PromiseLike<{ data: unknown; error: { code?: string; message: string } | null }>;
+
+/** Lê os mapas com `inclui_convidados` (0063); se a coluna ainda não existe
+ * (42703), repete sem ela e avisa que compartilhar está indisponível. */
+async function comColunaConvidados<T>(
+  consulta: (colunas: string) => Consulta,
+): Promise<{ data: T | null; error: { code?: string; message: string } | null; compartilharDisponivel: boolean }> {
+  const com = await consulta(COLUNAS_MAPA + COLUNA_CONVIDADOS);
+  if (com.error?.code !== "42703") return { data: com.data as T | null, error: com.error, compartilharDisponivel: !com.error };
+  const sem = await consulta(COLUNAS_MAPA);
+  return { data: sem.data as T | null, error: sem.error, compartilharDisponivel: false };
+}
+
 const COLUNAS_NO = "id, mapa_id, pai_id, ordem, texto, nota, recolhido, tarefa_id, compromisso_id";
 const COLUNAS_POSICAO = ", pos_x, pos_y, cor, forma";
 
@@ -19,14 +34,11 @@ export async function contextoMapas() {
 
 export async function listarMapas(tenantId: string, userId: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("mapas")
-    .select(COLUNAS_MAPA)
-    .eq("tenant_id", tenantId)
-    .order("atualizado_em", { ascending: false })
-    .limit(200);
+  const { data, error } = await comColunaConvidados<Mapa[]>((colunas) =>
+    supabase.from("mapas").select(colunas).eq("tenant_id", tenantId).order("atualizado_em", { ascending: false }).limit(200),
+  );
   if (error) console.error("Mapas: listar", error);
-  const todos = (data ?? []) as Mapa[];
+  const todos = data ?? [];
   return {
     // Tabela ainda não criada em produção (migration 0059 pendente) ou
     // banco fora do ar: a tela avisa em vez de oferecer criar e falhar.
@@ -42,12 +54,12 @@ export async function listarMapas(tenantId: string, userId: string) {
 export async function carregarMapa(
   tenantId: string,
   mapaId: string,
-): Promise<{ mapa: Mapa; nos: NoMapa[]; posicoesDisponiveis: boolean } | null> {
+): Promise<{ mapa: Mapa; nos: NoMapa[]; posicoesDisponiveis: boolean; compartilharDisponivel: boolean } | null> {
   if (!/^[0-9a-f-]{36}$/i.test(mapaId)) return null;
   const supabase = await createClient();
   const ramos = (colunas: string) => supabase.from("mapa_nos").select(colunas).eq("mapa_id", mapaId).eq("tenant_id", tenantId);
-  const [{ data: mapa, error }, comPosicao] = await Promise.all([
-    supabase.from("mapas").select(COLUNAS_MAPA).eq("id", mapaId).eq("tenant_id", tenantId).maybeSingle(),
+  const [{ data: mapa, error, compartilharDisponivel }, comPosicao] = await Promise.all([
+    comColunaConvidados<Mapa>((colunas) => supabase.from("mapas").select(colunas).eq("id", mapaId).eq("tenant_id", tenantId).maybeSingle()),
     ramos(COLUNAS_NO + COLUNAS_POSICAO),
   ]);
   let nos = comPosicao.data as unknown as NoMapa[] | null;
@@ -62,7 +74,7 @@ export async function carregarMapa(
   }
   if (error) console.error("Mapas: carregar", error);
   if (!mapa) return null;
-  return { mapa: mapa as Mapa, nos: nos ?? [], posicoesDisponiveis };
+  return { mapa, nos: nos ?? [], posicoesDisponiveis, compartilharDisponivel };
 }
 
 const HORAS_ALERTA = 48;

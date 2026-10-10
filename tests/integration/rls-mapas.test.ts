@@ -12,6 +12,7 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — Mapas: privado, compartilhado só 
   let userA: { userId: string; email: string; cliente: SupabaseClient };
   let userB: { userId: string; email: string; cliente: SupabaseClient };
   let estranho: { userId: string; email: string; cliente: SupabaseClient };
+  let convidado: { userId: string; email: string; cliente: SupabaseClient };
   let tenantId: string;
   let tenantEstranhoId: string;
   let mapaA: string;
@@ -26,6 +27,8 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — Mapas: privado, compartilhado só 
     tenantId = await criarTenantDeTeste(service, userA.userId);
     tenantEstranhoId = await criarTenantDeTeste(service, estranho.userId);
     await service.from("memberships").insert({ user_id: userB.userId, tenant_id: tenantId, papel: "member", escopo: "completo" });
+    convidado = await criarUsuarioDeTeste(service, "mapas-convidado");
+    await service.from("memberships").insert({ user_id: convidado.userId, tenant_id: tenantId, papel: "member", escopo: "projeto" });
 
     const { data: mapa, error } = await userA.cliente
       .from("mapas")
@@ -57,6 +60,7 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — Mapas: privado, compartilhado só 
     await apagarUsuarioDeTeste(service, userA.userId);
     await apagarUsuarioDeTeste(service, userB.userId);
     await apagarUsuarioDeTeste(service, estranho.userId);
+    await apagarUsuarioDeTeste(service, convidado.userId);
     await service.from("tenants").delete().in("id", [tenantId, tenantEstranhoId]);
   });
 
@@ -111,6 +115,29 @@ describe.skipIf(!TEM_BANCO_DE_TESTE)("RLS — Mapas: privado, compartilhado só 
     // Meia posição é recusada (x sem y).
     const { error: meia } = await userA.cliente.from("mapa_nos").update({ pos_x: 1, pos_y: null }).eq("id", ramoA);
     expect(meia).not.toBeNull();
+  });
+
+  it("convidado de um quadro só (escopo 'projeto'): vê só com 'Equipe e convidados' (migration 0063)", async () => {
+    // Mapa já está compartilhado com a equipe (teste anterior), sem convidados.
+    await userA.cliente.from("mapas").update({ compartilhado: true, inclui_convidados: false }).eq("id", mapaA);
+    const { data: semMapa } = await convidado.cliente.from("mapas").select("id").eq("id", mapaA);
+    expect(semMapa).toEqual([]);
+    const { data: semNos } = await convidado.cliente.from("mapa_nos").select("id").eq("mapa_id", mapaA);
+    expect(semNos).toEqual([]);
+    // B (acesso completo) continua vendo.
+    const { data: deB } = await userB.cliente.from("mapas").select("id").eq("id", mapaA);
+    expect(deB).toHaveLength(1);
+
+    await userA.cliente.from("mapas").update({ inclui_convidados: true }).eq("id", mapaA);
+    const { data: comNos } = await convidado.cliente.from("mapa_nos").select("id").eq("mapa_id", mapaA);
+    expect((comNos ?? []).length).toBeGreaterThan(0);
+    const { data: alterado } = await convidado.cliente.from("mapas").update({ titulo: "invadido" }).eq("id", mapaA).select("id");
+    expect(alterado ?? []).toEqual([]);
+
+    // Convidados sem compartilhar é recusado pelo CHECK.
+    const { error: incoerente } = await userA.cliente.from("mapas").update({ compartilhado: false, inclui_convidados: true }).eq("id", mapaA);
+    expect(incoerente).not.toBeNull();
+    await userA.cliente.from("mapas").update({ inclui_convidados: false }).eq("id", mapaA);
   });
 
   it("pessoa de outro workspace não vê nem o mapa compartilhado", async () => {

@@ -10,6 +10,7 @@ import { FUSO_BRASIL, hojeISOBrasil, paraUtcDoFuso } from "@/lib/ecc/kanban";
 import { enviarEmailResumoMapa } from "@/lib/ecc/notificacoes";
 import { montarResumoMapa } from "@/lib/ecc/mapas/resumo-email";
 import { lerListaIndentada, ordemParaNovo, planoMovimento } from "@/lib/ecc/mapas/arvore";
+import { camposDoCompartilhamento, ehCompartilhamento, type Compartilhamento } from "@/lib/ecc/mapas/compartilhamento";
 import { CORES_RAMO, MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO, type CorRamo, type FormaRamo, type MovimentoNo } from "@/lib/ecc/mapas/tipos";
 
 /**
@@ -133,6 +134,33 @@ export async function excluirMapa(mapaId: string): Promise<ResultadoMapa> {
   const { tenantId, supabase } = await contexto();
   const { error } = await supabase.from("mapas").delete().eq("id", id).eq("tenant_id", tenantId);
   return resultado(error, "Não foi possível excluir o mapa.");
+}
+
+const AVISO_COMPARTILHAR_PENDENTE =
+  "Ainda não dá pra compartilhar: falta uma atualização do banco (migration 0063). O mapa continua como estava.";
+
+/** "Só eu" | "Equipe" | "Equipe e convidados" — só o dono muda (a RLS da
+ * 0059 só deixa o dono escrever; o `.eq("user_id")` deixa a resposta clara
+ * pra quem não é). Grava sempre as duas colunas: sem a 0063, falha em vez
+ * de compartilhar com a regra antiga, que incluía convidados. */
+export async function definirCompartilhamento(mapaId: string, escolha: Compartilhamento): Promise<ResultadoMapa> {
+  const id = lerId(mapaId);
+  if (!id) return falha("Mapa inválido.");
+  if (!ehCompartilhamento(escolha)) return falha("Opção de compartilhamento inválida.");
+  const usuario = await obterUsuarioAtual();
+  if (!usuario) return falha("Sessão expirada. Entre de novo.");
+
+  const { tenantId, supabase } = await contexto();
+  const { data, error } = await supabase
+    .from("mapas")
+    .update(camposDoCompartilhamento(escolha))
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .eq("user_id", usuario.id)
+    .select("id");
+  if (error?.code === "42703" || error?.code === "PGRST204") return falha(AVISO_COMPARTILHAR_PENDENTE);
+  if (!error && (data ?? []).length === 0) return falha("Só quem criou o mapa pode mudar o compartilhamento.");
+  return resultado(error, "Não foi possível mudar o compartilhamento.");
 }
 
 // --------------------------------------------------------------------------

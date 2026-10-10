@@ -4,7 +4,7 @@ Aprovado pelo Fabio em 2026-10-09, depois do benchmark do MindMeister.
 
 ## Decisões
 
-- **Privado por padrão**, como o Planner. O dono pode compartilhar com o workspace, só para leitura.
+- **Privado por padrão**, como o Planner. O dono escolhe na hora com quem compartilhar, sempre só para leitura: **🔒 Só eu**, **👥 Equipe** (membros com acesso completo) ou **👥 Equipe e convidados** (inclui quem foi convidado só para um quadro, `memberships.escopo = 'projeto'`). Migration 0063 (`mapas.inclui_convidados` + RLS via `tem_acesso_completo`).
 - **Item próprio no menu** ("Mapas"), visível para todos, inclusive convidados de um quadro só.
 - **E-mail de resumo só para a própria pessoa**, com limite de envio.
 - **Sem IA paga:** datas pelo `parser-fala-agenda.ts` e palavras por contagem, com stopwords em português e `#tags`.
@@ -16,7 +16,8 @@ Aprovado pelo Fabio em 2026-10-09, depois do benchmark do MindMeister.
 | Fase | Entrega | Estado |
 |---|---|---|
 | 1 | Migration 0059 (`mapas`, `mapa_nos`, RLS), menu, lista de mapas, **modo lista**: editar tudo, recolher/expandir, focar no ramo (`?foco=`), atalhos Enter/Tab/Shift+Tab/Esc/Backspace, colar lista → ramos, nota por ramo | Feita |
-| 2 | **Visão de mapa** (desktop e celular: zoom, arrastar, pinça), alternar lista/mapa, desfazer/refazer, reorganizar. Migration 0060 (`pos_x`/`pos_y`) | Feita (falta o botão de compartilhar: fica pra 2b) |
+| 2 | **Visão de mapa** (desktop e celular: zoom, arrastar, pinça), alternar lista/mapa, desfazer/refazer, reorganizar. Migration 0060 (`pos_x`/`pos_y`) | Feita |
+| 2b | Botão **Compartilhar** no cabeçalho do mapa (`botao-compartilhar.tsx`, action `definirCompartilhamento`, regra em `compartilhamento.ts`), selo na lista. Migration 0063. Sem a 0063 o botão fica desligado, e a action sempre grava as duas colunas, então nunca compartilha pela regra antiga, que incluía convidados | Feita |
 | 3 | Datas e palavras detectadas, **"▶ Executar este ramo"** (vira tarefa do Kanban ou compromisso do Planner, com confirmação, e fica ligado a ela: o ramo mostra a cor de urgência/✓ de lá, e dá pra já iniciar o hiperfoco), botão de **resumo por e-mail**. Migration 0062 (`mapa_envios`) | Feita |
 
 Decisão de 2026-10-10: o mapa **não ganha timer, prazo ou alarme próprios**. Ele usa os do Kanban/Planner por ligação (`mapa_nos.tarefa_id` / `compromisso_id`, já criados na 0059), para não haver duas verdades. Conferido em 2026-10-10: o compromisso do Planner **não tem alarme próprio**. Ele aparece na Agenda e no resumo das 7h. Alarme e hiperfoco existem só na tarefa do Kanban, por isso o "Executar" oferece a tarefa com foco opcional.

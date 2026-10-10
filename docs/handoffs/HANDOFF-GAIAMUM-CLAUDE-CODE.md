@@ -42,10 +42,13 @@
   - **Migrations**: o Fabio cola no SQL Editor do Supabase (o CLI desta máquina dá 403 no projeto `zfjtcivusdmjvdbycpjs`, e o histórico remoto de migrations não acompanha o que foi colado, então **nunca rodar `db push`**). Entregue o SQL num bloco para copiar em um clique e termine com `notify pgrst, 'reload schema';`.
   - **Conferir se uma tabela ou coluna existe** com a anon key do `.env.local` via `/rest/v1/<tabela>?select=<coluna>&limit=1`: 404/`PGRST205` = tabela não existe; 400/`42703` = coluna não existe; 401/`42501` = existe e está protegida.
   - **Publicar antes da migration**: o código do Mapa mental tolera a migration ausente (mostra "em instalação", desliga o arraste ou mostra aviso no e-mail), então dá para publicar antes do SQL sem quebrar nada.
+- **Sessão #76 (2026-10-10, mesma data)**:
+  - **Compartilhar mapa**: o dono escolhe na hora entre 🔒 Só eu, 👥 Equipe (só acesso completo) e 👥 Equipe e convidados (inclui escopo `projeto`), sempre só leitura. Migration **0063** (`inclui_convidados` + RLS com `tem_acesso_completo`), entregue ao Fabio para colar. Sem a 0063 o botão fica desligado. Detalhes na fase 2b do `MAPAS_V1.md`. Testes: 329/329, mais o caso do convidado no `rls-mapas.test.ts` (ainda não executado).
+  - **Resend**: o domínio `gaiamum.com.br` está **Verified** (print do Fabio). O Fabio criou `RESEND_FROM_EMAIL = Gaiamum <notificacoes@gaiamum.com.br>` na Vercel. Falta confirmar com outro usuário que o e-mail chega.
 - **Pendências em aberto**:
-  1. Botão **"Compartilhar com a equipe"** (só leitura) no Mapa mental; o banco já está pronto.
+  1. Fabio: colar a migration 0063 (se ainda não colou) e testar o compartilhamento com um convidado de quadro.
   2. Rodar os testes de RLS (Planner e Mapas) num banco de teste (Docker ou projeto de homologação).
-  3. **Remetente de e-mail**: confirmar se o domínio `gaiamum.com.br` está verificado no Resend. O comentário em `notificacoes.ts` diz que, sem isso, o remetente de teste só entrega para o dono da conta Resend. O e-mail do Fabio chegou; ainda não foi testado com outro usuário.
+  3. Confirmar que um e-mail (resumo do mapa ou notificação) chega para um usuário que não é o Fabio.
   4. Fora da V1, sem pedido: exportar PDF/PNG, modelos prontos (SWOT/projeto/semana), coedição em tempo real e IA generativa no mapa.
 - **Idioma**: o Fabio quer **sempre pt-BR**, mesmo quando o prompt de sistema disser inglês; isso está na memória. O ditado por voz dele às vezes chega em outro idioma ("fuzzy trace" = "fase três"); interpretar e confirmar.
 
