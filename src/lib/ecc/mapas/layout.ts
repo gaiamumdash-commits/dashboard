@@ -16,6 +16,8 @@ import type { NoMapa } from "@/lib/ecc/mapas/tipos";
 export type NoParaLayout = Pick<NoMapa, "id" | "pai_id" | "ordem" | "texto" | "recolhido"> & {
   pos_x?: number | null;
   pos_y?: number | null;
+  /** Altura a mais (px) pra selos embaixo do texto (data, tarefa ligada). */
+  extra?: number;
 };
 
 export type Caixa = {
@@ -99,7 +101,8 @@ export function calcularLayout(nos: NoParaLayout[]): ResultadoLayout {
     const no = pilha.pop()!;
     visitados.push(no);
     const nivel = nivelDe.get(no.id)!;
-    tamanhos.set(no.id, tamanhoDoRamo(no.texto, nivel));
+    const t = tamanhoDoRamo(no.texto, nivel);
+    tamanhos.set(no.id, { w: t.w, h: t.h + (no.extra ?? 0) });
     if (no.recolhido && no.pai_id !== null) continue;
     for (const f of filhos.get(no.id) ?? []) {
       nivelDe.set(f.id, nivel + 1);

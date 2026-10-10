@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuarioAtual } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
-import { textoObrigatorio, textoOpcional } from "@/lib/ecc/planner/regras";
+import { ehAreaPlanner, ehChaveData, textoObrigatorio, textoOpcional } from "@/lib/ecc/planner/regras";
+import { lerCompromisso } from "@/lib/ecc/planner/validacao";
+import { atualizarDatasTarefa, criarTarefa, iniciarHiperfoco } from "@/lib/ecc/actions";
+import { FUSO_BRASIL, hojeISOBrasil, paraUtcDoFuso } from "@/lib/ecc/kanban";
+import { enviarEmailResumoMapa } from "@/lib/ecc/notificacoes";
+import { montarResumoMapa } from "@/lib/ecc/mapas/resumo-email";
 import { lerListaIndentada, ordemParaNovo, planoMovimento } from "@/lib/ecc/mapas/arvore";
 import { CORES_RAMO, MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO, type CorRamo, type FormaRamo, type MovimentoNo } from "@/lib/ecc/mapas/tipos";
 
@@ -426,4 +431,165 @@ export async function restaurarRamos(mapaId: string, nos: unknown[]): Promise<Re
   const { error } = await supabase.from("mapa_nos").insert(linhas.map((l) => ({ ...l, tenant_id: tenantId })));
   if (!error) await tocarMapa(supabase, tenantId, mapa);
   return resultado(error, "Não foi possível restaurar o ramo.");
+}
+
+// --------------------------------------------------------------------------
+// Fase 3: executar ramo (Kanban / Planner) e resumo por e-mail
+// --------------------------------------------------------------------------
+
+const HORA_VALIDA = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Liga o ramo à tarefa/compromisso recém-criado (só o dono do mapa). */
+async function ligarRamo(
+  supabase: Supabase,
+  tenantId: string,
+  noId: string,
+  campos: { tarefa_id?: string | null; compromisso_id?: string | null },
+) {
+  const { data, error } = await supabase.from("mapa_nos").update(campos).eq("id", noId).eq("tenant_id", tenantId).select("mapa_id");
+  if (!error && data?.[0]) await tocarMapa(supabase, tenantId, data[0].mapa_id);
+  return { error: error ?? (data && data.length > 0 ? null : { message: "ramo não encontrado" }) };
+}
+
+/** Texto do ramo → título de uma linha (o Kanban cria 1 cartão por linha). */
+function tituloDeUmaLinha(bruto: unknown): string | null {
+  const t = typeof bruto === "string" ? bruto.replace(/\s+/g, " ").trim() : "";
+  return t && t.length <= 200 ? t : null;
+}
+
+/**
+ * "▶ Executar este ramo" como TAREFA do Kanban. Usa as próprias Server
+ * Actions do Kanban (criar, prazo, hiperfoco) — mesmas regras, mesma RLS do
+ * projeto; o mapa só guarda o vínculo (`tarefa_id`). Prazo, alarme, foco e
+ * cor de urgência continuam sendo os do Kanban (decisão de 2026-10-10).
+ */
+export async function executarRamoComoTarefa(
+  noId: string,
+  dados: { projetoId: string; colunaId: string; titulo: string; data?: string | null; hora?: string | null; focoMinutos?: number | null },
+): Promise<ResultadoMapa> {
+  const no = lerId(noId);
+  const projetoId = lerId(dados?.projetoId);
+  const colunaId = lerId(dados?.colunaId);
+  const titulo = tituloDeUmaLinha(dados?.titulo);
+  if (!no || !projetoId || !colunaId) return falha("Escolha o projeto e a coluna.");
+  if (!titulo) return falha("O título da tarefa precisa ter entre 1 e 200 caracteres.");
+  const data = dados.data || null;
+  const hora = dados.hora || null;
+  if (data && !ehChaveData(data)) return falha("Data inválida.");
+  if (hora && !HORA_VALIDA.test(hora)) return falha("Horário inválido.");
+  const foco = dados.focoMinutos ?? null;
+  if (foco !== null && (!Number.isInteger(foco) || foco < 1 || foco > 24 * 60)) return falha("Duração do foco: de 1 minuto a 24 horas.");
+
+  const { tenantId, supabase } = await contexto();
+  const { data: ramo } = await supabase.from("mapa_nos").select("id, tarefa_id").eq("id", no).eq("tenant_id", tenantId).maybeSingle();
+  if (!ramo) return falha("Ramo não encontrado. Recarregue a página.");
+  if (ramo.tarefa_id) return falha("Este ramo já virou tarefa. Desligue antes de criar outra.");
+
+  const tarefaId = crypto.randomUUID();
+  try {
+    const fd = new FormData();
+    fd.set("titulo", titulo);
+    await criarTarefa(projetoId, colunaId, fd, [tarefaId]);
+    if (data) {
+      const prazo = new FormData();
+      prazo.set("data_limite", paraUtcDoFuso(`${data}T${hora ?? "18:00"}`, FUSO_BRASIL).toISOString());
+      await atualizarDatasTarefa(tarefaId, projetoId, prazo);
+    }
+    if (foco) await iniciarHiperfoco(tarefaId, projetoId, foco);
+  } catch (erro) {
+    console.error("Mapas: executar como tarefa", erro);
+    const mensagem = erro instanceof Error && /Concluído/.test(erro.message) ? erro.message : "Não foi possível criar a tarefa.";
+    return falha(`${mensagem} Tente de novo.`);
+  }
+
+  const { error } = await ligarRamo(supabase, tenantId, no, { tarefa_id: tarefaId });
+  revalidatePath(`/projetos/${projetoId}/tarefas`);
+  return resultado(error, "A tarefa foi criada, mas não ficou ligada ao ramo.");
+}
+
+/** "▶ Executar este ramo" como COMPROMISSO do Planner (aparece na Agenda e
+ * no resumo das 7h). Mesma validação do formulário do Planner. */
+export async function executarRamoComoCompromisso(noId: string, formData: FormData): Promise<ResultadoMapa> {
+  const no = lerId(noId);
+  if (!no) return falha("Ramo inválido.");
+  const area = formData.get("area");
+  if (!ehAreaPlanner(area)) return falha("Área inválida.");
+  const compromisso = lerCompromisso(formData);
+  if (!compromisso.ok) return falha(compromisso.erro);
+
+  const { tenantId, supabase } = await contexto();
+  const { data: ramo } = await supabase.from("mapa_nos").select("id, compromisso_id").eq("id", no).eq("tenant_id", tenantId).maybeSingle();
+  if (!ramo) return falha("Ramo não encontrado. Recarregue a página.");
+  if (ramo.compromisso_id) return falha("Este ramo já virou compromisso. Desligue antes de criar outro.");
+
+  const compromissoId = crypto.randomUUID();
+  const { error: erroCriar } = await supabase
+    .from("planner_compromissos")
+    .insert({ id: compromissoId, tenant_id: tenantId, area, tipo: "outro", ...compromisso.valor });
+  if (erroCriar) return resultado(erroCriar, "Não foi possível criar o compromisso.");
+
+  const { error } = await ligarRamo(supabase, tenantId, no, { compromisso_id: compromissoId });
+  revalidatePath("/planner", "layout");
+  revalidatePath("/agenda");
+  return resultado(error, "O compromisso foi criado, mas não ficou ligado ao ramo.");
+}
+
+/** Desfaz só o VÍNCULO — a tarefa/compromisso continua existindo lá. */
+export async function desligarRamo(noId: string, qual: "tarefa" | "compromisso"): Promise<ResultadoMapa> {
+  const no = lerId(noId);
+  if (!no || (qual !== "tarefa" && qual !== "compromisso")) return falha("Ramo inválido.");
+  const { tenantId, supabase } = await contexto();
+  const { error } = await ligarRamo(supabase, tenantId, no, qual === "tarefa" ? { tarefa_id: null } : { compromisso_id: null });
+  return resultado(error, "Não foi possível desligar.");
+}
+
+const LIMITE_ENVIOS_DIA = 20;
+
+/** "📬 Resumo por e-mail": o mapa em tópicos + datas + palavras-chave, SÓ
+ * pro e-mail de quem pediu (vem da sessão). Limite: 1 por minuto e 20 por
+ * dia por pessoa (tabela `mapa_envios`, migration 0062). */
+export async function enviarResumoMapa(mapaId: string): Promise<ResultadoMapa> {
+  const mapa = lerId(mapaId);
+  if (!mapa) return falha("Mapa inválido.");
+  const { tenantId, supabase } = await contexto();
+  const usuario = await obterUsuarioAtual();
+  if (!usuario?.email) return falha("Sua conta não tem e-mail pra receber o resumo.");
+
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: envios, error: erroEnvios } = await supabase
+    .from("mapa_envios")
+    .select("enviado_em")
+    .eq("user_id", usuario.id)
+    .gte("enviado_em", desde)
+    .order("enviado_em", { ascending: false });
+  if (erroEnvios) {
+    if (erroEnvios.code === "42P01" || erroEnvios.code === "PGRST205") {
+      return falha("O resumo por e-mail ainda não está liberado: falta uma atualização do banco (migration 0062).");
+    }
+    return resultado(erroEnvios, "Não foi possível enviar o resumo.");
+  }
+  if ((envios ?? []).length >= LIMITE_ENVIOS_DIA) return falha(`Limite de ${LIMITE_ENVIOS_DIA} resumos por dia atingido. Tente amanhã.`);
+  if (envios?.[0] && Date.now() - new Date(envios[0].enviado_em).getTime() < 60_000) {
+    return falha("Você acabou de pedir um resumo. Espere 1 minuto pra pedir outro.");
+  }
+
+  const [{ data: dadosMapa }, { data: nos }] = await Promise.all([
+    supabase.from("mapas").select("titulo").eq("id", mapa).eq("tenant_id", tenantId).maybeSingle(),
+    supabase.from("mapa_nos").select("id, pai_id, ordem, texto, nota").eq("mapa_id", mapa).eq("tenant_id", tenantId),
+  ]);
+  if (!dadosMapa) return falha("Mapa não encontrado.");
+
+  // Registra ANTES de mandar: clique duplo não manda 2 e-mails.
+  const { error: erroRegistro } = await supabase.from("mapa_envios").insert({ tenant_id: tenantId, mapa_id: mapa });
+  if (erroRegistro) return resultado(erroRegistro, "Não foi possível enviar o resumo.");
+
+  const resumo = montarResumoMapa({
+    titulo: dadosMapa.titulo,
+    nos: nos ?? [],
+    hoje: hojeISOBrasil(),
+    link: `https://www.gaiamum.com.br/mapas/${mapa}`,
+  });
+  const enviado = await enviarEmailResumoMapa({ destinatario: usuario.email, resumo });
+  if (!enviado) return falha("O e-mail não saiu agora. Tente de novo em alguns minutos.");
+  return { ok: true };
 }

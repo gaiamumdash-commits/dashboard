@@ -113,6 +113,15 @@ describe("layout do mapa", () => {
     }
   });
 
+  it("selos (altura extra) entram no tamanho e continuam sem sobreposição", () => {
+    const nos = arvoreGrande(80).map((n, i) => (i % 3 === 0 ? { ...n, extra: 24 } : n));
+    const { caixas } = calcularLayout(nos);
+    const sem = calcularLayout(arvoreGrande(80)).caixas;
+    expect(caixas.get("n3")!.h).toBe(sem.get("n3")!.h + 24);
+    const lista = [...caixas.values()];
+    for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) expect(sobrepoem(lista[i], lista[j])).toBe(false);
+  });
+
   it("mapa antigo (sem posições salvas) e mapa só com a ideia central abrem", () => {
     expect(calcularLayout([no("r", null, 0, "Só a ideia")]).caixas.size).toBe(1);
     expect(calcularLayout([]).caixas.size).toBe(0);

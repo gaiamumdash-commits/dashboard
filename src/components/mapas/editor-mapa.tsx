@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   criarNo,
   definirAparencia,
+  desligarRamo,
   definirPosicoes,
   definirRecolhido,
   editarNo,
@@ -39,7 +40,11 @@ import {
   type Aparencia,
   type Posicao,
 } from "@/lib/ecc/mapas/historico";
-import { CORES_RAMO, MAX_NOTA_NO, MAX_TEXTO_NO, type CorRamo, type FormaRamo, type NoMapa } from "@/lib/ecc/mapas/tipos";
+import { CORES_RAMO, MAX_NOTA_NO, MAX_TEXTO_NO, type CorRamo, type FormaRamo, type NoMapa, type OpcoesExecucao, type VinculoRamo } from "@/lib/ecc/mapas/tipos";
+import { detectarData } from "@/lib/ecc/mapas/datas";
+import { citaPalavra } from "@/lib/ecc/mapas/palavras";
+import { DialogoExecutar } from "@/components/mapas/dialogo-executar";
+import { SeloData, SeloVinculo } from "@/components/mapas/selos-ramo";
 import { Dialog } from "@/components/ui/dialog";
 import { ItemMenu, MenuSuspenso } from "@/components/ui/menu-suspenso";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
@@ -74,6 +79,8 @@ const NOME_COR: Record<CorRamo, string> = {
 /** Distância (px de tela) que separa "toque" de "arrasto". */
 const LIMIAR_ARRASTO = { mouse: 4, toque: 8 };
 const TEXTO_RASCUNHO = "Nova ideia";
+/** Evento da janela que pede pro mapa selecionar um ramo (`detail` = id). */
+export const EVENTO_SELECIONAR_RAMO = "gaiamum:mapa-selecionar-ramo";
 
 type Rascunho = { id: string; paiId: string; depoisDe: string | null };
 
@@ -115,6 +122,10 @@ export function EditorMapa({
   somenteLeitura,
   posicoesDisponiveis,
   selecionadoInicial = null,
+  hoje,
+  vinculos = {},
+  opcoes = { projetos: [] },
+  palavra = null,
 }: {
   mapaId: string;
   nos: NoMapa[];
@@ -122,6 +133,12 @@ export function EditorMapa({
   posicoesDisponiveis: boolean;
   /** Ramo já selecionado ao abrir (ex.: vindo da lista). */
   selecionadoInicial?: string | null;
+  /** "AAAA-MM-DD" do Brasil, vindo do servidor (datas nos ramos). */
+  hoje: string;
+  vinculos?: Record<string, VinculoRamo>;
+  opcoes?: OpcoesExecucao;
+  /** Palavra-chave em destaque (`?palavra=`): os outros ramos ficam apagados. */
+  palavra?: string | null;
 }) {
   const { pendente, executar } = useAcaoPlanner();
   const [erroAoSalvar, setErroAoSalvar] = useState(false);
@@ -149,6 +166,7 @@ export function EditorMapa({
   const [editando, setEditando] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState<Rascunho | null>(null);
   const [notaDe, setNotaDe] = useState<NoMapa | null>(null);
+  const [executarDe, setExecutarDe] = useState<NoMapa | null>(null);
   const [historico, setHistorico] = useState<Historico>(historicoVazio);
   /** Posição relativa do ramo sendo arrastado (só tela, até soltar). */
   const [arrasto, setArrasto] = useState<{ id: string; rx: number; ry: number } | null>(null);
@@ -211,7 +229,13 @@ export function EditorMapa({
   const porId = useMemo(() => new Map(nos.map((n) => [n.id, n])), [nos]);
 
   const paraLayout = useMemo(() => {
-    let lista = nos.map((n) => (arrasto?.id === n.id ? { ...n, pos_x: arrasto.rx, pos_y: arrasto.ry } : n));
+    // Ramo com selo (data citada ou tarefa ligada) ganha uma linha a mais.
+    let lista = nos.map((n) => {
+      // Um selo por linha (data, vínculo): altura previsível, sem vazar da caixa.
+      const selos = n.pai_id ? Number(Boolean(detectarData(n.texto, hoje))) + Number(Boolean(vinculos[n.id])) : 0;
+      const extra = selos * 22;
+      return arrasto?.id === n.id ? { ...n, extra, pos_x: arrasto.rx, pos_y: arrasto.ry } : { ...n, extra };
+    });
     if (rascunho) {
       lista = lista.map((n) => (n.id === rascunho.paiId ? { ...n, recolhido: false } : n));
       lista.push({
@@ -226,10 +250,11 @@ export function EditorMapa({
         pos_y: null,
         cor: null,
         forma: null,
+        extra: 0,
       });
     }
     return lista;
-  }, [nos, arrasto, rascunho, mapaId]);
+  }, [nos, arrasto, rascunho, mapaId, vinculos, hoje]);
 
   const layout = useMemo(() => calcularLayout(paraLayout), [paraLayout]);
   const raiz = nos.find((n) => n.pai_id === null) ?? null;
@@ -299,6 +324,40 @@ export function EditorMapa({
     }
     area.addEventListener("wheel", aoRolar, { passive: false });
     return () => area.removeEventListener("wheel", aoRolar);
+  }, []);
+
+  // O painel de datas (fora deste componente) pede pra selecionar um ramo:
+  // abre os ramos de cima (se recolhidos) e centraliza nele.
+  const nosRef = useRef(nos);
+  useEffect(() => {
+    nosRef.current = nos;
+  }, [nos]);
+  useEffect(() => {
+    function aoPedirSelecao(e: Event) {
+      const id = (e as CustomEvent<string>).detail;
+      const porIdAtual = new Map(nosRef.current.map((n) => [n.id, n]));
+      const acima: string[] = [];
+      let atual = porIdAtual.get(id)?.pai_id ?? null;
+      while (atual) {
+        acima.push(atual);
+        atual = porIdAtual.get(atual)?.pai_id ?? null;
+      }
+      setRecolhidos((r) => ({ ...r, ...Object.fromEntries(acima.filter((a) => porIdAtual.get(a)?.recolhido).map((a) => [a, false])) }));
+      setSelecionado(id);
+      // Depois de redesenhar: centraliza.
+      setTimeout(() => {
+        const area = areaRef.current;
+        const c = layoutRef.current.caixas.get(id);
+        if (!area || !c) return;
+        setCamera((cam) => {
+          const escala = Math.max(cam?.escala ?? 1, 0.8);
+          return { escala, x: area.clientWidth / 2 - c.x * escala, y: area.clientHeight / 2 - c.y * escala };
+        });
+        area.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }, 60);
+    }
+    window.addEventListener(EVENTO_SELECIONAR_RAMO, aoPedirSelecao);
+    return () => window.removeEventListener(EVENTO_SELECIONAR_RAMO, aoPedirSelecao);
   }, []);
 
   function enquadrarTudo() {
@@ -789,6 +848,15 @@ export function EditorMapa({
                 caixa={c}
                 cor={visual.get(c.id)?.cor ?? corDoRamo(c.cor)}
                 sublinhado={visual.get(c.id)?.sublinhado ?? false}
+                apagado={Boolean(palavra) && !citaPalavra(porId.get(c.id)?.texto ?? "", palavra!)}
+                selos={
+                  porId.get(c.id)?.pai_id ? (
+                    <>
+                      <SeloData texto={porId.get(c.id)!.texto} hoje={hoje} />
+                      {vinculos[c.id] && <SeloVinculo vinculo={vinculos[c.id]} />}
+                    </>
+                  ) : null
+                }
                 no={porId.get(c.id)}
                 rascunho={rascunho?.id === c.id}
                 selecionado={selecionado === c.id}
@@ -905,6 +973,11 @@ export function EditorMapa({
                   📝<span className="ml-1 hidden text-xs sm:inline">Nota</span>
                 </button>
               )}
+              {!somenteLeitura && sel.pai_id && !sel.tarefa_id && !sel.compromisso_id && (
+                <button type="button" onClick={() => setExecutarDe(sel)} className={botao} title="Executar: virar tarefa ou compromisso">
+                  ▶<span className="ml-1 hidden text-xs sm:inline">Executar</span>
+                </button>
+              )}
               {!somenteLeitura && posicoesDisponiveis && (
                 <MenuSuspenso
                   rotulo={`Cor e borda de ${sel.texto}`}
@@ -984,6 +1057,27 @@ export function EditorMapa({
                     <Link href={`/mapas/${mapaId}?modo=lista${sel.pai_id ? `&foco=${sel.id}` : ""}`} className="rounded-lg px-3 py-2 text-sm text-gaiamum-text hover:bg-gaiamum-surface-raised">
                       🔍 Focar na lista
                     </Link>
+                    {!somenteLeitura && sel.pai_id && !sel.tarefa_id && !sel.compromisso_id && (
+                      <ItemMenu
+                        onClick={() => {
+                          fechar();
+                          setExecutarDe(sel);
+                        }}
+                      >
+                        ▶ Executar este ramo
+                      </ItemMenu>
+                    )}
+                    {!somenteLeitura && (sel.tarefa_id || sel.compromisso_id) && (
+                      <ItemMenu
+                        onClick={() => {
+                          fechar();
+                          const qual = sel.tarefa_id ? "tarefa" : "compromisso";
+                          if (window.confirm(`Desligar este ramo da ${qual}? A ${qual} continua existindo.`)) gravar(() => desligarRamo(sel.id, qual), { sucesso: "Desligado." });
+                        }}
+                      >
+                        ⛓ Desligar da {sel.tarefa_id ? "tarefa" : "compromisso"}
+                      </ItemMenu>
+                    )}
                     {!somenteLeitura && selCaixa.manual && (
                       <ItemMenu
                         onClick={() => {
@@ -1027,6 +1121,7 @@ export function EditorMapa({
         </p>
       )}
 
+      {executarDe && <DialogoExecutar no={executarDe} hoje={hoje} opcoes={opcoes} aoFechar={() => setExecutarDe(null)} />}
       {notaDe && <DialogoNota no={notaDe} aoFechar={() => setNotaDe(null)} aoSalvar={(texto) => salvarTexto(notaDe, texto)} />}
     </div>
   );
@@ -1042,6 +1137,8 @@ function Ramo({
   somenteLeitura,
   cor,
   sublinhado,
+  apagado,
+  selos,
   aoExpandir,
   aoNovoFilho,
   aoNovoIrmao,
@@ -1057,6 +1154,8 @@ function Ramo({
   somenteLeitura: boolean;
   cor: string;
   sublinhado: boolean;
+  apagado: boolean;
+  selos: React.ReactNode;
   aoExpandir: () => void;
   aoNovoFilho: () => void;
   aoNovoIrmao: () => void;
@@ -1078,8 +1177,8 @@ function Ramo({
   return (
     <div
       data-ramo={caixa.id}
-      className="absolute"
-      style={{ left: caixa.x - caixa.w / 2, top: caixa.y - caixa.h / 2, width: caixa.w, minHeight: caixa.h }}
+      className="absolute transition-opacity"
+      style={{ left: caixa.x - caixa.w / 2, top: caixa.y - caixa.h / 2, width: caixa.w, minHeight: caixa.h, opacity: apagado ? 0.25 : 1 }}
     >
       <div
         className={`flex h-full w-full items-center justify-center ${selecionado ? "ring-2 ring-gaiamum-primary ring-offset-2 ring-offset-gaiamum-bg" : ""} ${
@@ -1098,13 +1197,16 @@ function Ramo({
         {editando ? (
           <CampoTextoRamo inicial={texto} aoConfirmar={aoConfirmar} aoCancelar={aoCancelar} />
         ) : (
-          <span className={`block w-full break-words text-center text-gaiamum-text ${sublinhado ? "text-left" : ""}`}>
-            {texto}
-            {no?.nota && (
-              <span aria-label="tem nota" title={no.nota} className="ml-1 text-xs">
-                📝
-              </span>
-            )}
+          <span className={`flex w-full flex-col gap-1 ${sublinhado ? "items-start" : "items-center"}`}>
+            <span className={`block w-full break-words text-gaiamum-text ${sublinhado ? "text-left" : "text-center"}`}>
+              {texto}
+              {no?.nota && (
+                <span aria-label="tem nota" title={no.nota} className="ml-1 text-xs">
+                  📝
+                </span>
+              )}
+            </span>
+            {selos && <span className={`flex max-w-full flex-col gap-1 leading-none ${sublinhado ? "items-start" : "items-center"}`}>{selos}</span>}
           </span>
         )}
       </div>

@@ -17,9 +17,9 @@ Aprovado pelo Fabio em 2026-10-09, depois do benchmark do MindMeister.
 |---|---|---|
 | 1 | Migration 0059 (`mapas`, `mapa_nos`, RLS), menu, lista de mapas, **modo lista**: editar tudo, recolher/expandir, focar no ramo (`?foco=`), atalhos Enter/Tab/Shift+Tab/Esc/Backspace, colar lista → ramos, nota por ramo | Feita |
 | 2 | **Visão de mapa** (desktop e celular: zoom, arrastar, pinça), alternar lista/mapa, desfazer/refazer, reorganizar. Migration 0060 (`pos_x`/`pos_y`) | Feita (falta o botão de compartilhar: fica pra 2b) |
-| 3 | Datas e palavras detectadas, **"▶ Executar este ramo"** (vira tarefa do Kanban ou compromisso do Planner, com confirmação, e fica ligado a ela: o ramo mostra a cor de urgência/✓ de lá, e dá pra já iniciar o hiperfoco), botão de **resumo por e-mail** | Pendente |
+| 3 | Datas e palavras detectadas, **"▶ Executar este ramo"** (vira tarefa do Kanban ou compromisso do Planner, com confirmação, e fica ligado a ela: o ramo mostra a cor de urgência/✓ de lá, e dá pra já iniciar o hiperfoco), botão de **resumo por e-mail**. Migration 0062 (`mapa_envios`) | Feita |
 
-Decisão de 2026-10-10: o mapa **não ganha timer, prazo ou alarme próprios**. Ele usa os do Kanban/Planner por ligação (`mapa_nos.tarefa_id` / `compromisso_id`, já criados na 0059), para não haver duas verdades. Antes de construir, conferir se o compromisso do Planner tem alarme próprio ou depende do da Agenda.
+Decisão de 2026-10-10: o mapa **não ganha timer, prazo ou alarme próprios**. Ele usa os do Kanban/Planner por ligação (`mapa_nos.tarefa_id` / `compromisso_id`, já criados na 0059), para não haver duas verdades. Conferido em 2026-10-10: o compromisso do Planner **não tem alarme próprio**. Ele aparece na Agenda e no resumo das 7h. Alarme e hiperfoco existem só na tarefa do Kanban, por isso o "Executar" oferece a tarefa com foco opcional.
 
 ## Onde está
 
@@ -50,3 +50,11 @@ Decisão de 2026-10-10: o mapa **não ganha timer, prazo ou alarme próprios**. 
 - **Reforço opcional:** a migration 0061 tira o privilégio de tabela do papel `anon` (defesa em profundidade).
 - **Pendente:** `tests/integration/rls-mapas.test.ts`, que cobre dono × equipe × outro workspace, está escrito mas não foi executado, porque falta banco de teste (Docker ou projeto de homologação).
 - **Liberação:** o módulo não tem trava própria. Quem entra no Gaiamum, ou seja, os e-mails autorizados em `acesso-beta`, já vê o Mapa mental, sempre com os próprios mapas privados.
+
+## Fase 3 (2026-10-10)
+
+- **Datas** (`datas.ts`, puro e testado): leitor próprio por regra, sem IA. Entende hoje, amanhã, depois de amanhã, dd/mm(/aa), "dia 20 de novembro", "dia 5", dias da semana e o horário ("14h", "14:30", "às 9", "meio-dia"). Trabalha só com datas do Brasil no formato "AAAA-MM-DD" e devolve `null` quando o ramo não cita data. Não reaproveita o `parser-fala-agenda` porque aquele sempre devolve uma data.
+- **Palavras-chave** (`palavras.ts`, puro e testado): conta palavras sem acento e sem maiúscula, ignora as palavras comuns do português e mostra a grafia mais usada. As `#tags` sempre aparecem. O filtro `?palavra=` apaga os ramos que não citam a palavra.
+- **▶ Executar este ramo:** cria uma **tarefa no Kanban** pelas próprias actions do Kanban (criar, prazo em UTC a partir do horário de Brasília, hiperfoco opcional) ou um **compromisso no Planner** (com a mesma validação de `lerCompromisso`), e liga ao ramo (`tarefa_id`/`compromisso_id`). O estado mostrado no ramo é calculado no servidor com as regras de lá (`urgenciaDoPrazo`, `estadoHiperfoco`): concluída, atrasada, perto do prazo (48h), sem prazo, ou sem acesso. "Desligar" desfaz só o vínculo. Desfazer uma exclusão de ramo não refaz o vínculo.
+- **📬 Resumo por e-mail** (`resumo-email.ts`, puro e testado): o mapa inteiro em tópicos (inclusive os ramos recolhidos), com datas em ordem e palavras-chave. Todo texto é escapado no HTML. O e-mail vai **só** para o endereço da sessão. O limite é de 1 envio por minuto e 20 por dia por pessoa (tabela `mapa_envios`, migration 0062, com RLS da própria pessoa); o envio é registrado antes de sair, então clique duplo não manda dois.
+- **Painel** embaixo do mapa: datas (no Mapa, tocar seleciona e centraliza o ramo; na Lista, foca nele), palavras-chave e o botão de e-mail.

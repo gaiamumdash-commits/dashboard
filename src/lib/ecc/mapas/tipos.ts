@@ -26,6 +26,26 @@ export type NoMapa = {
   /** Aparência escolhida no ramo (migration 0060); null = automática. */
   cor?: CorRamo | null;
   forma?: FormaRamo | null;
+  /** "▶ Executar este ramo" (fase 3): vínculo com tarefa/compromisso. */
+  tarefa_id?: string | null;
+  compromisso_id?: string | null;
+};
+
+/** Estado da tarefa/compromisso ligado a um ramo, calculado no servidor
+ * com as regras de lá (Kanban: `urgenciaDoPrazo`). O mapa só mostra. */
+export type EstadoVinculo = "concluido" | "atrasado" | "proximo" | "ok" | "sem_prazo" | "indisponivel";
+
+export type VinculoRamo = {
+  tipo: "tarefa" | "compromisso";
+  estado: EstadoVinculo;
+  /** "Tarefa · vence 15/11 18:00" etc. */
+  rotulo: string;
+  href: string | null;
+  focoAtivo: boolean;
+};
+
+export type OpcoesExecucao = {
+  projetos: { id: string; nome: string; colunas: { id: string; nome: string }[] }[];
 };
 
 export const CORES_RAMO = ["roxo", "verde-agua", "coral", "azul", "amarelo", "lima", "verde", "laranja"] as const;

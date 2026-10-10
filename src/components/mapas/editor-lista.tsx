@@ -8,6 +8,7 @@ import {
   criarNo,
   definirRecolhido,
   definirTudoRecolhido,
+  desligarRamo,
   editarNo,
   excluirNo,
   moverNo,
@@ -17,11 +18,15 @@ import { MAX_NOTA_NO, MAX_TEXTO_NO, type MovimentoNo, type NoMapa } from "@/lib/
 import { Dialog } from "@/components/ui/dialog";
 import { ItemMenu, MenuSuspenso } from "@/components/ui/menu-suspenso";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
+import { detectarData } from "@/lib/ecc/mapas/datas";
+import type { OpcoesExecucao, VinculoRamo } from "@/lib/ecc/mapas/tipos";
+import { DialogoExecutar } from "@/components/mapas/dialogo-executar";
+import { SeloData, SeloVinculo } from "@/components/mapas/selos-ramo";
 import { CLASSE_BOTAO_PRIMARIO, CLASSE_BOTAO_SECUNDARIO, CLASSE_CAMPO } from "@/components/planner/estilos";
 
 /** Onde o próximo ramo vai entrar enquanto a pessoa digita. */
 type Rascunho = { paiId: string; depoisDe: string | null; texto?: string };
-type Dialogo = { tipo: "nota" | "colar"; no: NoMapa } | null;
+type Dialogo = { tipo: "nota" | "colar" | "executar"; no: NoMapa } | null;
 /** Marca que o campo já salvou/cancelou — o blur que vem depois não repete. */
 type Trava = { current: boolean };
 
@@ -46,6 +51,9 @@ type Editor = {
   mover: (no: NoMapa, movimento: MovimentoNo) => void;
   excluir: (no: NoMapa, perguntar: boolean) => void;
   hrefFoco: (id: string | null) => string;
+  hoje: string;
+  vinculos: Record<string, VinculoRamo>;
+  desligar: (no: NoMapa) => void;
 };
 
 const ContextoEditor = createContext<Editor | null>(null);
@@ -75,11 +83,17 @@ export function EditorLista({
   nos: nosServidor,
   focoId,
   somenteLeitura,
+  hoje,
+  vinculos = {},
+  opcoes = { projetos: [] },
 }: {
   mapaId: string;
   nos: NoMapa[];
   focoId: string | null;
   somenteLeitura: boolean;
+  hoje: string;
+  vinculos?: Record<string, VinculoRamo>;
+  opcoes?: OpcoesExecucao;
 }) {
   const { executar } = useAcaoPlanner();
   const [novos, setNovos] = useState<NoMapa[]>([]);
@@ -117,6 +131,13 @@ export function EditorLista({
   const editor: Editor = {
     topoId: topo.id,
     somenteLeitura,
+    hoje,
+    vinculos,
+    desligar(no) {
+      const qual = no.tarefa_id ? "tarefa" : "compromisso";
+      if (!window.confirm(`Desligar este ramo da ${qual}? A ${qual} continua existindo.`)) return;
+      executar(() => desligarRamo(no.id, qual), { sucesso: "Desligado." });
+    },
     porId,
     filhos,
     editando,
@@ -278,6 +299,7 @@ export function EditorLista({
 
         {dialogo?.tipo === "nota" && <DialogoNota no={dialogo.no} aoFechar={() => setDialogo(null)} />}
         {dialogo?.tipo === "colar" && <DialogoColar mapaId={mapaId} no={dialogo.no} aoFechar={() => setDialogo(null)} />}
+        {dialogo?.tipo === "executar" && <DialogoExecutar no={dialogo.no} hoje={hoje} opcoes={opcoes} aoFechar={() => setDialogo(null)} />}
       </div>
     </ContextoEditor.Provider>
   );
@@ -340,6 +362,12 @@ function Ramo({ no, campoNovoDepois }: { no: NoMapa; campoNovoDepois: Rascunho |
                   </span>
                 )}
                 {no.nota && <span className="mt-0.5 line-clamp-2 block text-xs text-gaiamum-text-muted">📝 {no.nota}</span>}
+                {(editor.vinculos[no.id] || detectarData(no.texto, editor.hoje)) && (
+                  <span className="mt-1 flex flex-wrap gap-1">
+                    <SeloData texto={no.texto} hoje={editor.hoje} />
+                    {editor.vinculos[no.id] && <SeloVinculo vinculo={editor.vinculos[no.id]} />}
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -494,6 +522,8 @@ function MenuRamo({ no }: { no: NoMapa }) {
                   editor.setRascunho({ paiId: no.id, depoisDe: ultimoFilho(editor, no.id) });
                 })}
                 {item("📋 Colar lista aqui", () => editor.setDialogo({ tipo: "colar", no }))}
+                {!no.tarefa_id && !no.compromisso_id && item("▶ Executar este ramo", () => editor.setDialogo({ tipo: "executar", no }))}
+                {(no.tarefa_id || no.compromisso_id) && item(`⛓ Desligar da ${no.tarefa_id ? "tarefa" : "compromisso"}`, () => editor.desligar(no))}
                 {i > 0 && item("↑ Subir", () => editor.mover(no, "cima"))}
                 {i >= 0 && i < irmaos.length - 1 && item("↓ Descer", () => editor.mover(no, "baixo"))}
                 {i > 0 && item("→ Mover pra dentro do de cima", () => editor.mover(no, "dentro"))}

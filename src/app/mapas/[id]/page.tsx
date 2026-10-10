@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { carregarMapa, contextoMapas } from "@/lib/ecc/mapas/dados";
+import { carregarMapa, carregarOpcoesExecucao, carregarVinculos, contextoMapas } from "@/lib/ecc/mapas/dados";
+import { hojeISOBrasil } from "@/lib/ecc/kanban";
+import { obterUsuarioAtual } from "@/lib/supabase/server";
+import { PainelMapa } from "@/components/mapas/painel-mapa";
 import { EstruturaMapas } from "@/components/mapas/estrutura-mapas";
 import { EditorLista } from "@/components/mapas/editor-lista";
 import { EditorMapa } from "@/components/mapas/editor-mapa";
@@ -16,13 +19,20 @@ export default async function PaginaMapa({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ foco?: string; modo?: string }>;
+  searchParams: Promise<{ foco?: string; modo?: string; palavra?: string }>;
 }) {
-  const [{ id }, { foco, modo: modoBruto }] = await Promise.all([params, searchParams]);
+  const [{ id }, { foco, modo: modoBruto, palavra: palavraBruta }] = await Promise.all([params, searchParams]);
   const ctx = await contextoMapas();
   const dados = await carregarMapa(ctx.tenantId, id);
   if (!dados) notFound();
   const somenteLeitura = dados.mapa.user_id !== ctx.userId;
+  const hoje = hojeISOBrasil();
+  const [vinculos, opcoes, usuario] = await Promise.all([
+    carregarVinculos(ctx.tenantId, dados.nos),
+    somenteLeitura ? Promise.resolve({ projetos: [] }) : carregarOpcoesExecucao(ctx.tenantId),
+    obterUsuarioAtual(),
+  ]);
+  const palavra = typeof palavraBruta === "string" && palavraBruta.length <= 80 ? palavraBruta : null;
   const focoId = typeof foco === "string" ? foco : null;
   // Com foco na URL, é a lista (o foco é um recurso da lista).
   const modo = modoBruto === "lista" || (focoId && modoBruto !== "mapa") ? "lista" : "mapa";
@@ -55,12 +65,23 @@ export default async function PaginaMapa({
         </p>
       )}
       {modo === "mapa" ? (
-        <EditorMapa key={id} mapaId={id} nos={dados.nos} somenteLeitura={somenteLeitura} posicoesDisponiveis={dados.posicoesDisponiveis} />
+        <EditorMapa
+          key={id}
+          mapaId={id}
+          nos={dados.nos}
+          somenteLeitura={somenteLeitura}
+          posicoesDisponiveis={dados.posicoesDisponiveis}
+          hoje={hoje}
+          vinculos={vinculos}
+          opcoes={opcoes}
+          palavra={palavra}
+        />
       ) : (
         <section className="rounded-2xl border border-gaiamum-border bg-gaiamum-surface p-4 sm:p-6">
-          <EditorLista key={id} mapaId={id} nos={dados.nos} focoId={focoId} somenteLeitura={somenteLeitura} />
+          <EditorLista key={id} mapaId={id} nos={dados.nos} focoId={focoId} somenteLeitura={somenteLeitura} hoje={hoje} vinculos={vinculos} opcoes={opcoes} />
         </section>
       )}
+      <PainelMapa mapaId={id} nos={dados.nos} hoje={hoje} palavraAtiva={palavra} email={usuario?.email ?? ""} modo={modo} />
     </EstruturaMapas>
   );
 }

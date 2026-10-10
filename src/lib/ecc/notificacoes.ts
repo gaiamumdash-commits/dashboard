@@ -678,3 +678,30 @@ export async function enviarEmailResumoPlanner({
   }
   return true;
 }
+
+// --------------------------------------------------------------------------
+// Resumo de um Mapa mental, pedido pela própria pessoa (botão no mapa). O
+// conteúdo (já escapado) é montado em `mapas/resumo-email.ts`.
+// --------------------------------------------------------------------------
+
+export async function enviarEmailResumoMapa({
+  destinatario,
+  resumo,
+}: {
+  destinatario: string;
+  resumo: { assunto: string; texto: string; html: string };
+}): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails
+    .send({ from: REMETENTE_PADRAO, to: destinatario, subject: resumo.assunto, html: resumo.html, text: resumo.texto })
+    .catch((erro) => ({ error: erro }));
+
+  if (error) {
+    console.error(`Falha ao enviar o resumo do mapa pra ${destinatario}:`, error);
+    return false;
+  }
+  return true;
+}
