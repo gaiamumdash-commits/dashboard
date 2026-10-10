@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { textoObrigatorio, textoOpcional } from "@/lib/ecc/planner/regras";
 import { lerListaIndentada, ordemParaNovo, planoMovimento } from "@/lib/ecc/mapas/arvore";
-import { MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO, type MovimentoNo } from "@/lib/ecc/mapas/tipos";
+import { CORES_RAMO, MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO, type CorRamo, type FormaRamo, type MovimentoNo } from "@/lib/ecc/mapas/tipos";
 
 /**
  * Server Actions dos Mapas (migration 0059). Mesmas garantias do Planner:
@@ -302,7 +302,7 @@ export async function definirTudoRecolhido(mapaId: string, recolhido: boolean): 
 // --------------------------------------------------------------------------
 
 const AVISO_POSICAO_PENDENTE =
-  "Ainda não dá pra salvar a posição dos ramos: falta uma atualização do banco (migration 0060). O mapa continua funcionando no layout automático.";
+  "Ainda não dá pra salvar posição, cor ou borda dos ramos: falta uma atualização do banco (migration 0060). O resto do mapa funciona normalmente.";
 
 function lerCoordenada(valor: unknown): number | null {
   return typeof valor === "number" && Number.isFinite(valor) && Math.abs(valor) <= 100000 ? Math.round(valor * 10) / 10 : null;
@@ -332,6 +332,22 @@ export async function salvarPosicao(noId: string, posicao: { x: number; y: numbe
     .select("id");
   if (!error && (data ?? []).length === 0) return falha("Ramo não encontrado. Recarregue a página.");
   return erroDePosicao(error, "Não foi possível salvar a posição.");
+}
+
+/** Cor e borda escolhidas no ramo (null = automática). Só valores da
+ * paleta; o CHECK da migration 0060 é a garantia. */
+export async function definirAparencia(noId: string, aparencia: { cor: CorRamo | null; forma: FormaRamo | null }): Promise<ResultadoMapa> {
+  const id = lerId(noId);
+  if (!id) return falha("Ramo inválido.");
+  const cor = aparencia?.cor ?? null;
+  const forma = aparencia?.forma ?? null;
+  if (cor !== null && !CORES_RAMO.includes(cor)) return falha("Cor inválida.");
+  if (forma !== null && forma !== "caixa" && forma !== "linha") return falha("Borda inválida.");
+
+  const { tenantId, supabase } = await contexto();
+  const { data, error } = await supabase.from("mapa_nos").update({ cor, forma }).eq("id", id).eq("tenant_id", tenantId).select("id");
+  if (!error && (data ?? []).length === 0) return falha("Ramo não encontrado. Recarregue a página.");
+  return erroDePosicao(error, "Não foi possível salvar a aparência.");
 }
 
 /** "Reorganizar": todos os ramos voltam ao layout automático. */
@@ -395,6 +411,9 @@ export async function restaurarRamos(mapaId: string, nos: unknown[]): Promise<Re
       nota: nota.valor,
       recolhido: n.recolhido === true,
       ...(x !== null && y !== null ? { pos_x: x, pos_y: y } : {}),
+      // Aparência só vai se for da paleta (e só existe com a 0060 aplicada).
+      ...(CORES_RAMO.includes(n.cor as CorRamo) ? { cor: n.cor } : {}),
+      ...(n.forma === "caixa" || n.forma === "linha" ? { forma: n.forma } : {}),
     });
   }
 

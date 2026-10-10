@@ -8,7 +8,7 @@ import type { Mapa, NoMapa } from "@/lib/ecc/mapas/tipos";
 
 const COLUNAS_MAPA = "id, tenant_id, user_id, titulo, compartilhado, criado_em, atualizado_em";
 const COLUNAS_NO = "id, mapa_id, pai_id, ordem, texto, nota, recolhido";
-const COLUNAS_POSICAO = ", pos_x, pos_y";
+const COLUNAS_POSICAO = ", pos_x, pos_y, cor, forma";
 
 /** Mesmo contexto do Planner (menu lateral, papel, acesso) + quem sou eu. */
 export async function contextoMapas() {

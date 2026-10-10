@@ -1,4 +1,6 @@
-import type { NoMapa } from "@/lib/ecc/mapas/tipos";
+import type { CorRamo, FormaRamo, NoMapa } from "@/lib/ecc/mapas/tipos";
+
+export type Aparencia = { cor: CorRamo | null; forma: FormaRamo | null };
 
 // Desfazer/refazer da visão de mapa — puro, testado em
 // `__tests__/mapas-historico.test.ts`. Cada entrada descreve a operação
@@ -15,7 +17,8 @@ export type Operacao =
   | { tipo: "criar"; no: NoMapa }
   /** `nos` = o ramo e tudo dentro dele, pai antes dos filhos. */
   | { tipo: "excluir"; nos: NoMapa[] }
-  | { tipo: "reorganizar"; antes: { id: string; x: number; y: number }[] };
+  | { tipo: "reorganizar"; antes: { id: string; x: number; y: number }[] }
+  | { tipo: "aparencia"; id: string; antes: Aparencia; depois: Aparencia };
 
 export type Historico = { passado: Operacao[]; futuro: Operacao[] };
 

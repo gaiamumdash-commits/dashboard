@@ -135,6 +135,9 @@ describe("layout do mapa", () => {
     // Ramo sublinhado (nível 2+): a curva encosta na linha de baixo.
     const sub = caminhoDaAresta({ x: 0, y: 0, w: 100, h: 40, nivel: 1 }, { x: 200, y: 50, w: 60, h: 20, nivel: 2 });
     expect(sub.endsWith("170 60")).toBe(true);
+    // Estilo "caixas": todo ramo tem borda, a curva encosta no meio.
+    const caixa = caminhoDaAresta({ x: 0, y: 0, w: 100, h: 40, nivel: 1 }, { x: 200, y: 50, w: 60, h: 20, nivel: 2 }, "caixas");
+    expect(caixa.endsWith("170 50")).toBe(true);
   });
 
   it("câmera: enquadrar centraliza sem passar de 100%; zoom mantém o ponto do cursor", () => {

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as TecladoReact, type PointerEvent as PonteiroReact } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as TecladoReact, type PointerEvent as PonteiroReact } from "react";
 import Link from "next/link";
 import {
   criarNo,
+  definirAparencia,
   definirPosicoes,
   definirRecolhido,
   editarNo,
@@ -21,8 +22,9 @@ import {
   enquadrar,
   estiloDoNivel,
   zoomEm,
-  NIVEL_SUBLINHADO,
+  ehSublinhado,
   type Camera,
+  type EstiloMapa,
   type Caixa,
 } from "@/lib/ecc/mapas/layout";
 import {
@@ -34,9 +36,10 @@ import {
   registrar,
   type Historico,
   type Operacao,
+  type Aparencia,
   type Posicao,
 } from "@/lib/ecc/mapas/historico";
-import { MAX_NOTA_NO, MAX_TEXTO_NO, type NoMapa } from "@/lib/ecc/mapas/tipos";
+import { CORES_RAMO, MAX_NOTA_NO, MAX_TEXTO_NO, type CorRamo, type FormaRamo, type NoMapa } from "@/lib/ecc/mapas/tipos";
 import { Dialog } from "@/components/ui/dialog";
 import { ItemMenu, MenuSuspenso } from "@/components/ui/menu-suspenso";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
@@ -55,6 +58,18 @@ const CORES = [
   "var(--gaiamum-warning)",
 ];
 const corDoRamo = (indice: number) => (indice < 0 ? "var(--gaiamum-primary)" : CORES[indice % CORES.length]);
+/** Mesma ordem de CORES_RAMO (tipos.ts): "roxo" = 1ª cor, e assim por diante. */
+const corEscolhida = (cor: CorRamo) => CORES[CORES_RAMO.indexOf(cor)];
+const NOME_COR: Record<CorRamo, string> = {
+  roxo: "Roxo",
+  "verde-agua": "Verde-água",
+  coral: "Coral",
+  azul: "Azul",
+  amarelo: "Amarelo",
+  lima: "Lima",
+  verde: "Verde",
+  laranja: "Laranja",
+};
 
 /** Distância (px de tela) que separa "toque" de "arrasto". */
 const LIMIAR_ARRASTO = { mouse: 4, toque: 8 };
@@ -67,6 +82,20 @@ type Gesto =
   | { tipo: "pan"; inicioX: number; inicioY: number; camera: Camera; movido: boolean }
   | { tipo: "ramo"; id: string; inicioX: number; inicioY: number; rx: number; ry: number; movido: boolean; limiar: number }
   | { tipo: "pinca"; distancia: number; meioX: number; meioY: number; camera: Camera };
+
+function chaveEstilo(mapaId: string) {
+  return `gaiamum:mapa:estilo:${mapaId}`;
+}
+
+const semAssinatura = () => () => {};
+
+function lerEstilo(mapaId: string): EstiloMapa {
+  try {
+    return localStorage.getItem(chaveEstilo(mapaId)) === "linhas" ? "linhas" : "caixas";
+  } catch {
+    return "caixas"; // armazenamento bloqueado: fica no padrão
+  }
+}
 
 function chaveCamera(mapaId: string) {
   return `gaiamum:mapa:camera:${mapaId}`;
@@ -103,6 +132,7 @@ export function EditorMapa({
   const [textos, setTextos] = useState<Record<string, string>>({});
   const [recolhidos, setRecolhidos] = useState<Record<string, boolean>>({});
   const [posicoes, setPosicoes] = useState<Record<string, Posicao>>({});
+  const [aparencias, setAparencias] = useState<Record<string, Aparencia>>({});
   const [ultimoServidor, setUltimoServidor] = useState(nosServidor);
   if (nosServidor !== ultimoServidor) {
     const ids = new Set(nosServidor.map((n) => n.id));
@@ -111,6 +141,7 @@ export function EditorMapa({
     setRemovidos(new Set());
     setTextos({});
     setPosicoes({});
+    setAparencias({});
     if (!somenteLeitura) setRecolhidos({});
   }
 
@@ -124,6 +155,19 @@ export function EditorMapa({
 
   const areaRef = useRef<HTMLDivElement>(null);
   const [camera, setCamera] = useState<Camera | null>(null);
+  /** Caixas (todo ramo com borda) ou linhas (orgânico). Preferência de
+   * quem está vendo, por mapa, neste navegador — não é dado do mapa. */
+  const estiloSalvo = useSyncExternalStore(semAssinatura, () => lerEstilo(mapaId), () => "caixas" as EstiloMapa);
+  const [estiloEscolhido, setEstiloEscolhido] = useState<EstiloMapa | null>(null);
+  const estilo = estiloEscolhido ?? estiloSalvo;
+  function trocarEstilo(novo: EstiloMapa) {
+    setEstiloEscolhido(novo);
+    try {
+      localStorage.setItem(chaveEstilo(mapaId), novo);
+    } catch {
+      // Só não lembra a escolha.
+    }
+  }
   const gesto = useRef<Gesto>({ tipo: "nenhum" });
   const ponteiros = useRef(new Map<number, { x: number; y: number }>());
   const ultimoToque = useRef<{ id: string; quando: number } | null>(null);
@@ -143,6 +187,8 @@ export function EditorMapa({
         recolhido: recolhidos[n.id] ?? n.recolhido,
         pos_x: p === undefined ? (n.pos_x ?? null) : (p?.x ?? null),
         pos_y: p === undefined ? (n.pos_y ?? null) : (p?.y ?? null),
+        cor: aparencias[n.id] ? aparencias[n.id].cor : (n.cor ?? null),
+        forma: aparencias[n.id] ? aparencias[n.id].forma : (n.forma ?? null),
       };
     });
     // Ramo removido some com tudo o que estava dentro.
@@ -159,7 +205,7 @@ export function EditorMapa({
       }
     }
     return atual;
-  }, [nosServidor, novos, removidos, textos, recolhidos, posicoes]);
+  }, [nosServidor, novos, removidos, textos, recolhidos, posicoes, aparencias]);
 
   const filhos = useMemo(() => filhosPorPai(nos), [nos]);
   const porId = useMemo(() => new Map(nos.map((n) => [n.id, n])), [nos]);
@@ -178,6 +224,8 @@ export function EditorMapa({
         recolhido: false,
         pos_x: null,
         pos_y: null,
+        cor: null,
+        forma: null,
       });
     }
     return lista;
@@ -185,6 +233,21 @@ export function EditorMapa({
 
   const layout = useMemo(() => calcularLayout(paraLayout), [paraLayout]);
   const raiz = nos.find((n) => n.pai_id === null) ?? null;
+
+  /** Cor e borda de cada ramo desenhado: a escolhida no ramo, senão a
+   * herdada do pai (cor) / a do estilo do mapa (borda). Caixas vêm na
+   * ordem pai → filhos, então o pai já está resolvido. */
+  const visual = useMemo(() => {
+    const r = new Map<string, { cor: string; sublinhado: boolean }>();
+    for (const c of layout.caixas.values()) {
+      const no = porId.get(c.id);
+      const pai = no?.pai_id ? r.get(no.pai_id) : undefined;
+      const cor = no?.cor ? corEscolhida(no.cor) : c.nivel <= 1 || !pai ? corDoRamo(c.cor) : pai.cor;
+      const sublinhado = no?.forma === "linha" ? true : no?.forma === "caixa" ? false : ehSublinhado(c.nivel, estilo);
+      r.set(c.id, { cor, sublinhado });
+    }
+    return r;
+  }, [layout, porId, estilo]);
 
   // ------------------------------------------------------------------------
   // Câmera: começa enquadrando o mapa (ou como a pessoa deixou nesta aba).
@@ -381,6 +444,17 @@ export function EditorMapa({
     gravar(() => salvarPosicao(id, depois), { desfazer: () => setPosicoes((p) => ({ ...p, [id]: antes })) });
   }
 
+  function mudarAparencia(id: string, mudanca: Partial<Aparencia>) {
+    const no = porId.get(id);
+    if (somenteLeitura || !no) return;
+    const antes: Aparencia = { cor: no.cor ?? null, forma: no.forma ?? null };
+    const depois: Aparencia = { ...antes, ...mudanca };
+    if (antes.cor === depois.cor && antes.forma === depois.forma) return;
+    setAparencias((a) => ({ ...a, [id]: depois }));
+    anotar({ tipo: "aparencia", id, antes, depois });
+    gravar(() => definirAparencia(id, depois), { desfazer: () => setAparencias((a) => ({ ...a, [id]: antes })) });
+  }
+
   function reorganizar() {
     const manuais = nos.filter((n) => typeof n.pos_x === "number" && typeof n.pos_y === "number").map((n) => ({ id: n.id, x: n.pos_x!, y: n.pos_y! }));
     if (manuais.length === 0) {
@@ -427,6 +501,11 @@ export function EditorMapa({
         setRemovidos((s) => new Set([...s, lote[0].id]));
         if (selecionado && lote.some((n) => n.id === selecionado)) setSelecionado(null);
         return gravar(() => excluirNo(lote[0].id), { aoFalhar });
+      }
+      case "aparencia": {
+        const valor = ida ? op.depois : op.antes;
+        setAparencias((a) => ({ ...a, [op.id]: valor }));
+        return gravar(() => definirAparencia(op.id, valor), { aoFalhar });
       }
       case "reorganizar": {
         if (ida) {
@@ -695,9 +774,9 @@ export function EditorMapa({
                 return (
                   <path
                     key={a.para}
-                    d={caminhoDaAresta(pai, filho)}
+                    d={caminhoDaAresta({ ...pai, sublinhado: visual.get(a.de)?.sublinhado }, { ...filho, sublinhado: visual.get(a.para)?.sublinhado }, estilo)}
                     fill="none"
-                    stroke={corDoRamo(a.cor)}
+                    stroke={visual.get(a.para)?.cor ?? corDoRamo(a.cor)}
                     strokeWidth={filho.nivel === 1 ? 3.5 : 2.5}
                     strokeLinecap="round"
                   />
@@ -708,6 +787,8 @@ export function EditorMapa({
               <Ramo
                 key={c.id}
                 caixa={c}
+                cor={visual.get(c.id)?.cor ?? corDoRamo(c.cor)}
+                sublinhado={visual.get(c.id)?.sublinhado ?? false}
                 no={porId.get(c.id)}
                 rascunho={rascunho?.id === c.id}
                 selecionado={selecionado === c.id}
@@ -769,6 +850,27 @@ export function EditorMapa({
               </button>
             )}
           </div>
+          <div role="group" aria-label="Estilo dos ramos" className="flex items-center rounded-full border border-gaiamum-border bg-gaiamum-surface/95 p-0.5 shadow-sm">
+            {(
+              [
+                ["caixas", "▭ Caixas", "Todos os ramos com borda"],
+                ["linhas", "〰 Linhas", "Ramos de dentro como texto sobre linha"],
+              ] as const
+            ).map(([valor, rotulo, dica]) => (
+              <button
+                key={valor}
+                type="button"
+                onClick={() => trocarEstilo(valor)}
+                aria-pressed={estilo === valor}
+                title={dica}
+                className={`rounded-full px-2.5 py-1.5 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-gaiamum-primary ${
+                  estilo === valor ? "bg-gaiamum-primary text-white" : "text-gaiamum-text-muted hover:text-gaiamum-text"
+                }`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Base: ações do ramo selecionado (alcance do polegar no celular). */}
@@ -802,6 +904,76 @@ export function EditorMapa({
                 <button type="button" onClick={() => setNotaDe(sel)} className={botao} title="Nota">
                   📝<span className="ml-1 hidden text-xs sm:inline">Nota</span>
                 </button>
+              )}
+              {!somenteLeitura && posicoesDisponiveis && (
+                <MenuSuspenso
+                  rotulo={`Cor e borda de ${sel.texto}`}
+                  icone={
+                    <span className="flex h-9 min-w-9 items-center justify-center px-2 text-sm text-gaiamum-text">
+                      🎨<span className="ml-1 hidden text-xs sm:inline">Estilo</span>
+                    </span>
+                  }
+                  classeBotao="rounded-full"
+                  itens={(fechar) => (
+                    <div className="flex w-56 flex-col gap-3 p-1.5">
+                      <div>
+                        <p className="mb-1.5 text-xs font-semibold text-gaiamum-text-muted">Cor</p>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {CORES_RAMO.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => {
+                                fechar();
+                                mudarAparencia(sel.id, { cor: c });
+                              }}
+                              aria-label={NOME_COR[c]}
+                              aria-pressed={sel.cor === c}
+                              title={NOME_COR[c]}
+                              className={`h-8 w-8 rounded-full border-2 ${sel.cor === c ? "border-gaiamum-text" : "border-transparent"}`}
+                              style={{ background: corEscolhida(c) }}
+                            />
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fechar();
+                              mudarAparencia(sel.id, { cor: null });
+                            }}
+                            aria-pressed={!sel.cor}
+                            title="Automática (cor do ramo principal)"
+                            className={`h-8 w-8 rounded-full border-2 text-[10px] text-gaiamum-text-muted ${!sel.cor ? "border-gaiamum-text" : "border-gaiamum-border"}`}
+                          >
+                            Auto
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="mb-1.5 text-xs font-semibold text-gaiamum-text-muted">Borda</p>
+                        <div className="flex flex-col gap-0.5">
+                          {(
+                            [
+                              ["caixa", "▭ Com borda"],
+                              ["linha", "〰 Sem borda (linha)"],
+                              [null, "Automática (Caixas | Linhas)"],
+                            ] as [FormaRamo | null, string][]
+                          ).map(([forma, rotulo]) => (
+                            <ItemMenu
+                              key={rotulo}
+                              ativo={(sel.forma ?? null) === forma}
+                              onClick={() => {
+                                fechar();
+                                mudarAparencia(sel.id, { forma });
+                              }}
+                            >
+                              {rotulo}
+                            </ItemMenu>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                />
               )}
               <MenuSuspenso
                 rotulo={`Mais ações de ${sel.texto}`}
@@ -868,6 +1040,8 @@ function Ramo({
   editando,
   ocultos,
   somenteLeitura,
+  cor,
+  sublinhado,
   aoExpandir,
   aoNovoFilho,
   aoNovoIrmao,
@@ -881,6 +1055,8 @@ function Ramo({
   editando: boolean;
   ocultos: number;
   somenteLeitura: boolean;
+  cor: string;
+  sublinhado: boolean;
   aoExpandir: () => void;
   aoNovoFilho: () => void;
   aoNovoIrmao: () => void;
@@ -888,14 +1064,16 @@ function Ramo({
   aoCancelar: () => void;
 }) {
   const e = estiloDoNivel(caixa.nivel);
-  const cor = corDoRamo(caixa.cor);
-  const sublinhado = caixa.nivel >= NIVEL_SUBLINHADO;
   const texto = rascunho ? "" : (no?.texto ?? "");
   const lado = caixa.lado === -1 ? -1 : 1;
 
   const forma = sublinhado
     ? { borderBottom: `2.5px solid ${cor}`, borderRadius: 0 }
-    : { border: `${caixa.nivel === 0 ? 3 : 2}px solid ${cor}`, borderRadius: caixa.nivel === 0 ? 16 : 12, background: "var(--gaiamum-surface)" };
+    : {
+        border: `${caixa.nivel === 0 ? 3 : caixa.nivel === 1 ? 2 : 1.5}px solid ${cor}`,
+        borderRadius: caixa.nivel === 0 ? 16 : caixa.nivel === 1 ? 12 : 10,
+        background: "var(--gaiamum-surface)",
+      };
 
   return (
     <div

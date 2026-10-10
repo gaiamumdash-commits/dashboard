@@ -188,27 +188,34 @@ export function calcularLayout(nos: NoParaLayout[]): ResultadoLayout {
   return { caixas, arestas, limites };
 }
 
-/** Nível a partir do qual o ramo é desenhado como texto sobre uma linha
- * (estilo orgânico); antes disso, caixa com borda. */
+/** Estilo "linhas" (orgânico): do nível 2 em diante o ramo é texto sobre
+ * uma linha. No estilo "caixas", todo ramo tem borda. */
 export const NIVEL_SUBLINHADO = 2;
+
+export type EstiloMapa = "caixas" | "linhas";
+
+export function ehSublinhado(nivel: number, estilo: EstiloMapa): boolean {
+  return estilo === "linhas" && nivel >= NIVEL_SUBLINHADO;
+}
 
 /** Altura onde a conexão encosta: meio da caixa, ou a linha de baixo do
  * ramo sublinhado (a curva continua a linha). */
-function alturaDaAncora(c: Pick<Caixa, "y" | "h"> & { nivel?: number }): number {
-  return (c.nivel ?? 0) >= NIVEL_SUBLINHADO ? c.y + c.h / 2 : c.y;
+function alturaDaAncora(c: Pick<Caixa, "y" | "h"> & { nivel?: number; sublinhado?: boolean }, estilo: EstiloMapa): number {
+  return (c.sublinhado ?? ehSublinhado(c.nivel ?? 0, estilo)) ? c.y + c.h / 2 : c.y;
 }
 
 /** Curva da conexão: sai da borda do pai voltada pro filho e chega na
  * borda do filho voltada pro pai (Bézier com tangentes horizontais). */
 export function caminhoDaAresta(
-  pai: Pick<Caixa, "x" | "y" | "w"> & { h?: number; nivel?: number },
-  filho: Pick<Caixa, "x" | "y" | "w"> & { h?: number; nivel?: number },
+  pai: Pick<Caixa, "x" | "y" | "w"> & { h?: number; nivel?: number; sublinhado?: boolean },
+  filho: Pick<Caixa, "x" | "y" | "w"> & { h?: number; nivel?: number; sublinhado?: boolean },
+  estilo: EstiloMapa = "linhas",
 ): string {
   const dir = filho.x >= pai.x ? 1 : -1;
   const sx = pai.x + (dir * pai.w) / 2;
   const ex = filho.x - (dir * filho.w) / 2;
-  const sy = alturaDaAncora({ ...pai, h: pai.h ?? 0 });
-  const ey = alturaDaAncora({ ...filho, h: filho.h ?? 0 });
+  const sy = alturaDaAncora({ ...pai, h: pai.h ?? 0 }, estilo);
+  const ey = alturaDaAncora({ ...filho, h: filho.h ?? 0 }, estilo);
   const meio = (ex - sx) / 2;
   const r = (n: number) => Math.round(n * 10) / 10;
   return `M ${r(sx)} ${r(sy)} C ${r(sx + meio)} ${r(sy)}, ${r(ex - meio)} ${r(ey)}, ${r(ex)} ${r(ey)}`;

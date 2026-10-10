@@ -23,7 +23,14 @@ export type NoMapa = {
    * null/ausente = layout automático. Nunca muda a hierarquia. */
   pos_x?: number | null;
   pos_y?: number | null;
+  /** Aparência escolhida no ramo (migration 0060); null = automática. */
+  cor?: CorRamo | null;
+  forma?: FormaRamo | null;
 };
+
+export const CORES_RAMO = ["roxo", "verde-agua", "coral", "azul", "amarelo", "lima", "verde", "laranja"] as const;
+export type CorRamo = (typeof CORES_RAMO)[number];
+export type FormaRamo = "caixa" | "linha";
 
 /** Mover um ramo: subir/descer entre os irmãos, entrar no irmão de cima
  * (vira filho dele) ou sair do pai (vira irmão do pai). */
