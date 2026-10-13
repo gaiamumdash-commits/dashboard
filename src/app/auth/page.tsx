@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { iniciarLoginGoogle } from "@/lib/ecc/auth-google";
 import { CampoSenha } from "@/components/campo-senha";
@@ -294,6 +295,24 @@ function FormularioAuth() {
         >
           {modo === "cadastro" ? "Já tem conta? Entre" : "Ainda não tem conta? Cadastre-se"}
         </button>
+
+        {/* Esta é a "página inicial" cadastrada no Google Auth Platform — a
+            verificação OAuth (escopo calendar.events) exige que ela diga o
+            que o app faz e tenha link pra Política de Privacidade. */}
+        <footer className="mt-6 border-t border-gaiamum-border pt-4 text-xs text-gaiamum-text-muted">
+          <p>
+            Gaiamum organiza projetos, tarefas, metas e finanças num só lugar, com agenda integrada ao
+            Google Agenda (opcional).
+          </p>
+          <p className="mt-2 flex gap-3">
+            <Link href="/privacidade" className="underline underline-offset-2 hover:text-gaiamum-text">
+              Política de Privacidade
+            </Link>
+            <Link href="/termos" className="underline underline-offset-2 hover:text-gaiamum-text">
+              Termos de Uso
+            </Link>
+          </p>
+        </footer>
         </div>
       </div>
     </main>
