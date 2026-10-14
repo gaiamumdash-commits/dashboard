@@ -1,4 +1,4 @@
-import { MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO } from "@/lib/ecc/mapas/tipos";
+import { MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO, type CorRamo } from "@/lib/ecc/mapas/tipos";
 
 // Importar mapa mental de outros apps (XMind, FreeMind/MindMeister .mm,
 // Markdown/texto e, via Gemini, foto/PDF). Regras puras — sem DOM, sem
@@ -6,13 +6,29 @@ import { MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO } from "@/lib/ecc/mapas/tip
 // uma árvore e depois uma lista plana (pai antes do filho) que a Server
 // Action `importarMapa` grava como um mapa novo, editável como qualquer outro.
 
-/** `incerto`: a IA não teve certeza do texto ou do pai — a prévia destaca
- * pra pessoa revisar (não vai pro banco). */
-export type RamoImportado = { texto: string; nota?: string; incerto?: boolean; filhos: RamoImportado[] };
+/** O que o mapa original mostra além do texto, pra reproduzir fiel:
+ * - `lado`: só nos ramos principais — de que lado da ideia central ele sai
+ *   (1 = direita, -1 = esquerda); vira posição gravada, então o mapa abre
+ *   com a mesma orientação do original (ex.: tudo à direita).
+ * - `cor`: caixa colorida do original, na paleta do Gaiamum.
+ * - `incerto`: a IA não teve certeza do texto ou do pai — a prévia destaca
+ *   pra pessoa revisar (não vai pro banco). */
+export type ExtrasRamo = { lado?: 1 | -1; cor?: CorRamo; incerto?: boolean };
+
+export type RamoImportado = { texto: string; nota?: string; filhos: RamoImportado[] } & ExtrasRamo;
 
 /** Ramo pronto pra gravar: `pai` é o índice de outro item (-1 = direto na
  * ideia central) e sempre aponta pra trás. */
-export type ItemImportado = { texto: string; nota: string | null; pai: number; incerto?: boolean };
+export type ItemImportado = { texto: string; nota: string | null; pai: number } & ExtrasRamo;
+
+/** Copia só os extras presentes (sem chaves `undefined` no objeto). */
+function extras(r: ExtrasRamo, principal: boolean): ExtrasRamo {
+  return {
+    ...(principal && r.lado ? { lado: r.lado } : {}),
+    ...(r.cor ? { cor: r.cor } : {}),
+    ...(r.incerto ? { incerto: true } : {}),
+  };
+}
 
 export type MapaImportado = { titulo: string; notaCentral: string | null; itens: ItemImportado[]; cortados: number };
 
@@ -39,7 +55,7 @@ export function arvoreParaMapa(raiz: RamoImportado): MapaImportado {
         cortados += 1 + contarRamos(ramo.filhos);
         return;
       }
-      itens.push({ texto, nota: notaLimpa(ramo.nota), pai, ...(ramo.incerto ? { incerto: true } : {}) });
+      itens.push({ texto, nota: notaLimpa(ramo.nota), pai, ...extras(ramo, pai === -1) });
       paiDosFilhos = itens.length - 1;
     }
     for (const filho of ramo.filhos) visitar(filho, paiDosFilhos);
@@ -57,13 +73,15 @@ function contarRamos(ramos: RamoImportado[]): number {
 // outline), que é fácil de recuar/avançar e de excluir com os filhos juntos.
 // --------------------------------------------------------------------------
 
-export type LinhaPrevia = { texto: string; nota: string | null; nivel: number; incerto?: boolean };
+export type LinhaPrevia = { texto: string; nota: string | null; nivel: number } & ExtrasRamo;
 
 export function itensParaLinhas(itens: ItemImportado[]): LinhaPrevia[] {
   const linhas: LinhaPrevia[] = [];
   itens.forEach((item, i) => {
     const nivel = item.pai >= 0 && item.pai < i ? linhas[item.pai].nivel + 1 : 0;
-    linhas.push({ texto: item.texto, nota: item.nota, nivel, ...(item.incerto ? { incerto: true } : {}) });
+    // `lado` fica guardado mesmo fora do nível 0: se a pessoa subir o ramo
+    // na prévia, ele vai pro lado do ramo principal de onde saiu.
+    linhas.push({ texto: item.texto, nota: item.nota, nivel, ...extras(item, true) });
   });
   return linhas;
 }
@@ -72,13 +90,18 @@ export function itensParaLinhas(itens: ItemImportado[]): LinhaPrevia[] {
 export function linhasParaItens(linhas: LinhaPrevia[]): ItemImportado[] {
   const ultimoNoNivel: number[] = [];
   let nivelAnterior = -1;
+  let ladoAtual: 1 | -1 | undefined;
   return linhas.map((linha, i) => {
     // Nunca mais de um nível abaixo da linha de cima (já corrigida).
     const nivel = Math.max(0, Math.min(linha.nivel, nivelAnterior + 1));
     nivelAnterior = nivel;
     ultimoNoNivel[nivel] = i;
     ultimoNoNivel.length = nivel + 1;
-    return { texto: linha.texto, nota: linha.nota, pai: nivel === 0 ? -1 : ultimoNoNivel[nivel - 1] };
+    // Ramo principal sem lado próprio (ex.: subiu de nível na prévia)
+    // herda o lado do ramo principal de cima.
+    if (nivel === 0) ladoAtual = linha.lado ?? ladoAtual;
+    const item: ItemImportado = { texto: linha.texto, nota: linha.nota, pai: nivel === 0 ? -1 : ultimoNoNivel[nivel - 1] };
+    return { ...item, ...extras({ ...linha, lado: ladoAtual }, nivel === 0) };
   });
 }
 
@@ -171,6 +194,9 @@ export function lerFreeMind(xml: string, nomeArquivo = "Mapa importado"): RamoIm
       continue;
     }
     const ramo: RamoImportado = { texto: atributo(atributos, "TEXT") ?? "", filhos: [] };
+    // FreeMind grava de que lado da ideia central cada ramo principal fica.
+    const posicao = atributo(atributos, "POSITION")?.toLowerCase();
+    if (pilha.length === 1 && (posicao === "left" || posicao === "right")) ramo.lado = posicao === "left" ? -1 : 1;
     (pilha.at(-1)?.filhos ?? topo).push(ramo);
     if (!autoFecha) pilha.push(ramo);
   }
@@ -218,6 +244,7 @@ export function lerXMindXml(xml: string, nomeArquivo = "Mapa importado"): RamoIm
 
 type TopicoXMind = {
   title?: unknown;
+  structureClass?: unknown;
   notes?: { plain?: { content?: unknown } };
   children?: { attached?: unknown; detached?: unknown };
 };
@@ -244,7 +271,14 @@ export function lerXMindJson(json: string, nomeArquivo = "Mapa importado"): Ramo
   const topo = abas
     .map((aba) => (aba as { rootTopic?: unknown })?.rootTopic)
     .filter((raiz) => raiz && typeof raiz === "object")
-    .map((raiz) => topicoXMind(raiz, 0));
+    .map((raiz) => {
+      const ramo = topicoXMind(raiz, 0);
+      // "Mapa lógico" do XMind cresce pra um lado só (ex.: org.xmind.ui.logic.right).
+      const estrutura = String((raiz as TopicoXMind).structureClass ?? "");
+      const lado = /\.(logic|tree)\.left$/.test(estrutura) ? -1 : /\.(logic|tree)\.right$/.test(estrutura) ? 1 : undefined;
+      if (lado) ramo.filhos.forEach((f) => (f.lado = lado));
+      return ramo;
+    });
   if (topo.length === 0) throw new Error("Não achei nenhum tópico nesse arquivo do XMind.");
   return raizUnica(topo, nomeArquivo);
 }

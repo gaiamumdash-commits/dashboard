@@ -3,7 +3,7 @@
 import "server-only";
 import { garantirWorkspace } from "@/lib/ecc/workspace";
 import { obterUsuarioAtual } from "@/lib/supabase/server";
-import { lerMapaMentalComGemini, mensagemDeErroGemini, MODELO_GEMINI_PADRAO } from "@/lib/ecc/gemini";
+import { lerMapaMentalComGemini, mensagemDeErroGemini, MODELO_GEMINI_VISAO } from "@/lib/ecc/gemini";
 import { registrarConsumoIA } from "@/lib/ecc/ia-consumo";
 import { verificarRateLimitIA } from "@/lib/ecc/ia-rate-limit";
 import { TAMANHO_MAXIMO_LEITURA_IA, type RamoImportado } from "@/lib/ecc/mapas/importar";
@@ -49,7 +49,7 @@ export async function lerMapaDeArquivoComIA(formData: FormData): Promise<Resulta
           userId: user.id,
           projetoId: null,
           provedor: "gemini",
-          modelo: MODELO_GEMINI_PADRAO,
+          modelo: MODELO_GEMINI_VISAO,
           sucesso: false,
           erro: mensagem,
         });

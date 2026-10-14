@@ -21,7 +21,7 @@ import {
   type RamoImportado,
 } from "@/lib/ecc/mapas/importar";
 import { lerTextoDoZip } from "@/lib/ecc/mapas/zip";
-import { MAX_NOS_POR_MAPA, MAX_TEXTO_NO } from "@/lib/ecc/mapas/tipos";
+import { MAX_NOS_POR_MAPA, MAX_TEXTO_NO, type CorRamo } from "@/lib/ecc/mapas/tipos";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
 import { CLASSE_BOTAO_PRIMARIO, CLASSE_BOTAO_SECUNDARIO, CLASSE_CAMPO } from "@/components/planner/estilos";
 
@@ -85,6 +85,18 @@ async function lerArquivo(arquivo: File): Promise<{ raiz: RamoImportado; incerto
       throw new Error("Formato não suportado. Use .xmind, .mm, .md, .txt, PDF ou foto.");
   }
 }
+
+/** Mesmas cores do editor (editor-mapa.tsx, ordem de CORES_RAMO). */
+const COR_PREVIA: Record<CorRamo, string> = {
+  roxo: "var(--gaiamum-tag-purple)",
+  "verde-agua": "var(--gaiamum-tag-teal)",
+  coral: "var(--gaiamum-tag-coral)",
+  azul: "var(--gaiamum-tag-blue)",
+  amarelo: "var(--gaiamum-tag-yellow)",
+  lima: "var(--gaiamum-tag-lime)",
+  verde: "var(--gaiamum-success)",
+  laranja: "var(--gaiamum-warning)",
+};
 
 const CLASSE_ICONE = "rounded px-1.5 py-0.5 text-gaiamum-text-muted hover:bg-gaiamum-surface hover:text-gaiamum-text disabled:opacity-30";
 
@@ -175,6 +187,11 @@ export function FormularioImportarMapa({ aoSalvar }: { aoSalvar: () => void }) {
             <span>
               Confira antes de criar: {linhas.length} {linhas.length === 1 ? "ramo" : "ramos"}
               {linhas.some((l) => l.nota) && " · 📝 com notas"}
+              {linhas.some((l) => l.cor) && " · cores do original"}
+              {linhas.some((l) => l.nivel === 0 && l.lado) &&
+                (linhas.every((l) => l.nivel > 0 || (l.lado ?? 1) === 1)
+                  ? " · ramos à direita, como no original"
+                  : " · lados como no original")}
             </span>
             {incertos > 0 && (
               <span className="text-gaiamum-warning">
@@ -184,8 +201,12 @@ export function FormularioImportarMapa({ aoSalvar }: { aoSalvar: () => void }) {
             <ul className="max-h-72 overflow-y-auto rounded-lg border border-gaiamum-border bg-gaiamum-surface-raised p-2 text-xs text-gaiamum-text">
               {linhas.map((linha, i) => (
                 <li key={i} style={{ paddingLeft: `${linha.nivel * 14}px` }} className="flex items-center gap-1 py-0.5">
-                  <span aria-hidden className="w-3 shrink-0 text-gaiamum-text-muted">
-                    {linha.incerto ? "⚠️" : linha.nivel === 0 ? "●" : "–"}
+                  <span
+                    aria-hidden
+                    className="w-3 shrink-0 text-gaiamum-text-muted"
+                    style={linha.cor && !linha.incerto ? { color: COR_PREVIA[linha.cor] } : undefined}
+                  >
+                    {linha.incerto ? "⚠️" : linha.cor || linha.nivel === 0 ? "●" : "–"}
                   </span>
                   <input
                     value={linha.texto}

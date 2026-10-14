@@ -24,6 +24,7 @@ vi.mock("@/lib/ecc/gemini", () => ({
       ? "Os recursos de IA estão indisponíveis no momento. Tente mais tarde."
       : "O Gemini não respondeu (503) — tente de novo.",
   MODELO_GEMINI_PADRAO: "gemini-3.1-flash-lite",
+  MODELO_GEMINI_VISAO: "gemini-flash-latest",
 }));
 
 const registrarConsumoIAMock = vi.fn().mockResolvedValue(undefined);
@@ -54,6 +55,24 @@ describe("validarMapaDaIA", () => {
     expect(r.raiz.filhos.map((f) => f.texto)).toEqual(["Roteiro", "Orçamento"]);
     expect(r.raiz.filhos[0].filhos[0]).toMatchObject({ texto: "Lis boa", incerto: true });
     expect(r.incertos).toBe(1);
+  });
+
+  it("lado só nos filhos diretos do centro; cor da paleta; valor estranho vira 'sem' sem invalidar", () => {
+    const r = validarMapaDaIA(
+      respostaIA([
+        { id: "c", pai: null, texto: "AZEVEDO - CV HUNTER", lado: "direita" },
+        { id: "d", pai: "c", texto: "13/10/26", lado: "direita", cor: "laranja" },
+        { id: "p", pai: "d", texto: "Produto", lado: "esquerda", cor: "amarelo" },
+        { id: "x", pai: "d", texto: "Estranho", cor: "magenta" },
+      ]),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.raiz).not.toHaveProperty("lado");
+    expect(r.raiz.filhos[0]).toMatchObject({ texto: "13/10/26", lado: 1, cor: "laranja" });
+    expect(r.raiz.filhos[0].filhos[0]).not.toHaveProperty("lado"); // neto não tem lado
+    expect(r.raiz.filhos[0].filhos[0].cor).toBe("amarelo");
+    expect(r.raiz.filhos[0].filhos[1]).not.toHaveProperty("cor");
   });
 
   it("sem_mapa ou lista vazia → motivo sem_mapa", () => {
@@ -122,6 +141,18 @@ describe("prévia editável", () => {
 
   it("excluir remove o ramo com tudo o que está dentro", () => {
     expect(removerLinha(base, 1).map((l) => l.texto)).toEqual(["A", "B"]);
+  });
+
+  it("lado e cor atravessam a prévia; ramo que sobe pro topo herda o lado do principal de cima", () => {
+    const linhas: LinhaPrevia[] = [
+      { texto: "A", nota: null, nivel: 0, lado: -1, cor: "azul" },
+      { texto: "A1", nota: null, nivel: 1, cor: "verde" },
+    ];
+    expect(linhasParaItens(linhas)).toEqual([
+      { texto: "A", nota: null, pai: -1, lado: -1, cor: "azul" },
+      { texto: "A1", nota: null, pai: 0, cor: "verde" },
+    ]);
+    expect(linhasParaItens(mudarNivel(linhas, 1, -1))[1]).toMatchObject({ pai: -1, lado: -1, cor: "verde" });
   });
 
   it("linhas com salto de nível são corrigidas (pai sempre válido)", () => {

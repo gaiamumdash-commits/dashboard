@@ -85,13 +85,12 @@ export function dividirLados(pesos: number[]): (1 | -1)[] {
   return lados;
 }
 
-export function calcularLayout(nos: NoParaLayout[]): ResultadoLayout {
-  const filhos = filhosPorPai(nos);
-  const raiz = nos.find((n) => n.pai_id === null);
-  const caixas = new Map<string, Caixa>();
-  const arestas: Aresta[] = [];
-  if (!raiz) return { caixas, arestas, limites: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
+const ehManual = (n: NoParaLayout) => typeof n.pos_x === "number" && typeof n.pos_y === "number";
 
+/** Tamanho de cada ramo e altura da faixa que ele ocupa (com tudo o que
+ * está visível dentro dele) — base do layout automático. */
+function medirArvore(nos: NoParaLayout[], raiz: NoParaLayout) {
+  const filhos = filhosPorPai(nos);
   const tamanhos = new Map<string, { w: number; h: number }>();
   const nivelDe = new Map<string, number>([[raiz.id, 0]]);
   // Ordem de visita (pai antes dos filhos) — iterativa, sem recursão funda.
@@ -112,7 +111,6 @@ export function calcularLayout(nos: NoParaLayout[]): ResultadoLayout {
   const visiveis = new Set(visitados.map((n) => n.id));
   const recolhidos = new Set(nos.filter((n) => n.recolhido && n.pai_id !== null).map((n) => n.id));
   const filhosVisiveis = (id: string) => (visiveis.has(id) && !recolhidos.has(id) ? (filhos.get(id) ?? []) : []);
-  const ehManual = (n: NoParaLayout) => typeof n.pos_x === "number" && typeof n.pos_y === "number";
 
   // Altura da faixa de cada ramo (de baixo pra cima). Filho com posição
   // manual não ocupa faixa: ele está onde a pessoa colocou.
@@ -136,6 +134,35 @@ export function calcularLayout(nos: NoParaLayout[]): ResultadoLayout {
     }
     return r;
   }
+
+  return { visitados, tamanhos, faixa, filhosVisiveis, empilhar };
+}
+
+/** Posição (relativa à ideia central) de cada ramo principal num lado
+ * ESCOLHIDO — pra reproduzir a orientação de um mapa importado (ex.: tudo à
+ * direita). Os ramos de cada lado ficam empilhados na ordem, igual ao
+ * layout automático; o que está dentro deles continua automático. */
+export function posicoesDosPrincipais(nos: NoParaLayout[], ladoDe: Map<string, 1 | -1>): Map<string, { x: number; y: number }> {
+  const raiz = nos.find((n) => n.pai_id === null);
+  const posicoes = new Map<string, { x: number; y: number }>();
+  if (!raiz) return posicoes;
+  const semManual = nos.map((n) => ({ ...n, pos_x: null, pos_y: null }));
+  const { filhosVisiveis, empilhar } = medirArvore(semManual, semManual.find((n) => n.id === raiz.id)!);
+  const principais = filhosVisiveis(raiz.id);
+  for (const lado of [1, -1] as const) {
+    const lista = principais.filter((f) => (ladoDe.get(f.id) ?? 1) === lado);
+    for (const [id, r] of empilhar(raiz, lista, lado)) posicoes.set(id, { x: r.rx, y: r.ry });
+  }
+  return posicoes;
+}
+
+export function calcularLayout(nos: NoParaLayout[]): ResultadoLayout {
+  const raiz = nos.find((n) => n.pai_id === null);
+  const caixas = new Map<string, Caixa>();
+  const arestas: Aresta[] = [];
+  if (!raiz) return { caixas, arestas, limites: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
+
+  const { visitados, tamanhos, faixa, filhosVisiveis, empilhar } = medirArvore(nos, raiz);
 
   const tRaiz = tamanhos.get(raiz.id)!;
   caixas.set(raiz.id, { id: raiz.id, x: 0, y: 0, ...tRaiz, nivel: 0, lado: 0, cor: -1, rx: 0, ry: 0, manual: false });

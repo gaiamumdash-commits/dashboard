@@ -3,6 +3,7 @@ import {
   caminhoDaAresta,
   calcularLayout,
   dividirLados,
+  posicoesDosPrincipais,
   cameraInicial,
   enquadrar,
   tamanhoDoRamo,
@@ -163,5 +164,30 @@ describe("layout do mapa", () => {
     // Celular com mapa grande: abre na ideia central, legível (não em 20%).
     expect(cameraInicial({ minX: -2000, minY: -1000, maxX: 2000, maxY: 1000 }, 375, 600)).toEqual({ escala: 0.6, x: 187.5, y: 300 });
     expect(cameraInicial({ minX: -100, minY: -50, maxX: 100, maxY: 50 }, 1000, 600)).toEqual(cam);
+  });
+});
+
+describe("posicoesDosPrincipais (mapa importado com orientação do original)", () => {
+  it("tudo à direita: ramos principais empilhados à direita, sem sobrepor, e o layout respeita", () => {
+    const nos = [no("r", null, 0, "Centro"), no("a", "r", 1), no("a1", "a", 1), no("b", "r", 2), no("c", "r", 3), no("c1", "c", 1), no("c2", "c", 2)];
+    const pos = posicoesDosPrincipais(nos, new Map([["a", 1], ["b", 1], ["c", 1]]));
+    expect([...pos.keys()]).toEqual(["a", "b", "c"]);
+    expect([...pos.values()].every((p) => p.x > 0)).toBe(true);
+    expect(pos.get("a")!.y).toBeLessThan(pos.get("b")!.y);
+    expect(pos.get("b")!.y).toBeLessThan(pos.get("c")!.y);
+
+    const comPosicao = nos.map((n) => (pos.has(n.id) ? { ...n, pos_x: pos.get(n.id)!.x, pos_y: pos.get(n.id)!.y } : n));
+    const { caixas } = calcularLayout(comPosicao);
+    expect([...caixas.values()].filter((c) => c.nivel > 0).every((c) => c.lado === 1)).toBe(true);
+    const lista = [...caixas.values()];
+    for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) expect(sobrepoem(lista[i], lista[j])).toBe(false);
+  });
+
+  it("lados misturados vão cada um pro seu lado; sem lado = direita", () => {
+    const nos = [no("r", null, 0), no("a", "r", 1), no("b", "r", 2), no("c", "r", 3)];
+    const pos = posicoesDosPrincipais(nos, new Map<string, 1 | -1>([["a", -1], ["c", 1]]));
+    expect(pos.get("a")!.x).toBeLessThan(0);
+    expect(pos.get("b")!.x).toBeGreaterThan(0);
+    expect(pos.get("c")!.x).toBeGreaterThan(0);
   });
 });

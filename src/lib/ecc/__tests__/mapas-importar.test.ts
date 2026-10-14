@@ -43,6 +43,12 @@ describe("lerFreeMind (.mm)", () => {
   it("arquivo sem nós dá erro claro", () => {
     expect(() => lerFreeMind("<map></map>")).toThrow(/nenhum ramo/);
   });
+
+  it("POSITION dos ramos principais vira o lado (só no 1º nível)", () => {
+    const raiz = lerFreeMind(`<map><node TEXT="C"><node TEXT="E" POSITION="left"><node TEXT="E1" POSITION="right"/></node><node TEXT="D" POSITION="right"/></node></map>`);
+    expect(raiz.filhos.map((f) => f.lado)).toEqual([-1, 1]);
+    expect(raiz.filhos[0].filhos[0].lado).toBeUndefined();
+  });
 });
 
 describe("lerXMindJson (XMind 2020+)", () => {
@@ -71,6 +77,13 @@ describe("lerXMindJson (XMind 2020+)", () => {
   it("várias abas viram ramos de uma ideia central com o nome do arquivo", () => {
     const duas = JSON.stringify([{ rootTopic: { title: "A" } }, { rootTopic: { title: "B" } }]);
     expect(forma(lerXMindJson(duas, "Planejamento 2027.xmind"))).toBe("Planejamento 2027(A,B)");
+  });
+
+  it("mapa lógico para a direita: todos os ramos principais à direita", () => {
+    const json = JSON.stringify([
+      { rootTopic: { title: "C", structureClass: "org.xmind.ui.logic.right", children: { attached: [{ title: "A" }, { title: "B" }] } } },
+    ]);
+    expect(lerXMindJson(json).filhos.map((f) => f.lado)).toEqual([1, 1]);
   });
 
   it("JSON inválido dá erro claro", () => {

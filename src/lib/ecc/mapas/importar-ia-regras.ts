@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Type, type Schema } from "@google/genai";
-import { MAX_NOS_POR_MAPA, MAX_TEXTO_NO } from "@/lib/ecc/mapas/tipos";
+import { CORES_RAMO, MAX_NOS_POR_MAPA, MAX_TEXTO_NO } from "@/lib/ecc/mapas/tipos";
 import type { RamoImportado } from "@/lib/ecc/mapas/importar";
 
 // Resposta da IA ao ler foto/PDF de um mapa mental: schema pedido ao
@@ -25,6 +25,8 @@ export const SCHEMA_MAPA_IA: Schema = {
           id: { type: Type.STRING },
           pai: { type: Type.STRING, nullable: true },
           texto: { type: Type.STRING },
+          lado: { type: Type.STRING, enum: ["direita", "esquerda"], nullable: true },
+          cor: { type: Type.STRING, enum: [...CORES_RAMO], nullable: true },
           incerto: { type: Type.BOOLEAN },
         },
         required: ["id", "pai", "texto"],
@@ -42,6 +44,9 @@ const RespostaIASchema = z.object({
         id: z.string().trim().min(1).max(64),
         pai: z.string().trim().min(1).max(64).nullable(),
         texto: z.string(),
+        // Lado e cor são enfeite: valor fora do esperado vira "sem", nunca invalida o mapa.
+        lado: z.enum(["direita", "esquerda"]).nullish().catch(null),
+        cor: z.enum(CORES_RAMO).nullish().catch(null),
         incerto: z.boolean().optional(),
       }),
     )
@@ -99,11 +104,23 @@ export function validarMapaDaIA(jsonBruto: string): ResultadoValidacaoIA {
     }
   }
 
-  const ramos = new Map(nos.map((n) => [n.id, { texto: n.texto, filhos: [] as RamoImportado[], ...(n.incerto ? { incerto: true } : {}) }]));
+  const centro = centros[0].id;
+  const ramos = new Map<string, RamoImportado>(
+    nos.map((n) => [
+      n.id,
+      {
+        texto: n.texto,
+        filhos: [],
+        ...(n.pai === centro && n.lado ? { lado: n.lado === "esquerda" ? -1 : 1 } : {}),
+        ...(n.cor ? { cor: n.cor } : {}),
+        ...(n.incerto ? { incerto: true } : {}),
+      },
+    ]),
+  );
   for (const n of nos) {
     if (n.pai !== null) ramos.get(n.pai)!.filhos.push(ramos.get(n.id)!);
   }
-  return { ok: true, raiz: ramos.get(centros[0].id)!, incertos: nos.filter((n) => n.incerto).length };
+  return { ok: true, raiz: ramos.get(centro)!, incertos: nos.filter((n) => n.incerto).length };
 }
 
 /** Assinatura (primeiros bytes) dos formatos aceitos pra leitura com IA —

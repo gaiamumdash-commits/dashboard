@@ -10,6 +10,7 @@ import { FUSO_BRASIL, hojeISOBrasil, paraUtcDoFuso } from "@/lib/ecc/kanban";
 import { enviarEmailResumoMapa } from "@/lib/ecc/notificacoes";
 import { montarResumoMapa } from "@/lib/ecc/mapas/resumo-email";
 import { lerListaIndentada, ordemParaNovo, planoMovimento } from "@/lib/ecc/mapas/arvore";
+import { posicoesDosPrincipais } from "@/lib/ecc/mapas/layout";
 import { camposDoCompartilhamento, ehCompartilhamento, type Compartilhamento } from "@/lib/ecc/mapas/compartilhamento";
 import { CORES_RAMO, MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO, type CorRamo, type FormaRamo, type MovimentoNo } from "@/lib/ecc/mapas/tipos";
 
@@ -140,14 +141,17 @@ export async function importarMapa(dados: { titulo: unknown; notaCentral?: unkno
   if (!Array.isArray(dados?.itens)) return falha("Nada pra importar.");
   if (dados.itens.length > MAX_NOS_POR_MAPA - 1) return falha(`O mapa passa de ${MAX_NOS_POR_MAPA} ramos.`);
 
-  const itens: { texto: string; nota: string | null; pai: number }[] = [];
+  const itens: { texto: string; nota: string | null; pai: number; lado: 1 | -1 | null; cor: CorRamo | null }[] = [];
   for (const [i, bruto] of dados.itens.entries()) {
     const n = (bruto ?? {}) as Record<string, unknown>;
     const texto = textoObrigatorio(n.texto, MAX_TEXTO_NO, "Texto do ramo");
     const nota = textoOpcional(n.nota ?? "", MAX_NOTA_NO, "Nota");
     const pai = typeof n.pai === "number" && Number.isInteger(n.pai) && n.pai >= -1 && n.pai < i ? n.pai : null;
     if (!texto.ok || !nota.ok || pai === null) return falha("O arquivo importado tem ramos inválidos.");
-    itens.push({ texto: texto.valor, nota: nota.valor, pai });
+    // Lado e cor são aparência: valor fora do esperado é ignorado, não barra a importação.
+    const lado = pai === -1 && (n.lado === 1 || n.lado === -1) ? n.lado : null;
+    const cor = CORES_RAMO.includes(n.cor as CorRamo) ? (n.cor as CorRamo) : null;
+    itens.push({ texto: texto.valor, nota: nota.valor, pai, lado, cor });
   }
 
   const { tenantId, supabase } = await contexto();
@@ -173,8 +177,32 @@ export async function importarMapa(dados: { titulo: unknown; notaCentral?: unkno
       };
     }),
   ];
+  // Orientação do original (ex.: tudo à direita): se algum ramo principal
+  // trouxe lado, TODOS os principais ganham posição gravada nesse lado (sem
+  // lado = direita), empilhados como no layout automático. "Reorganizar"
+  // no editor volta ao equilibrado.
+  const comLado = itens.some((item) => item.lado !== null);
+  const posicoes = comLado
+    ? posicoesDosPrincipais(
+        linhas.map((l) => ({ id: l.id, pai_id: l.pai_id, ordem: l.ordem, texto: l.texto, recolhido: false })),
+        new Map(itens.flatMap((item, i) => (item.pai === -1 ? [[ids[i], item.lado ?? 1] as const] : []))),
+      )
+    : new Map<string, { x: number; y: number }>();
+  const aparencia = (i: number) => {
+    const pos = posicoes.get(ids[i]);
+    return {
+      ...(itens[i].cor ? { cor: itens[i].cor } : {}),
+      ...(pos ? { pos_x: Math.round(pos.x * 10) / 10, pos_y: Math.round(pos.y * 10) / 10 } : {}),
+    };
+  };
+  const linhasComAparencia = linhas.map((l, j) => (j === 0 ? l : { ...l, ...aparencia(j - 1) }));
+
   // Um insert só, pai sempre antes do filho (mesma ordem de `restaurarRamos`).
-  const { error: erroRamos } = await supabase.from("mapa_nos").insert(linhas);
+  // Sem a migration 0060 (cor/posição), grava a estrutura sem a aparência.
+  let { error: erroRamos } = await supabase.from("mapa_nos").insert(linhasComAparencia);
+  if (erroRamos?.code === "42703" || erroRamos?.code === "PGRST204") {
+    ({ error: erroRamos } = await supabase.from("mapa_nos").insert(linhas));
+  }
   if (erroRamos) {
     await supabase.from("mapas").delete().eq("id", mapa.id).eq("tenant_id", tenantId);
     return resultado(erroRamos, "Não foi possível importar o mapa.");
