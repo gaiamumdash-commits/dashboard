@@ -10,7 +10,7 @@ import {
   lerXMindXml,
   type RamoImportado,
 } from "@/lib/ecc/mapas/importar";
-import { lerTextoDoZip } from "@/lib/ecc/mapas/zip";
+import { lerTextoDoZip, MAX_DESCOMPACTADO_ZIP } from "@/lib/ecc/mapas/zip";
 import { MAX_NOS_POR_MAPA } from "@/lib/ecc/mapas/tipos";
 
 /** Árvore → "texto(filho,filho)" pra comparar estrutura de um jeito legível. */
@@ -172,6 +172,11 @@ describe("lerTextoDoZip (.xmind)", () => {
     const lido = await lerTextoDoZip(zipCom("content.json", json), ["content.json", "content.xml"]);
     expect(lido?.nome).toBe("content.json");
     expect(forma(lerXMindJson(lido!.texto))).toBe("Ação(Passo)");
+  });
+
+  it("zip bomb: para de descompactar acima do teto", async () => {
+    const enorme = "a".repeat(MAX_DESCOMPACTADO_ZIP + 1024); // comprime pra poucos KB
+    await expect(lerTextoDoZip(zipCom("content.json", enorme), ["content.json"])).rejects.toThrow(/grande demais/);
   });
 
   it("devolve null se o arquivo procurado não existe; erro se não é zip", async () => {

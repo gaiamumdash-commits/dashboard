@@ -6,11 +6,13 @@ import { MAX_NOS_POR_MAPA, MAX_NOTA_NO, MAX_TEXTO_NO } from "@/lib/ecc/mapas/tip
 // uma árvore e depois uma lista plana (pai antes do filho) que a Server
 // Action `importarMapa` grava como um mapa novo, editável como qualquer outro.
 
-export type RamoImportado = { texto: string; nota?: string; filhos: RamoImportado[] };
+/** `incerto`: a IA não teve certeza do texto ou do pai — a prévia destaca
+ * pra pessoa revisar (não vai pro banco). */
+export type RamoImportado = { texto: string; nota?: string; incerto?: boolean; filhos: RamoImportado[] };
 
 /** Ramo pronto pra gravar: `pai` é o índice de outro item (-1 = direto na
  * ideia central) e sempre aponta pra trás. */
-export type ItemImportado = { texto: string; nota: string | null; pai: number };
+export type ItemImportado = { texto: string; nota: string | null; pai: number; incerto?: boolean };
 
 export type MapaImportado = { titulo: string; notaCentral: string | null; itens: ItemImportado[]; cortados: number };
 
@@ -37,7 +39,7 @@ export function arvoreParaMapa(raiz: RamoImportado): MapaImportado {
         cortados += 1 + contarRamos(ramo.filhos);
         return;
       }
-      itens.push({ texto, nota: notaLimpa(ramo.nota), pai });
+      itens.push({ texto, nota: notaLimpa(ramo.nota), pai, ...(ramo.incerto ? { incerto: true } : {}) });
       paiDosFilhos = itens.length - 1;
     }
     for (const filho of ramo.filhos) visitar(filho, paiDosFilhos);
@@ -48,6 +50,60 @@ export function arvoreParaMapa(raiz: RamoImportado): MapaImportado {
 
 function contarRamos(ramos: RamoImportado[]): number {
   return ramos.reduce((total, r) => total + 1 + contarRamos(r.filhos), 0);
+}
+
+// --------------------------------------------------------------------------
+// Edição na prévia: a lista plana vira "nível de cada linha" (como um
+// outline), que é fácil de recuar/avançar e de excluir com os filhos juntos.
+// --------------------------------------------------------------------------
+
+export type LinhaPrevia = { texto: string; nota: string | null; nivel: number; incerto?: boolean };
+
+export function itensParaLinhas(itens: ItemImportado[]): LinhaPrevia[] {
+  const linhas: LinhaPrevia[] = [];
+  itens.forEach((item, i) => {
+    const nivel = item.pai >= 0 && item.pai < i ? linhas[item.pai].nivel + 1 : 0;
+    linhas.push({ texto: item.texto, nota: item.nota, nivel, ...(item.incerto ? { incerto: true } : {}) });
+  });
+  return linhas;
+}
+
+/** Linhas → itens com `pai` (o último item acima com um nível a menos). */
+export function linhasParaItens(linhas: LinhaPrevia[]): ItemImportado[] {
+  const ultimoNoNivel: number[] = [];
+  let nivelAnterior = -1;
+  return linhas.map((linha, i) => {
+    // Nunca mais de um nível abaixo da linha de cima (já corrigida).
+    const nivel = Math.max(0, Math.min(linha.nivel, nivelAnterior + 1));
+    nivelAnterior = nivel;
+    ultimoNoNivel[nivel] = i;
+    ultimoNoNivel.length = nivel + 1;
+    return { texto: linha.texto, nota: linha.nota, pai: nivel === 0 ? -1 : ultimoNoNivel[nivel - 1] };
+  });
+}
+
+/** Fim (exclusivo) do bloco da linha `i`: ela e os filhos/netos abaixo. */
+function fimDoBloco(linhas: LinhaPrevia[], i: number): number {
+  let fim = i + 1;
+  while (fim < linhas.length && linhas[fim].nivel > linhas[i].nivel) fim += 1;
+  return fim;
+}
+
+/** Recuar (+1, vira filho do ramo de cima) ou avançar (-1, sobe um nível),
+ * levando os filhos junto. Devolve a mesma lista quando não dá. */
+export function mudarNivel(linhas: LinhaPrevia[], i: number, delta: 1 | -1): LinhaPrevia[] {
+  const linha = linhas[i];
+  if (!linha) return linhas;
+  const novo = linha.nivel + delta;
+  if (novo < 0 || (delta === 1 && (i === 0 || novo > linhas[i - 1].nivel + 1))) return linhas;
+  const fim = fimDoBloco(linhas, i);
+  return linhas.map((l, j) => (j >= i && j < fim ? { ...l, nivel: l.nivel + delta } : l));
+}
+
+/** Exclui a linha e tudo o que está dentro dela. */
+export function removerLinha(linhas: LinhaPrevia[], i: number): LinhaPrevia[] {
+  if (!linhas[i]) return linhas;
+  return [...linhas.slice(0, i), ...linhas.slice(fimDoBloco(linhas, i))];
 }
 
 /** Vários ramos no topo (planilha com várias abas, Markdown sem título

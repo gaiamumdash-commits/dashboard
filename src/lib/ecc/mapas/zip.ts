@@ -7,9 +7,35 @@ const ASSINATURA_FIM = 0x06054b50;
 const ASSINATURA_CENTRAL = 0x02014b50;
 const ASSINATURA_LOCAL = 0x04034b50;
 
+/** Teto do arquivo descompactado (proteção contra "zip bomb"): o
+ * content.json de um mapa de 500 ramos fica bem abaixo disso. */
+export const MAX_DESCOMPACTADO_ZIP = 20 * 1024 * 1024;
+
+const GRANDE_DEMAIS = "Esse arquivo .xmind é grande demais para importar.";
+
+/** Descompacta parando assim que passar do teto — não confia no tamanho
+ * declarado no cabeçalho do zip. */
 async function inflar(dados: Uint8Array): Promise<Uint8Array> {
-  const fluxo = new Blob([dados as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(fluxo).arrayBuffer());
+  const leitor = new Blob([dados as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate-raw")).getReader();
+  const pedacos: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await leitor.read();
+    if (done) break;
+    total += value.length;
+    if (total > MAX_DESCOMPACTADO_ZIP) {
+      await leitor.cancel();
+      throw new Error(GRANDE_DEMAIS);
+    }
+    pedacos.push(value);
+  }
+  const saida = new Uint8Array(total);
+  let posicao = 0;
+  for (const pedaco of pedacos) {
+    saida.set(pedaco, posicao);
+    posicao += pedaco.length;
+  }
+  return saida;
 }
 
 /** Conteúdo (texto UTF-8) do primeiro arquivo do zip cujo nome está em
@@ -50,8 +76,11 @@ export async function lerTextoDoZip(zip: ArrayBuffer, nomes: string[]): Promise<
   for (const nome of nomes) {
     const entrada = encontrados.get(nome);
     if (!entrada) continue;
-    if (visao.getUint32(entrada.local, true) !== ASSINATURA_LOCAL) throw new Error("Esse arquivo .xmind está corrompido.");
+    const corrompido = new Error("Esse arquivo .xmind está corrompido.");
+    if (entrada.local + 30 > bytes.length || visao.getUint32(entrada.local, true) !== ASSINATURA_LOCAL) throw corrompido;
     const inicio = entrada.local + 30 + visao.getUint16(entrada.local + 26, true) + visao.getUint16(entrada.local + 28, true);
+    if (entrada.tamanho > MAX_DESCOMPACTADO_ZIP) throw new Error(GRANDE_DEMAIS);
+    if (inicio + entrada.tamanho > bytes.length) throw corrompido;
     const comprimido = bytes.subarray(inicio, inicio + entrada.tamanho);
     let conteudo: Uint8Array;
     if (entrada.metodo === 0) conteudo = comprimido;
