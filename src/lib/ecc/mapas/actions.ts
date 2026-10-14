@@ -141,7 +141,7 @@ export async function importarMapa(dados: { titulo: unknown; notaCentral?: unkno
   if (!Array.isArray(dados?.itens)) return falha("Nada pra importar.");
   if (dados.itens.length > MAX_NOS_POR_MAPA - 1) return falha(`O mapa passa de ${MAX_NOS_POR_MAPA} ramos.`);
 
-  const itens: { texto: string; nota: string | null; pai: number; lado: 1 | -1 | null; cor: CorRamo | null }[] = [];
+  const itens: { texto: string; nota: string | null; pai: number; lado: 1 | -1 | null; cor: CorRamo | null; recolhido: boolean }[] = [];
   for (const [i, bruto] of dados.itens.entries()) {
     const n = (bruto ?? {}) as Record<string, unknown>;
     const texto = textoObrigatorio(n.texto, MAX_TEXTO_NO, "Texto do ramo");
@@ -151,7 +151,7 @@ export async function importarMapa(dados: { titulo: unknown; notaCentral?: unkno
     // Lado e cor são aparência: valor fora do esperado é ignorado, não barra a importação.
     const lado = pai === -1 && (n.lado === 1 || n.lado === -1) ? n.lado : null;
     const cor = CORES_RAMO.includes(n.cor as CorRamo) ? (n.cor as CorRamo) : null;
-    itens.push({ texto: texto.valor, nota: nota.valor, pai, lado, cor });
+    itens.push({ texto: texto.valor, nota: nota.valor, pai, lado, cor, recolhido: n.recolhido === true });
   }
 
   const { tenantId, supabase } = await contexto();
@@ -162,7 +162,9 @@ export async function importarMapa(dados: { titulo: unknown; notaCentral?: unkno
   const ids = itens.map(() => crypto.randomUUID());
   const ordemNoPai = new Map<number, number>();
   const linhas = [
-    { id: raizId, tenant_id: tenantId, mapa_id: mapa.id, pai_id: null, ordem: 0, texto: titulo.valor, nota: notaCentral.valor },
+    // Toda linha leva as mesmas colunas: num insert em lote, coluna que falta
+    // em uma linha vai como NULL (e `recolhido` é NOT NULL).
+    { id: raizId, tenant_id: tenantId, mapa_id: mapa.id, pai_id: null, ordem: 0, texto: titulo.valor, nota: notaCentral.valor, recolhido: false },
     ...itens.map((item, i) => {
       const ordem = (ordemNoPai.get(item.pai) ?? 0) + 1;
       ordemNoPai.set(item.pai, ordem);
@@ -174,13 +176,14 @@ export async function importarMapa(dados: { titulo: unknown; notaCentral?: unkno
         ordem,
         texto: item.texto,
         nota: item.nota,
+        recolhido: item.recolhido,
       };
     }),
   ];
   // Orientação do original (ex.: tudo à direita): se algum ramo principal
-  // trouxe lado, TODOS os principais ganham posição gravada nesse lado (sem
-  // lado = direita), empilhados como no layout automático. "Reorganizar"
-  // no editor volta ao equilibrado.
+  // trouxe lado e o layout automático não o poria lá, os principais ganham
+  // posição gravada nesse lado (sem lado = direita), com espaço reservado
+  // pra quando forem abertos. "Reorganizar" no editor volta ao equilibrado.
   const comLado = itens.some((item) => item.lado !== null);
   const posicoes = comLado
     ? posicoesDosPrincipais(

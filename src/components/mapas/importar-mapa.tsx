@@ -16,6 +16,7 @@ import {
   lerXMindXml,
   linhasParaItens,
   mudarNivel,
+  recolhidosIniciais,
   removerLinha,
   type LinhaPrevia,
   type RamoImportado,
@@ -112,6 +113,7 @@ export function FormularioImportarMapa({ aoSalvar }: { aoSalvar: () => void }) {
   const [titulo, setTitulo] = useState("");
   const [notaCentral, setNotaCentral] = useState<string | null>(null);
   const [cortados, setCortados] = useState(0);
+  const [abrirRecolhido, setAbrirRecolhido] = useState(true);
 
   async function escolher(arquivo: File | undefined) {
     if (!arquivo) return;
@@ -143,7 +145,13 @@ export function FormularioImportarMapa({ aoSalvar }: { aoSalvar: () => void }) {
     setErro(null);
     executar(
       async () => {
-        const r = await importarMapa({ titulo, notaCentral, itens: linhasParaItens(linhas) });
+        const itens = linhasParaItens(linhas);
+        const recolhidos = abrirRecolhido ? recolhidosIniciais(itens) : [];
+        const r = await importarMapa({
+          titulo,
+          notaCentral,
+          itens: itens.map((item, i) => (recolhidos[i] ? { ...item, recolhido: true } : item)),
+        });
         if (r.ok && r.id) router.push(`/mapas/${r.id}`);
         return r;
       },
@@ -234,6 +242,20 @@ export function FormularioImportarMapa({ aoSalvar }: { aoSalvar: () => void }) {
               </span>
             )}
           </div>
+          <label className="flex items-start gap-2 text-sm text-gaiamum-text">
+            <input
+              type="checkbox"
+              checked={abrirRecolhido}
+              onChange={(e) => setAbrirRecolhido(e.target.checked)}
+              className="mt-0.5 accent-[var(--gaiamum-primary)]"
+            />
+            <span>
+              Abrir só com os ramos principais
+              <span className="block text-xs text-gaiamum-text-muted">
+                O resto entra recolhido — toque no +N de um ramo para abrir, e no − para fechar de novo.
+              </span>
+            </span>
+          </label>
           <div className="flex gap-2">
             <button type="button" onClick={criar} disabled={pendente || !titulo.trim() || linhas.length === 0} className={CLASSE_BOTAO_PRIMARIO}>
               {pendente ? "Criando..." : "Criar mapa"}

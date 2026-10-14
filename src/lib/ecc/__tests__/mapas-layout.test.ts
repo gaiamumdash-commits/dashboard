@@ -183,6 +183,20 @@ describe("posicoesDosPrincipais (mapa importado com orientação do original)", 
     for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) expect(sobrepoem(lista[i], lista[j])).toBe(false);
   });
 
+  it("quando o automático já põe tudo no lado pedido (um único ramo à direita), não grava posição", () => {
+    const nos = [no("r", null, 0), no("data", "r", 1), no("a", "data", 1), no("b", "data", 2)];
+    expect(posicoesDosPrincipais(nos, new Map([["data", 1]])).size).toBe(0);
+  });
+
+  it("reserva o espaço do ramo aberto mesmo se ele entrar recolhido (abrir depois não sobrepõe)", () => {
+    const filhos = Array.from({ length: 8 }, (_, i) => no(`a${i}`, "a", i));
+    const base = [no("r", null, 0), no("a", "r", 1), ...filhos, no("b", "r", 2), no("c", "r", 3)];
+    const lados = new Map<string, 1 | -1>([["a", 1], ["b", 1], ["c", 1]]);
+    const aberto = posicoesDosPrincipais(base, lados);
+    const recolhido = posicoesDosPrincipais(base.map((n) => (n.id === "a" ? { ...n, recolhido: true } : n)), lados);
+    expect(recolhido).toEqual(aberto);
+  });
+
   it("lados misturados vão cada um pro seu lado; sem lado = direita", () => {
     const nos = [no("r", null, 0), no("a", "r", 1), no("b", "r", 2), no("c", "r", 3)];
     const pos = posicoesDosPrincipais(nos, new Map<string, 1 | -1>([["a", -1], ["c", 1]]));

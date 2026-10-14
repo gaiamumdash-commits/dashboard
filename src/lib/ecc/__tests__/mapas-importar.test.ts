@@ -8,6 +8,7 @@ import {
   lerMarkdown,
   lerXMindJson,
   lerXMindXml,
+  recolhidosIniciais,
   type RamoImportado,
 } from "@/lib/ecc/mapas/importar";
 import { lerTextoDoZip, MAX_DESCOMPACTADO_ZIP } from "@/lib/ecc/mapas/zip";
@@ -151,6 +152,20 @@ describe("arvoreParaMapa", () => {
     const m = arvoreParaMapa({ texto: "Grande", filhos });
     expect(m.itens).toHaveLength(MAX_NOS_POR_MAPA - 1);
     expect(m.cortados).toBe(11);
+  });
+});
+
+describe("recolhidosIniciais (abrir só com os ramos principais)", () => {
+  it("centro com um único filho (data): a cadeia fica aberta e os ramos principais aparecem fechados", () => {
+    // Centro → 13/10/26 → Produto(→ DHO60(→ prompt)), Anúncios(→ Drive), Plano
+    const m = arvoreParaMapa(lerMarkdown("# C\n- 13/10/26\n  - Produto\n    - DHO60\n      - prompt\n  - Anúncios\n    - Drive\n  - Plano"));
+    expect(m.itens.map((i) => i.texto)).toEqual(["13/10/26", "Produto", "DHO60", "prompt", "Anúncios", "Drive", "Plano"]);
+    expect(recolhidosIniciais(m.itens)).toEqual([false, true, true, false, true, false, false]);
+  });
+
+  it("centro com vários ramos: todos à mostra e fechados; folhas nunca recolhem", () => {
+    const m = arvoreParaMapa(lerMarkdown("# C\n- A\n  - A1\n- B"));
+    expect(recolhidosIniciais(m.itens)).toEqual([true, false, false]);
   });
 });
 

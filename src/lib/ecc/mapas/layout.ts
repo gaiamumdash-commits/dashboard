@@ -146,9 +146,16 @@ export function posicoesDosPrincipais(nos: NoParaLayout[], ladoDe: Map<string, 1
   const raiz = nos.find((n) => n.pai_id === null);
   const posicoes = new Map<string, { x: number; y: number }>();
   if (!raiz) return posicoes;
-  const semManual = nos.map((n) => ({ ...n, pos_x: null, pos_y: null }));
-  const { filhosVisiveis, empilhar } = medirArvore(semManual, semManual.find((n) => n.id === raiz.id)!);
+  // Medido com tudo ABERTO: a faixa de cada ramo já reserva o espaço de
+  // quando a pessoa expandir (posição gravada não se reorganiza sozinha).
+  const semManual = nos.map((n) => ({ ...n, pos_x: null, pos_y: null, recolhido: false }));
+  const { faixa, filhosVisiveis, empilhar } = medirArvore(semManual, semManual.find((n) => n.id === raiz.id)!);
   const principais = filhosVisiveis(raiz.id);
+  // Se o layout automático já põe cada ramo no lado pedido (ex.: um único
+  // ramo principal, que vai pra direita), não grava nada: o mapa continua
+  // 100% automático e se reorganiza ao abrir/recolher.
+  const automaticos = dividirLados(principais.map((f) => faixa.get(f.id)!));
+  if (principais.every((f, i) => (ladoDe.get(f.id) ?? 1) === automaticos[i])) return posicoes;
   for (const lado of [1, -1] as const) {
     const lista = principais.filter((f) => (ladoDe.get(f.id) ?? 1) === lado);
     for (const [id, r] of empilhar(raiz, lista, lado)) posicoes.set(id, { x: r.rx, y: r.ry });

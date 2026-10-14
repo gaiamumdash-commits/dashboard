@@ -862,6 +862,7 @@ export function EditorMapa({
                 selecionado={selecionado === c.id}
                 editando={editando === c.id}
                 ocultos={porId.get(c.id)?.recolhido ? contarDescendentes(filhos, c.id) : 0}
+                podeRecolher={Boolean(porId.get(c.id)?.pai_id) && (filhos.get(c.id) ?? []).length > 0 && rascunho?.paiId !== c.id}
                 somenteLeitura={somenteLeitura}
                 aoExpandir={() => alternarRecolhido(c.id)}
                 aoNovoFilho={() => novoFilho(c.id)}
@@ -1134,6 +1135,7 @@ function Ramo({
   selecionado,
   editando,
   ocultos,
+  podeRecolher,
   somenteLeitura,
   cor,
   sublinhado,
@@ -1151,6 +1153,8 @@ function Ramo({
   selecionado: boolean;
   editando: boolean;
   ocultos: number;
+  /** Ramo (não a ideia central) com algo dentro — pode ser recolhido. */
+  podeRecolher: boolean;
   somenteLeitura: boolean;
   cor: string;
   sublinhado: boolean;
@@ -1210,6 +1214,23 @@ function Ramo({
           </span>
         )}
       </div>
+
+      {/* Bolinha de recolher na ponta de onde saem as linhas (como nos apps
+          de mapa mental): só em ramo aberto que tem algo dentro. Recolhido,
+          vira o "+N" abaixo. A ideia central não recolhe. */}
+      {podeRecolher && ocultos === 0 && !editando && (
+        <button
+          type="button"
+          data-sem-gesto
+          onClick={aoExpandir}
+          aria-label={`Recolher ${texto}`}
+          title="Recolher"
+          className="absolute flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full border-2 bg-gaiamum-surface text-[11px] font-bold leading-none text-gaiamum-text-muted hover:text-gaiamum-text"
+          style={{ borderColor: cor, [lado === 1 ? "right" : "left"]: -9, top: sublinhado ? "100%" : "50%" }}
+        >
+          −
+        </button>
+      )}
 
       {ocultos > 0 && (
         <button

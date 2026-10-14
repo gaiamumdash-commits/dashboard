@@ -105,6 +105,24 @@ export function linhasParaItens(linhas: LinhaPrevia[]): ItemImportado[] {
   });
 }
 
+/** "Abrir só com os ramos principais": quais itens já entram recolhidos.
+ * Os ramos principais ficam à mostra e todo ramo que tem algo dentro
+ * entra fechado — a pessoa vai abrindo um nível de cada vez. Se a ideia
+ * central tem um único filho (ex.: uma data no meio do caminho), essa
+ * cadeia fica aberta até o primeiro ramo que se divide, pra os ramos
+ * principais "de verdade" aparecerem. */
+export function recolhidosIniciais(itens: Pick<ItemImportado, "pai">[]): boolean[] {
+  const filhos = new Map<number, number[]>();
+  itens.forEach((item, i) => filhos.set(item.pai, [...(filhos.get(item.pai) ?? []), i]));
+  const abertos = new Set<number>();
+  let nivel = filhos.get(-1) ?? [];
+  while (nivel.length === 1 && (filhos.get(nivel[0]) ?? []).length > 0) {
+    abertos.add(nivel[0]);
+    nivel = filhos.get(nivel[0])!;
+  }
+  return itens.map((_, i) => (filhos.get(i) ?? []).length > 0 && !abertos.has(i));
+}
+
 /** Fim (exclusivo) do bloco da linha `i`: ela e os filhos/netos abaixo. */
 function fimDoBloco(linhas: LinhaPrevia[], i: number): number {
   let fim = i + 1;
