@@ -10,7 +10,43 @@
 
 ---
 
-## Estado confirmado (2026-10-10, sessão #76 — última atualização)
+## Estado confirmado (2026-10-14, sessão #77 — última atualização)
+
+**Resumo em uma linha**: **Importar mapa mental** (XMind, .mm, Markdown/TXT e foto/PDF via Gemini) com reprodução fiel do original, **recolher/expandir pela bolinha "−"/"+N"** em todos os mapas, e o **Google Agenda migrado** para o projeto Google Cloud "Gaiamum Dashboard" (em produção, verificação do Google enviada). **Tudo publicado e APROVADO pelo Fabio** (último commit `d0a2e03`). Nenhuma migration nova. Nada pendente no git além de 3 arquivos soltos que não são desta sessão.
+
+- **Esposa do Fabio "bloqueada" (`apiovesan34@gmail.com`)**: no Gaiamum ela já estava liberada (allowlist e workspace próprio). O bloqueio era do **Google**: "Acesso bloqueado… Erro 403 access_denied" ao conectar o Google Agenda, porque o client do Agenda (`62144459925-…`) estava num projeto Google Cloud de **outra conta Google**, em modo Teste. Esse projeto não foi encontrado nesta conta ("Gaiamum Dashboard" = 418566369337, "Default Gemini Project" = 956411528542).
+  - **Solução**: novo client "Gaiamum Calendar" criado no **Gaiamum Dashboard**, que já estava "Em produção" e com a marca verificada.
+  - `GOOGLE_CALENDAR_CLIENT_ID/SECRET` trocados na Vercel e redeploy feito.
+  - Quem já tinha o Agenda conectado precisou reconectar (era só 1 conexão).
+  - O login com Google continua no client `997236353692-…`.
+- **Verificação OAuth do escopo sensível `calendar.events`**: enviada pelo Fabio em 14/10.
+  - Domínio `gaiamum.com.br` verificado no Search Console (registro TXT no Registro.br; **não apagar**).
+  - Escopos declarados: `openid`, `userinfo.email` e `calendar.events`.
+  - Vídeo não listado: https://www.youtube.com/watch?v=Ze6Y2GdrPFI
+  - **Conta de teste para os revisores**: `google-review@gaiamum.com.br` (Supabase, liberada no cadastro fechado; a senha está só no formulário enviado ao Google, nunca no repositório). **Apagar quando o Google aprovar.**
+  - Resposta vem em `gaiamumdash@gmail.com`. Até lá, quem conecta vê o alerta "app não verificado" e passa clicando em "Avançado" (limite de 100 usuários).
+  - E-mail liberado no cadastro fechado só para gravar o vídeo: `carreirasmulvi@gmail.com`.
+- **`/auth`** (`a8bebc6`), que é a página inicial cadastrada no Google: ganhou um rodapé com a descrição do app e links para `/privacidade` e `/termos`, que o Google exige.
+- **`/acesso-restrito`** (`a8bebc6`): deixou de ser estática. Quem tem membership ou allowlist, ou chega com o cadastro aberto, é mandado para `/`.
+- **`GEMINI_API_KEY` não existia na Vercel** (nenhum ambiente). Por isso a transcrição de voz, a explicação do Alinhamento e o planejamento com IA estavam quebrados em produção.
+  - Copiada do `.env.local` para **Production**. É uma chave **gratuita** do AI Studio, sem faturamento. **Decisão do Fabio: não pagar IA no piloto.**
+  - O Google pode usar os dados do plano gratuito para treinar modelos. O Fabio foi avisado.
+  - `ErroConfiguracaoIA` (`gemini.ts`): o nome da variável aparece só no log do servidor; o usuário vê "recursos de IA indisponíveis".
+- **Importar mapa** (`a558c40`, `70ed3dd`, `1391067`, `d0a2e03`), com o botão "Importar" na lista de mapas:
+  - **Formatos**: XMind (zip lido no navegador com `DecompressionStream`, teto de 20 MB descompactado), .mm (`POSITION` vira o lado), Markdown/TXT (títulos e recuo viram níveis). Notas dos ramos vêm junto.
+  - **Foto/PDF**: `lerMapaDeArquivoComIA` confere o tipo pela **assinatura dos bytes**, aplica o rate limit de IA e chama o Gemini **`gemini-flash-latest`** com JSON schema (id, pai, texto, lado, cor, incerto), `thinkingBudget` 4096 e timeout de 110 s. Se o flash der 503, cai no lite.
+  - `validarMapaDaIA` exige um único centro, ids únicos, nenhum pai inexistente, nenhum ciclo, até 500 ramos, profundidade de no máximo 30 e texto de 1 a 200 caracteres.
+  - `maxDuration = 120` em `/mapas`. A foto é reduzida no navegador por causa do limite de ~4,5 MB da Vercel.
+  - **Testado com o mapa real do Fabio (105 nós)**: o flash-lite errava a hierarquia; o flash acertou a raiz, o nó intermediário "13/10/26", os 6 ramos, o lado e as cores (~50 s).
+  - **Prévia editável**: corrigir texto, ← → mudam o nível com os filhos, ✕ exclui; ⚠️ marca leitura incerta. Nada é gravado antes de "Criar mapa".
+  - **`importarMapa`**: insere tudo de uma vez e, se falhar, apaga o mapa. Grava `cor` e `recolhido`. Grava `pos_x/pos_y` dos ramos principais **só se** o layout automático não os puser no lado do original (`posicoesDosPrincipais` em `layout.ts`, medido com tudo aberto).
+  - Opção **"Abrir só com os ramos principais"**, marcada por padrão (`recolhidosIniciais`).
+- **Editor de mapa**: bolinha **"−"** na ponta de todo ramo aberto com filhos (recolhe) e, recolhido, "+N" (abre). Vale para todos os mapas. Aprovado pelo Fabio.
+- **Testes**: 382 unitários, com o Gemini sempre simulado. `tsc`, `eslint` e `next build` limpos.
+- **Arquivos soltos no repositório**: `src/app/rescue.ts`, `src/app/phase4.test.ts` e `src/app/plan.test.ts` não são desta sessão e não foram commitados. Os dois de teste estão vazios e aparecem como "2 failed" na suíte; perguntar ao Fabio antes de apagar.
+- **Publicação nesta máquina**: o `gh` ativo é `unamenteapp-dev`, sem permissão no repositório do Gaiamum. O push foi feito com `gh auth switch -u gaiamumdash-commits` + `AIOX_ACTIVE_AGENT=devops git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main` e, depois, volta para `unamenteapp-dev`. **Pegadinha**: `Get-Content -Raw | Set-Content` no PowerShell 5.1 corrompe os acentos (leitura ANSI); editar arquivos só com a ferramenta de edição.
+
+## Estado confirmado (2026-10-10, sessão #76)
 
 **Resumo em uma linha**: **Gaiamum sem pendências abertas.** O Mapa mental V1 está completo, com o compartilhamento; o e-mail sai do domínio próprio e a suíte de RLS rodou inteira (99/99). **Nada pendente no git** (último commit `9ad5a19`, publicado). Migrations **até a 0063 aplicadas em produção** e conferidas. O Fabio vai voltar a trabalhar no **Unamente** (`Documents\unamente`).
 
@@ -1628,6 +1664,10 @@ Registrado porque muda como priorizar qualquer decisão daqui pra frente, não s
 ---
 
 ## Checkpoints
+
+### 2026-10-14 (sessão #77) — Importar mapa mental (arquivo e foto/PDF), recolher/expandir e Google Agenda no projeto certo
+
+O bloqueio da esposa era do Google: o client do Agenda estava num projeto em modo Teste, de outra conta Google. O Agenda foi movido para o "Gaiamum Dashboard", e a verificação OAuth foi enviada, com vídeo e conta de teste. A `GEMINI_API_KEY` (gratuita) foi para Production. A importação de mapas reproduz o original, com prévia editável e opção de abrir recolhido. O editor ganhou a bolinha "−"/"+N". Tudo publicado e aprovado; último commit `d0a2e03`. Pendente: aguardar o Google aprovar e então apagar `google-review@gaiamum.com.br`; decidir sobre os 3 arquivos soltos.
 
 ### 2026-10-10 (sessão #76) — Compartilhar mapa (0063), remetente Resend e suíte de RLS 99/99; Gaiamum sem pendências
 
