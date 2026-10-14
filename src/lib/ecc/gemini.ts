@@ -115,6 +115,42 @@ export async function transcreverAudioComGemini(audioBase64: string, mimeType: s
   };
 }
 
+/** Lê um mapa mental de uma foto ou PDF e devolve como tópicos em Markdown
+ * (`# ideia central` + `- ramo` com 2 espaços por nível) — o mesmo formato
+ * que a importação de .md já entende (`lerMarkdown`), então a resposta da
+ * IA passa pelo parser determinístico e pelas validações de sempre. */
+export async function lerMapaMentalComGemini(arquivoBase64: string, mimeType: string): Promise<ResultadoGeracaoIA> {
+  const ai = obterClient();
+  const parteArquivo = createPartFromBase64(arquivoBase64, mimeType);
+  const prompt =
+    "Este arquivo contém um mapa mental (pode ser foto de papel, quadro ou print de outro app). " +
+    "Transcreva TODOS os textos do mapa mantendo a hierarquia exata dos ramos, no idioma original, sem resumir, " +
+    "sem traduzir e sem inventar nada. Responda SOMENTE em Markdown neste formato:\n" +
+    "# Ideia central\n- Ramo principal\n  - Sub-ramo\n    - Sub-sub-ramo\n" +
+    "Use 2 espaços de recuo por nível. Uma ideia por linha. Ramos principais na ordem do relógio, começando do topo. " +
+    "Se não houver mapa mental no arquivo, responda apenas: SEM_MAPA";
+
+  const response = await ai.models.generateContent({
+    model: MODELO_GEMINI_PADRAO,
+    contents: [{ role: "user", parts: [{ text: prompt }, parteArquivo] }],
+  });
+
+  if (!response.text) {
+    throw new Error("O Gemini não devolveu nada ao ler o arquivo.");
+  }
+
+  return {
+    texto: response.text.trim(),
+    provedor: "gemini",
+    modelo: MODELO_GEMINI_PADRAO,
+    uso: {
+      promptTokens: response.usageMetadata?.promptTokenCount,
+      candidatesTokens: response.usageMetadata?.candidatesTokenCount,
+      totalTokens: response.usageMetadata?.totalTokenCount,
+    },
+  };
+}
+
 /** Mensagem amigável pro usuário a partir de uma exceção do SDK — cadeia
  * mais-específico-primeiro, mesmo espírito de `mensagemDeErroIA` em `ia.ts`. */
 export function mensagemDeErroGemini(erro: unknown): string {

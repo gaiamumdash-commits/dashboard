@@ -128,6 +128,60 @@ export async function criarMapa(formData: FormData): Promise<ResultadoMapa> {
   return resultado(null, "", mapa.id);
 }
 
+/** Mapa importado (XMind, .mm, Markdown, foto/PDF lida pela IA) vira um
+ * mapa novo, igual a um criado aqui: ideia central + ramos com nota. O
+ * navegador manda a árvore já achatada (`arvoreParaMapa`); aqui tudo é
+ * revalidado — texto, nota, limites e `pai` sempre apontando pra trás. */
+export async function importarMapa(dados: { titulo: unknown; notaCentral?: unknown; itens: unknown }): Promise<ResultadoMapa> {
+  const titulo = textoObrigatorio(typeof dados?.titulo === "string" ? dados.titulo.slice(0, MAX_TEXTO_NO) : dados?.titulo, MAX_TEXTO_NO, "Ideia central");
+  if (!titulo.ok) return falha(titulo.erro);
+  const notaCentral = textoOpcional(dados?.notaCentral ?? "", MAX_NOTA_NO, "Nota");
+  if (!notaCentral.ok) return falha(notaCentral.erro);
+  if (!Array.isArray(dados?.itens)) return falha("Nada pra importar.");
+  if (dados.itens.length > MAX_NOS_POR_MAPA - 1) return falha(`O mapa passa de ${MAX_NOS_POR_MAPA} ramos.`);
+
+  const itens: { texto: string; nota: string | null; pai: number }[] = [];
+  for (const [i, bruto] of dados.itens.entries()) {
+    const n = (bruto ?? {}) as Record<string, unknown>;
+    const texto = textoObrigatorio(n.texto, MAX_TEXTO_NO, "Texto do ramo");
+    const nota = textoOpcional(n.nota ?? "", MAX_NOTA_NO, "Nota");
+    const pai = typeof n.pai === "number" && Number.isInteger(n.pai) && n.pai >= -1 && n.pai < i ? n.pai : null;
+    if (!texto.ok || !nota.ok || pai === null) return falha("O arquivo importado tem ramos inválidos.");
+    itens.push({ texto: texto.valor, nota: nota.valor, pai });
+  }
+
+  const { tenantId, supabase } = await contexto();
+  const { data: mapa, error } = await supabase.from("mapas").insert({ tenant_id: tenantId, titulo: titulo.valor }).select("id").single();
+  if (error || !mapa) return resultado(error ?? { message: "sem id" }, "Não foi possível importar o mapa.");
+
+  const raizId = crypto.randomUUID();
+  const ids = itens.map(() => crypto.randomUUID());
+  const ordemNoPai = new Map<number, number>();
+  const linhas = [
+    { id: raizId, tenant_id: tenantId, mapa_id: mapa.id, pai_id: null, ordem: 0, texto: titulo.valor, nota: notaCentral.valor },
+    ...itens.map((item, i) => {
+      const ordem = (ordemNoPai.get(item.pai) ?? 0) + 1;
+      ordemNoPai.set(item.pai, ordem);
+      return {
+        id: ids[i],
+        tenant_id: tenantId,
+        mapa_id: mapa.id,
+        pai_id: item.pai === -1 ? raizId : ids[item.pai],
+        ordem,
+        texto: item.texto,
+        nota: item.nota,
+      };
+    }),
+  ];
+  // Um insert só, pai sempre antes do filho (mesma ordem de `restaurarRamos`).
+  const { error: erroRamos } = await supabase.from("mapa_nos").insert(linhas);
+  if (erroRamos) {
+    await supabase.from("mapas").delete().eq("id", mapa.id).eq("tenant_id", tenantId);
+    return resultado(erroRamos, "Não foi possível importar o mapa.");
+  }
+  return resultado(null, "", mapa.id);
+}
+
 export async function excluirMapa(mapaId: string): Promise<ResultadoMapa> {
   const id = lerId(mapaId);
   if (!id) return falha("Mapa inválido.");

@@ -10,8 +10,10 @@ import { BotaoDialogo } from "@/components/planner/botao-dialogo";
 import { useAcaoPlanner } from "@/components/planner/uso-acao";
 import {
   CLASSE_BOTAO_PRIMARIO,
+  CLASSE_BOTAO_SECUNDARIO,
   CLASSE_CAMPO,
 } from "@/components/planner/estilos";
+import { FormularioImportarMapa } from "@/components/mapas/importar-mapa";
 
 function quando(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", {
@@ -150,13 +152,22 @@ export function ListaMapas({
           </div>
         </div>
         {!indisponivel && (
-          <BotaoDialogo
-            titulo="Novo mapa"
-            className={CLASSE_BOTAO_PRIMARIO}
-            rotulo="+ Novo mapa"
-          >
-            {(fechar) => <FormularioNovoMapa aoSalvar={fechar} />}
-          </BotaoDialogo>
+          <div className="flex gap-2">
+            <BotaoDialogo
+              titulo="Importar mapa"
+              className={CLASSE_BOTAO_SECUNDARIO}
+              rotulo="Importar"
+            >
+              {(fechar) => <FormularioImportarMapa aoSalvar={fechar} />}
+            </BotaoDialogo>
+            <BotaoDialogo
+              titulo="Novo mapa"
+              className={CLASSE_BOTAO_PRIMARIO}
+              rotulo="+ Novo mapa"
+            >
+              {(fechar) => <FormularioNovoMapa aoSalvar={fechar} />}
+            </BotaoDialogo>
+          </div>
         )}
       </div>
 
@@ -175,7 +186,8 @@ export function ListaMapas({
           <p className="font-medium text-gaiamum-text">Nenhum mapa ainda.</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-gaiamum-text-muted">
             Comece com a ideia central — um projeto, uma viagem, um estudo. Se
-            já tiver as ideias numa lista (WhatsApp, Notas), é só colar.
+            já tiver as ideias numa lista (WhatsApp, Notas), é só colar. Mapa
+            feito em outro app (XMind, MindMeister) ou no papel? Use Importar.
           </p>
         </div>
       ) : (
